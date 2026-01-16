@@ -22,8 +22,11 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   // Estados auxiliares form
   const [tempMatId, setTempMatId] = useState('');
   const [tempMatQty, setTempMatQty] = useState('');
+  const [tempMatCost, setTempMatCost] = useState(''); // Estado para custo manual
+
   const [tempSrvId, setTempSrvId] = useState('');
   const [tempSrvHrs, setTempSrvHrs] = useState('');
+  const [tempSrvCost, setTempSrvCost] = useState(''); // Estado para custo manual
 
   const [formProject, setFormProject] = useState<Partial<Project>>({
     category: Category.ENGINEERING,
@@ -69,16 +72,51 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     setShowModal(true);
   };
 
-  const addPlannedMaterial = () => {
-    if(!tempMatId || !tempMatQty) return;
-    const current = formProject.plannedMaterials || [];
-    const existing = current.find(m => m.materialId === tempMatId);
-    if(existing) {
-        setFormProject({ ...formProject, plannedMaterials: current.map(m => m.materialId === tempMatId ? { ...m, quantity: m.quantity + Number(tempMatQty) } : m) });
+  // Handlers para seleção de material/serviço populando o custo padrão
+  const handleMaterialSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const mId = e.target.value;
+    setTempMatId(mId);
+    if (mId) {
+        const mat = materials.find(m => m.id === mId);
+        if (mat) setTempMatCost(mat.unitCost.toString());
     } else {
-        setFormProject({ ...formProject, plannedMaterials: [...current, { materialId: tempMatId, quantity: Number(tempMatQty) }] });
+        setTempMatCost('');
     }
-    setTempMatId(''); setTempMatQty('');
+  };
+
+  const handleServiceSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sId = e.target.value;
+    setTempSrvId(sId);
+    if (sId) {
+        const srv = services.find(s => s.id === sId);
+        if (srv) setTempSrvCost(srv.unitValue.toString());
+    } else {
+        setTempSrvCost('');
+    }
+  };
+
+  const addPlannedMaterial = () => {
+    if(!tempMatId || !tempMatQty || !tempMatCost) return;
+    const current = formProject.plannedMaterials || [];
+    const cost = Number(tempMatCost);
+    const qty = Number(tempMatQty);
+
+    const existingIndex = current.findIndex(m => m.materialId === tempMatId);
+    
+    let updatedMaterials;
+    if(existingIndex >= 0) {
+        updatedMaterials = [...current];
+        updatedMaterials[existingIndex] = {
+            ...updatedMaterials[existingIndex],
+            quantity: updatedMaterials[existingIndex].quantity + qty,
+            unitCost: cost // Atualiza o custo se re-adicionar
+        };
+    } else {
+        updatedMaterials = [...current, { materialId: tempMatId, quantity: qty, unitCost: cost }];
+    }
+    
+    setFormProject({ ...formProject, plannedMaterials: updatedMaterials });
+    setTempMatId(''); setTempMatQty(''); setTempMatCost('');
   };
 
   const removePlannedMaterial = (id: string) => {
@@ -86,15 +124,27 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   };
 
   const addPlannedService = () => {
-    if(!tempSrvId || !tempSrvHrs) return;
+    if(!tempSrvId || !tempSrvHrs || !tempSrvCost) return;
     const current = formProject.plannedServices || [];
-    const existing = current.find(s => s.serviceTypeId === tempSrvId);
-    if(existing) {
-        setFormProject({ ...formProject, plannedServices: current.map(s => s.serviceTypeId === tempSrvId ? { ...s, hours: s.hours + Number(tempSrvHrs) } : s) });
+    const cost = Number(tempSrvCost);
+    const hrs = Number(tempSrvHrs);
+
+    const existingIndex = current.findIndex(s => s.serviceTypeId === tempSrvId);
+
+    let updatedServices;
+    if(existingIndex >= 0) {
+        updatedServices = [...current];
+        updatedServices[existingIndex] = {
+            ...updatedServices[existingIndex],
+            hours: updatedServices[existingIndex].hours + hrs,
+            unitCost: cost
+        };
     } else {
-        setFormProject({ ...formProject, plannedServices: [...current, { serviceTypeId: tempSrvId, hours: Number(tempSrvHrs) }] });
+        updatedServices = [...current, { serviceTypeId: tempSrvId, hours: hrs, unitCost: cost }];
     }
-    setTempSrvId(''); setTempSrvHrs('');
+
+    setFormProject({ ...formProject, plannedServices: updatedServices });
+    setTempSrvId(''); setTempSrvHrs(''); setTempSrvCost('');
   };
 
   const removePlannedService = (id: string) => {
@@ -157,18 +207,17 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
 
   // --- PDF GENERATION LOGIC ---
   const generateProjectDetailPDF = (project: Project) => {
+    // ... [Mantido igual ao original]
     const doc = new jsPDF();
     const costs = calculateProjectCosts(project, oss, materials, services);
 
-    // Header
-    doc.setFillColor(71, 122, 127); // Brand Primary Color
+    doc.setFillColor(71, 122, 127);
     doc.rect(0, 0, 210, 20, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("FICHA TÉCNICA DE PROJETO (CAPEX)", 14, 13);
     
-    // Project Info
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -176,7 +225,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     let yPos = 30;
     doc.text(`Código: ${project.code}`, 14, yPos);
     doc.text(`Status: ${project.status}`, 120, yPos);
-    
     yPos += 6;
     doc.text(`Descrição:`, 14, yPos);
     doc.setFont("helvetica", "normal");
@@ -199,13 +247,11 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     doc.text(`Responsável: ${project.responsible || '-'} | Centro de Custo: ${project.costCenter || '-'}`, 14, yPos);
     yPos += 6;
     doc.text(`Datas: Início ${formatDate(project.startDate)} | Fim Est. ${formatDate(project.estimatedEndDate)}`, 14, yPos);
-    
     yPos += 10;
     doc.setDrawColor(200, 200, 200);
     doc.line(14, yPos, 196, yPos);
     yPos += 10;
 
-    // Financial Summary
     doc.setFontSize(11);
     doc.setTextColor(71, 122, 127);
     doc.text("RESUMO FINANCEIRO", 14, yPos);
@@ -228,7 +274,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // Materials Table
     doc.text("PLANEJAMENTO DE MATERIAIS (FÍSICO)", 14, yPos);
     yPos += 5;
     
@@ -256,7 +301,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
 
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // Services Table
     doc.text("PLANEJAMENTO DE SERVIÇOS (HH)", 14, yPos);
     yPos += 5;
 
@@ -286,12 +330,13 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
 
   // --- LIST EXPORT FUNCTIONS ---
   const exportToCSV = () => {
+    // ... [Mantido igual]
     const headers = ['Código', 'Descrição', 'Status', 'Cidade', 'Responsável', 'Budget (R$)', 'Realizado (R$)', 'Início', 'Fim Estimado'];
     const rows = filteredProjects.map(p => {
         const costs = calculateProjectCosts(p, oss, materials, services);
         return [
             p.code,
-            `"${p.description}"`, // Escape para descrições com vírgula
+            `"${p.description}"`,
             p.status,
             p.city,
             p.responsible,
@@ -312,6 +357,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   };
 
   const exportToPDF = () => {
+     // ... [Mantido igual]
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.text("Relatório de Projetos - Crop Service", 14, 15);
     doc.setFontSize(10);
@@ -337,7 +383,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
         body: tableRows,
         startY: 30,
         styles: { fontSize: 8 },
-        headStyles: { fillColor: [71, 122, 127] } // clean-primary color approx
+        headStyles: { fillColor: [71, 122, 127] }
     });
 
     doc.save(`projetos_export_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -379,20 +425,12 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
         {filteredProjects.map(p => {
           const costs = calculateProjectCosts(p, oss, materials, services);
           const projectOSs = oss.filter(o => o.projectId === p.id);
-          
-          // Definição de Totais e Filtragem
-          // Total de OSs inclui todas (Abertas, Pausadas, Concluídas, Canceladas) para visão global de volume
           const totalOSs = projectOSs.length;
           const activeOSs = projectOSs.filter(o => o.status !== OSStatus.CANCELED);
           const delayedOSCount = activeOSs.filter(o => o.status !== OSStatus.COMPLETED && new Date(o.limitDate) < new Date()).length;
-          
-          // Cálculo Financeiro
           const budgetPercent = p.estimatedValue > 0 ? (costs.totalReal / p.estimatedValue) * 100 : 0;
-          
-          // Cálculo Físico: (OSs Concluídas / Total de OSs vinculadas ao projeto) * 100
           const completedOSs = projectOSs.filter(o => o.status === OSStatus.COMPLETED).length;
           const executionPercent = totalOSs > 0 ? (completedOSs / totalOSs) * 100 : 0;
-
           const today = new Date();
           const diffDays = Math.ceil((new Date(p.estimatedEndDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
           
@@ -435,7 +473,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                         <p className={`font-bold ${diffDays < 0 ? 'text-red-700' : 'text-slate-800'}`}>{diffDays < 0 ? `Atrasado ${Math.abs(diffDays)}d` : `${diffDays} dias`}</p>
                     </div>
                     
-                    {/* Barra de Progresso Físico */}
                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                         <div className="flex justify-between items-end mb-1">
                             <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Execução <span className="font-medium opacity-80 ml-1">({completedOSs}/{totalOSs})</span></span>
@@ -446,7 +483,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                         </div>
                     </div>
 
-                    {/* Barra de Progresso Financeiro */}
                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
                         <div className="flex justify-between items-end mb-1">
                             <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Financeiro</span>
@@ -468,6 +504,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       </div>
 
       {showCostDetail && (
+        // ... [Detail Modal mantido igual]
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col animate-in zoom-in duration-200">
              <div className="p-8 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
@@ -483,7 +520,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                 </div>
              </div>
              <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                {/* Tabelas de comparativo */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="border border-slate-200 rounded-xl p-6 shadow-sm">
                         <h4 className="text-sm font-bold text-slate-900 uppercase mb-5 border-b border-slate-200 pb-3 flex items-center gap-2"><i className="fas fa-cubes text-slate-500"></i> Materiais (Plan x Real)</h4>
@@ -593,18 +629,20 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                         
                         <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-inner">
                              <div className="flex justify-between text-base mb-3 font-bold text-slate-800"><span>Materiais</span> <span className="text-clean-primary">Total: R$ {formatCurrency(plannedCosts.matCost)}</span></div>
-                             <div className="flex gap-3 mb-4">
-                                <select className="flex-1 h-12 px-3 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm" value={tempMatId} onChange={e => setTempMatId(e.target.value)}>
+                             <div className="flex gap-2 mb-4">
+                                <select className="flex-1 h-12 px-3 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm" value={tempMatId} onChange={handleMaterialSelect}>
                                     <option value="">Selecione Material...</option>
                                     {materials.map(m => <option key={m.id} value={m.id}>{m.description}</option>)}
                                 </select>
-                                <input type="number" className="w-24 h-12 px-3 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm" placeholder="Qtd" value={tempMatQty} onChange={e => setTempMatQty(e.target.value)} />
-                                <button type="button" onClick={addPlannedMaterial} className="h-12 px-5 bg-slate-800 hover:bg-slate-900 rounded-lg text-white shadow-sm transition-colors"><i className="fas fa-plus"></i></button>
+                                <input type="number" className="w-20 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="Qtd" value={tempMatQty} onChange={e => setTempMatQty(e.target.value)} />
+                                <input type="number" className="w-24 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="R$ Unit" value={tempMatCost} onChange={e => setTempMatCost(e.target.value)} />
+                                <button type="button" onClick={addPlannedMaterial} className="h-12 px-4 bg-slate-800 hover:bg-slate-900 rounded-lg text-white shadow-sm transition-colors"><i className="fas fa-plus"></i></button>
                              </div>
                              <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
                                 {formProject.plannedMaterials?.map((pm, i) => (
                                     <div key={i} className="flex justify-between items-center text-sm bg-white p-3 border border-slate-200 rounded-lg shadow-sm">
                                         <span className="truncate flex-1 font-bold text-slate-800">{materials.find(m => m.id === pm.materialId)?.description}</span>
+                                        <span className="mx-2 text-slate-500 text-xs">R$ {pm.unitCost}</span>
                                         <span className="font-bold mx-3 bg-slate-100 px-2 py-1 rounded text-slate-700 border border-slate-200">{pm.quantity} un</span>
                                         <button type="button" onClick={() => removePlannedMaterial(pm.materialId)} className="text-red-500 hover:text-red-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"><i className="fas fa-trash"></i></button>
                                     </div>
@@ -614,18 +652,20 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
 
                         <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-inner">
                              <div className="flex justify-between text-base mb-3 font-bold text-slate-800"><span>Serviços (HH)</span> <span className="text-clean-primary">Total: R$ {formatCurrency(plannedCosts.srvCost)}</span></div>
-                             <div className="flex gap-3 mb-4">
-                                <select className="flex-1 h-12 px-3 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm" value={tempSrvId} onChange={e => setTempSrvId(e.target.value)}>
+                             <div className="flex gap-2 mb-4">
+                                <select className="flex-1 h-12 px-3 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm" value={tempSrvId} onChange={handleServiceSelect}>
                                     <option value="">Selecione Serviço...</option>
                                     {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
-                                <input type="number" className="w-24 h-12 px-3 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm" placeholder="Hrs" value={tempSrvHrs} onChange={e => setTempSrvHrs(e.target.value)} />
-                                <button type="button" onClick={addPlannedService} className="h-12 px-5 bg-slate-800 hover:bg-slate-900 rounded-lg text-white shadow-sm transition-colors"><i className="fas fa-plus"></i></button>
+                                <input type="number" className="w-20 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="Hrs" value={tempSrvHrs} onChange={e => setTempSrvHrs(e.target.value)} />
+                                <input type="number" className="w-24 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="R$ Unit" value={tempSrvCost} onChange={e => setTempSrvCost(e.target.value)} />
+                                <button type="button" onClick={addPlannedService} className="h-12 px-4 bg-slate-800 hover:bg-slate-900 rounded-lg text-white shadow-sm transition-colors"><i className="fas fa-plus"></i></button>
                              </div>
                              <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
                                 {formProject.plannedServices?.map((ps, i) => (
                                     <div key={i} className="flex justify-between items-center text-sm bg-white p-3 border border-slate-200 rounded-lg shadow-sm">
                                         <span className="truncate flex-1 font-bold text-slate-800">{services.find(s => s.id === ps.serviceTypeId)?.name}</span>
+                                        <span className="mx-2 text-slate-500 text-xs">R$ {ps.unitCost}</span>
                                         <span className="font-bold mx-3 bg-slate-100 px-2 py-1 rounded text-slate-700 border border-slate-200">{ps.hours} h</span>
                                         <button type="button" onClick={() => removePlannedService(ps.serviceTypeId)} className="text-red-500 hover:text-red-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"><i className="fas fa-trash"></i></button>
                                     </div>

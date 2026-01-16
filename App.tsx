@@ -53,6 +53,9 @@ const App: React.FC = () => {
   const [purchases, setPurchases] = useState<any[]>([]);
   const [userRole] = useState<UserRole>('ADMIN');
 
+  // Estado de Layout Mobile
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Estado de Sincronização
   const [syncStatus, setSyncStatus] = useState<'online' | 'syncing' | 'offline' | 'error'>('online');
   const [firstLoad, setFirstLoad] = useState(true);
@@ -216,34 +219,61 @@ const App: React.FC = () => {
     }
   };
 
+  // Fecha o menu mobile ao trocar de aba
+  const handleTabChange = (id: TabId) => {
+    setActiveTab(id);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row antialiased font-sans text-slate-900 font-medium text-base">
-      {/* Sidebar - Aumentada e com melhor contraste */}
-      <aside className="w-full md:w-20 lg:w-72 bg-slate-900 flex-shrink-0 flex flex-col z-50 border-r border-slate-800">
-        <div className="h-24 flex items-center px-6 border-b border-slate-800/50 bg-slate-950">
+    <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
+      
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Navigation */}
+      <aside 
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white flex flex-col border-r border-slate-800 transition-transform duration-300 ease-in-out shadow-2xl
+          md:relative md:translate-x-0 md:shadow-none
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:w-20 lg:w-72
+        `}
+      >
+        {/* Brand Header */}
+        <div className="h-20 flex items-center px-6 border-b border-slate-800/50 bg-slate-950 shrink-0 justify-between md:justify-center lg:justify-start">
           <div className="flex items-center gap-4">
              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center p-1 shadow-lg shadow-white/5 shrink-0 overflow-hidden">
                <img src="https://placehold.co/100x100/ffffff/000000?text=GCSF" alt="GCSF Logo" className="w-full h-full object-contain" />
              </div>
-             <div className="hidden lg:block">
+             <div className="block md:hidden lg:block">
                <h1 className="text-xl font-bold text-white tracking-tight leading-none">Crop Service</h1>
                <span className="text-xs text-slate-300 font-medium uppercase tracking-wider">Industrial ERP</span>
              </div>
           </div>
+          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400 hover:text-white transition-colors">
+             <i className="fas fa-times text-2xl"></i>
+          </button>
         </div>
 
-        <nav className="flex-1 py-8 overflow-y-auto custom-scrollbar px-4 space-y-8">
+        {/* Menu Items */}
+        <nav className="flex-1 py-8 overflow-y-auto custom-scrollbar px-3 space-y-8">
           {MENU_GROUPS.map((group, groupIndex) => (
             <div key={groupIndex}>
-              <h3 className="hidden lg:block px-4 text-xs font-bold text-slate-300 uppercase tracking-widest mb-3 border-b border-slate-800/50 pb-2">
+              <h3 className="block md:hidden lg:block px-4 text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-800/50 pb-2 mx-2">
                 {group.title}
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {group.items.map((item) => (
                   <SidebarLink 
                     key={item.id}
                     active={activeTab === item.id} 
-                    onClick={() => setActiveTab(item.id as TabId)} 
+                    onClick={() => handleTabChange(item.id as TabId)} 
                     icon={item.icon} 
                     label={item.label} 
                   />
@@ -253,56 +283,71 @@ const App: React.FC = () => {
           ))}
         </nav>
 
-        <div className="p-6 border-t border-slate-800 bg-slate-950/50">
-          <div className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
-            <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-white border border-slate-600 group-hover:border-clean-primary group-hover:bg-clean-primary transition-all">
+        {/* User Footer */}
+        <div className="p-4 border-t border-slate-800 bg-slate-950/30 shrink-0">
+          <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
+            <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-white border border-slate-600 group-hover:border-clean-primary group-hover:bg-clean-primary transition-all shrink-0">
               DT
             </div>
-            <div className="hidden lg:block overflow-hidden">
-              <p className="text-base font-semibold text-white truncate">Diretoria Técnica</p>
-              <p className="text-xs text-slate-300 truncate">{userRole} Logged</p>
+            <div className="block md:hidden lg:block overflow-hidden">
+              <p className="text-sm font-bold text-white truncate">Diretoria Técnica</p>
+              <p className="text-xs text-slate-400 truncate">{userRole}</p>
             </div>
           </div>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#f1f5f9]">
-        {/* Header - Mais alto e com busca clara */}
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 flex-shrink-0 z-40 shadow-sm">
-          <div className="flex items-center gap-3 text-base text-slate-600">
-             <i className="fas fa-home text-slate-400 text-lg"></i>
-             <i className="fas fa-chevron-right text-xs text-slate-300"></i>
-             <span className="font-semibold text-slate-800">Planta Industrial A01</span>
-             <i className="fas fa-chevron-right text-xs text-slate-300"></i>
-             <span className="font-bold text-clean-primary text-xl">{MENU_GROUPS.reduce((acc, g) => [...acc, ...g.items], [] as any[]).find(i => i.id === activeTab)?.label}</span>
+      {/* Main Content Wrapper */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-[#f1f5f9]">
+        {/* Top Header */}
+        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 shrink-0 z-30 shadow-sm relative">
+          <div className="flex items-center gap-4 text-base text-slate-600 overflow-hidden">
+             <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-sm transition-all"
+             >
+                <i className="fas fa-bars text-lg"></i>
+             </button>
+
+             <div className="flex items-center gap-2 truncate">
+               <i className="fas fa-home text-slate-400 text-lg hidden sm:block"></i>
+               <i className="fas fa-chevron-right text-xs text-slate-300 hidden sm:block"></i>
+               <span className="font-semibold text-slate-800 hidden sm:block">Planta Industrial A01</span>
+               <i className="fas fa-chevron-right text-xs text-slate-300 hidden sm:block"></i>
+               <span className="font-bold text-clean-primary text-lg sm:text-xl truncate">
+                 {MENU_GROUPS.reduce((acc, g) => [...acc, ...g.items], [] as any[]).find(i => i.id === activeTab)?.label}
+               </span>
+             </div>
           </div>
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 sm:gap-6">
              {/* Status Sync */}
-             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
-                <span className={`w-3 h-3 rounded-full ${syncStatus === 'online' ? 'bg-emerald-500' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
+             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
+                <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'online' ? 'bg-emerald-500' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
                 <span className="text-xs font-bold text-slate-600 uppercase">
-                    {syncStatus === 'online' ? 'Conectado' : syncStatus === 'syncing' ? 'Sincronizando...' : syncStatus === 'error' ? 'Erro Sync' : 'Offline'}
+                    {syncStatus === 'online' ? 'Conectado' : syncStatus === 'syncing' ? 'Sync...' : syncStatus === 'error' ? 'Erro' : 'Offline'}
                 </span>
              </div>
 
-             <div className="relative">
-                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-base"></i>
-                <input type="text" placeholder="Pesquisar..." className="pl-11 pr-5 h-12 bg-slate-50 border border-slate-300 rounded-lg text-base font-medium text-slate-800 focus:ring-2 focus:ring-clean-primary/20 focus:bg-white focus:border-clean-primary w-80 transition-all shadow-sm placeholder:text-slate-400" />
+             <div className="relative hidden md:block">
+                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
+                <input type="text" placeholder="Pesquisar..." className="pl-11 pr-4 h-11 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-clean-primary/20 focus:bg-white focus:border-clean-primary w-64 xl:w-80 transition-all shadow-sm placeholder:text-slate-400" />
              </div>
-             <button className="w-12 h-12 rounded-full bg-white hover:bg-slate-50 border border-slate-300 flex items-center justify-center text-slate-600 transition-all relative shadow-sm hover:shadow">
-                <i className="fas fa-bell text-xl"></i>
-                <span className="absolute top-3 right-3.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+             
+             <button className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 border border-slate-300 flex items-center justify-center text-slate-600 transition-all relative shadow-sm hover:shadow active:scale-95">
+                <i className="fas fa-bell text-lg"></i>
+                <span className="absolute top-2.5 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
              </button>
           </div>
         </header>
 
-        <section className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10">
-          <div className="max-w-[1920px] mx-auto">
+        {/* Content Scroll Area */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 scroll-smooth">
+          <div className="max-w-[1920px] mx-auto pb-10">
             {renderContent()}
           </div>
-        </section>
-      </main>
+        </main>
+      </div>
     </div>
   );
 };
@@ -317,16 +362,22 @@ interface SidebarLinkProps {
 const SidebarLink: React.FC<SidebarLinkProps> = ({ active, onClick, icon, label }) => (
   <button 
     onClick={onClick}
-    className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl transition-all group relative ${
+    className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all group relative ${
       active 
-        ? 'bg-clean-primary text-white font-bold shadow-lg shadow-clean-primary/25' 
-        : 'text-slate-300 hover:bg-white/5 hover:text-white font-medium'
+        ? 'bg-clean-primary text-white font-bold shadow-lg shadow-clean-primary/20' 
+        : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
     }`}
+    title={label}
   >
-    <div className={`w-6 flex justify-center ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>
-      <i className={`fas ${icon} text-xl`}></i>
+    <div className={`w-6 flex justify-center shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-white'}`}>
+      <i className={`fas ${icon} text-lg`}></i>
     </div>
-    <span className="hidden lg:block text-lg tracking-tight">{label}</span>
+    <span className="block md:hidden lg:block text-base tracking-tight truncate">{label}</span>
+    
+    {/* Tooltip for collapsed state on Desktop */}
+    <div className="hidden md:block lg:hidden absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
+      {label}
+    </div>
   </button>
 );
 

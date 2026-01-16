@@ -29,7 +29,9 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
 
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
-  const [newItem, setNewItem] = useState<{ id: string, qty: number | '' }>({ id: '', qty: '' });
+  
+  // Estado para novo item na OS (agora com Custo)
+  const [newItem, setNewItem] = useState<{ id: string, qty: number | '', cost: number | '' }>({ id: '', qty: '', cost: '' });
 
   // Debounce do Search Input
   useEffect(() => {
@@ -95,26 +97,49 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
 
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
 
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const id = e.target.value;
+      let cost: number | '' = '';
+      
+      if (id) {
+          if (activeSubTab === 'services') {
+              const s = services.find(s => s.id === id);
+              if (s) cost = s.unitValue;
+          } else {
+              const m = materials.find(m => m.id === id);
+              if (m) cost = m.unitCost;
+          }
+      }
+      setNewItem({ id, qty: '', cost });
+  };
+
   const handleAddService = () => {
-    if (!selectedOS || !newItem.id || !newItem.qty || !isEditable(selectedOS)) return;
+    if (!selectedOS || !newItem.id || !newItem.qty || newItem.cost === '' || !isEditable(selectedOS)) return;
     const serviceTemplate = services.find(s => s.id === newItem.id);
     if (!serviceTemplate) return;
-    const newEntry: OSService = { serviceTypeId: serviceTemplate.id, quantity: Number(newItem.qty), unitCost: serviceTemplate.unitValue, timestamp: new Date().toISOString() };
+    
+    // Usa o custo manual ou o do template
+    const finalCost = Number(newItem.cost);
+
+    const newEntry: OSService = { serviceTypeId: serviceTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
     const updatedOS = { ...selectedOS, services: [...selectedOS.services, newEntry] };
     setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-    setSelectedOS(updatedOS); setNewItem({ id: '', qty: '' });
+    setSelectedOS(updatedOS); setNewItem({ id: '', qty: '', cost: '' });
   };
 
   const handleAddMaterial = () => {
-    if (!selectedOS || !newItem.id || !newItem.qty || !isEditable(selectedOS)) return;
+    if (!selectedOS || !newItem.id || !newItem.qty || newItem.cost === '' || !isEditable(selectedOS)) return;
     const materialTemplate = materials.find(m => m.id === newItem.id);
     if (!materialTemplate || materialTemplate.currentStock < Number(newItem.qty)) { alert("Estoque insuficiente."); return; }
     
-    const newEntry: OSItem = { materialId: materialTemplate.id, quantity: Number(newItem.qty), unitCost: materialTemplate.unitCost, timestamp: new Date().toISOString() };
+    // Usa o custo manual ou o do template
+    const finalCost = Number(newItem.cost);
+
+    const newEntry: OSItem = { materialId: materialTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
     onStockChange(materialTemplate.id, Number(newItem.qty), selectedOS.number);
     const updatedOS = { ...selectedOS, materials: [...selectedOS.materials, newEntry] };
     setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-    setSelectedOS(updatedOS); setNewItem({ id: '', qty: '' });
+    setSelectedOS(updatedOS); setNewItem({ id: '', qty: '', cost: '' });
   };
 
   const handleCreate = (e: React.FormEvent) => {
@@ -143,13 +168,13 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
       }
   };
 
-  // --- PDF GENERATION LOGIC FOR INDIVIDUAL OS ---
+  // --- PDF GENERATION LOGIC ---
   const generateOSDetailPDF = (os: OS) => {
+      // ... [Mantido igual]
     const doc = new jsPDF();
     const costs = calculateOSCosts(os, materials, services);
     const project = projects.find(p => p.id === os.projectId);
 
-    // Header
     doc.setFillColor(71, 122, 127);
     doc.rect(0, 0, 210, 20, 'F');
     doc.setTextColor(255, 255, 255);
@@ -157,7 +182,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
     doc.setFont("helvetica", "bold");
     doc.text(`ORDEM DE SERVIÇO: ${os.number}`, 14, 13);
     
-    // OS Info
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -181,7 +205,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
     doc.text(descLines, 14, yPos + 5);
     yPos += descLines.length * 5 + 10;
     
-    // Costs
     doc.setDrawColor(200, 200, 200);
     doc.line(14, yPos, 196, yPos);
     yPos += 10;
@@ -208,7 +231,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
     
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // Materials Table
     doc.setTextColor(0,0,0);
     doc.text("MATERIAIS CONSUMIDOS", 14, yPos);
     yPos += 5;
@@ -240,7 +262,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
         yPos += 15;
     }
 
-    // Services Table
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.text("SERVIÇOS EXECUTADOS", 14, yPos);
@@ -274,8 +295,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
     doc.save(`${os.number}_Detalhado.pdf`);
   };
 
-  // Exportação (Utilizando a lista filtrada)
   const exportToCSV = () => {
+     // ... [Mantido igual]
     const headers = ['Número OS', 'Projeto', 'Descrição', 'Tipo', 'Prioridade', 'Status', 'SLA (h)', 'Abertura', 'Custo Total (R$)'];
     const rows = filteredOSs.map(o => {
         const project = projects.find(p => p.id === o.projectId);
@@ -303,6 +324,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
   };
 
   const exportToPDF = () => {
+    // ... [Mantido igual]
     const doc = new jsPDF();
     doc.text("Relatório de Ordens de Serviço - Crop Service", 14, 15);
     doc.setFontSize(10);
@@ -335,6 +357,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
 
   return (
     <div className="space-y-8">
+      {/* ... [Header e Filtros Mantidos] ... */}
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-200 pb-6">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Ordens de Serviço</h2>
@@ -378,6 +401,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {currentOSs.map(os => {
+            // ... [Card OS mantido]
             const project = projects.find(p => p.id === os.projectId);
             const costs = calculateOSCosts(os, materials, services);
             const isOverdue = os.status !== OSStatus.COMPLETED && new Date(os.limitDate) < new Date();
@@ -458,6 +482,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
                     <div className="mb-8 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
                         <h5 className="text-sm font-bold text-slate-500 uppercase mb-4">Ações de Status</h5>
                         <div className="grid grid-cols-2 gap-3">
+                           {/* ... [Botões de status mantidos] ... */}
                            {selectedOS.status === OSStatus.OPEN && (
                                <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.IN_PROGRESS)} className="col-span-2 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-base shadow-sm transition-all"><i className="fas fa-play mr-2"></i> Iniciar Atividade</button>
                            )}
@@ -487,14 +512,20 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
                         <div className="space-y-6 flex-1">
                             <div>
                                 <label className="text-sm font-bold text-slate-700 uppercase mb-2 block">Item</label>
-                                <select className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.id} onChange={activeSubTab==='services'? (e)=>{setNewItem({id:e.target.value, qty:''})} : (e)=>setNewItem({id:e.target.value, qty:''})}>
+                                <select className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.id} onChange={handleSelectChange}>
                                     <option value="">Selecione...</option>
                                     {activeSubTab==='services' ? services.map(s=><option key={s.id} value={s.id}>{s.name}</option>) : materials.map(m=><option key={m.id} value={m.id}>{m.description} (Saldo: {m.currentStock})</option>)}
                                 </select>
                             </div>
-                            <div>
-                                <label className="text-sm font-bold text-slate-700 uppercase mb-2 block">{activeSubTab==='services'?'Horas':'Quantidade'}</label>
-                                <input type="number" className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.qty} onChange={e=>setNewItem({...newItem, qty:Number(e.target.value)})} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 uppercase mb-2 block">{activeSubTab==='services'?'Horas':'Quantidade'}</label>
+                                    <input type="number" className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.qty} onChange={e=>setNewItem({...newItem, qty:Number(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 uppercase mb-2 block">R$ Unitário</label>
+                                    <input type="number" className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.cost} onChange={e=>setNewItem({...newItem, cost:Number(e.target.value)})} />
+                                </div>
                             </div>
                             <button onClick={activeSubTab==='services'?handleAddService:handleAddMaterial} className="w-full h-14 bg-slate-800 text-white rounded-lg text-base font-bold hover:bg-slate-900 mt-2 shadow-lg transition-all transform hover:-translate-y-0.5">
                                 <i className="fas fa-plus mr-2"></i> Adicionar
@@ -564,6 +595,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
       )}
 
       {showModal && (
+        // ... [Modal Nova OS mantido igual]
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-8 animate-in zoom-in duration-200">
                   <h3 className="text-3xl font-bold text-slate-900 mb-8 border-b border-slate-200 pb-6">Nova Ordem de Serviço</h3>

@@ -8,10 +8,10 @@ export const INITIAL_MATERIALS: Material[] = [
 ];
 
 export const INITIAL_SERVICES: ServiceType[] = [
-  { id: 's1', name: 'Alvenaria', description: 'Levantamento de paredes e reboco', costType: ServiceCostType.HOURLY, unitValue: 0, category: 'INTERNAL' },
-  { id: 's2', name: 'Elétrica', description: 'Instalações elétricas prediais', costType: ServiceCostType.HOURLY, unitValue: 0, category: 'INTERNAL' },
-  { id: 's3', name: 'Hidráulica', description: 'Instalações de tubulações e esgoto', costType: ServiceCostType.HOURLY, unitValue: 0, category: 'INTERNAL' },
-  { id: 's4', name: 'Vistoria Técnica', description: 'Laudo de conformidade técnica', costType: ServiceCostType.FIXED, unitValue: 0, category: 'INTERNAL' },
+  { id: 's1', name: 'Alvenaria', description: 'Levantamento de paredes e reboco', team: 'Equipe Civil A', costType: ServiceCostType.HOURLY, unitValue: 50, category: 'INTERNAL' },
+  { id: 's2', name: 'Elétrica', description: 'Instalações elétricas prediais', team: 'Manutenção Elétrica', costType: ServiceCostType.HOURLY, unitValue: 80, category: 'INTERNAL' },
+  { id: 's3', name: 'Hidráulica', description: 'Instalações de tubulações e esgoto', team: 'Manutenção Hidráulica', costType: ServiceCostType.HOURLY, unitValue: 75, category: 'INTERNAL' },
+  { id: 's4', name: 'Vistoria Técnica', description: 'Laudo de conformidade técnica', team: 'Engenharia e Qualidade', costType: ServiceCostType.FIXED, unitValue: 250, category: 'INTERNAL' },
 ];
 
 export const INITIAL_PROJECTS: Project[] = [
@@ -31,12 +31,12 @@ export const INITIAL_PROJECTS: Project[] = [
     estimatedValue: 150000, 
     /* Planejamento Físico Inicial */
     plannedMaterials: [
-        { materialId: 'm1', quantity: 50 },
-        { materialId: 'm2', quantity: 20 }
+        { materialId: 'm1', quantity: 50, unitCost: 32.5 },
+        { materialId: 'm2', quantity: 20, unitCost: 45.9 }
     ],
     plannedServices: [
-        { serviceTypeId: 's1', hours: 120 },
-        { serviceTypeId: 's4', hours: 8 }
+        { serviceTypeId: 's1', hours: 120, unitCost: 50 },
+        { serviceTypeId: 's4', hours: 8, unitCost: 250 }
     ],
     startDate: '2024-01-15', 
     estimatedEndDate: '2024-06-15', 

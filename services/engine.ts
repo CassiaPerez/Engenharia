@@ -2,14 +2,13 @@
 import { OS, Material, ServiceType, Project, OSStatus, ServiceCostType } from '../types';
 
 export const calculateOSCosts = (os: OS, materials: Material[], services: ServiceType[]) => {
-  // Materiais apropriados na OS
+  // Materiais apropriados na OS (Usa o unitCost gravado no momento da OS, não o do cadastro atual)
   const materialCost = os.materials.reduce((acc, item) => {
     return acc + (item.quantity * item.unitCost);
   }, 0);
 
-  // Serviços lançados na OS - Diferencia entre Horas e Valor Fixo
+  // Serviços lançados na OS (Usa o unitCost gravado no momento da OS)
   const serviceCost = os.services.reduce((acc, srvEntry) => {
-    // Apenas para consistência, se necessário buscar valor atual, mas usamos o histórico da OS geralmente
     return acc + (srvEntry.quantity * srvEntry.unitCost);
   }, 0);
 
@@ -45,14 +44,21 @@ export const calculateProjectCosts = (project: Project, oss: OS[], materials: Ma
 
 export const calculatePlannedCosts = (project: Partial<Project>, materials: Material[], services: ServiceType[]) => {
   const matCost = (project.plannedMaterials || []).reduce((acc, pm) => {
-    const mat = materials.find(m => m.id === pm.materialId);
-    return acc + (pm.quantity * (mat?.unitCost || 0));
+    // Usa o custo manual definido no planejamento, ou fallback para o cadastro se não existir (compatibilidade)
+    const manualCost = pm.unitCost;
+    const catalogCost = materials.find(m => m.id === pm.materialId)?.unitCost || 0;
+    const finalCost = manualCost !== undefined ? manualCost : catalogCost;
+    
+    return acc + (pm.quantity * finalCost);
   }, 0);
 
   const srvCost = (project.plannedServices || []).reduce((acc, ps) => {
-    // Assumindo custo hora genérico ou unitValue do serviço se tiver (no momento serviços são internos = 0, mas preparado para valor)
-    const srv = services.find(s => s.id === ps.serviceTypeId);
-    return acc + (ps.hours * (srv?.unitValue || 0)); 
+    // Usa o custo manual definido no planejamento
+    const manualCost = ps.unitCost;
+    const catalogCost = services.find(s => s.id === ps.serviceTypeId)?.unitValue || 0;
+    const finalCost = manualCost !== undefined ? manualCost : catalogCost;
+
+    return acc + (ps.hours * finalCost); 
   }, 0);
 
   return {

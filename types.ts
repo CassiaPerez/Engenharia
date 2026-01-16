@@ -53,37 +53,40 @@ export interface ServiceType {
   id: string;
   name: string;
   description: string;
+  team: string; /* Time/Equipe responsável */
   costType: ServiceCostType;
-  unitValue: number; /* Mantido como referência de custo interno se necessário, mas oculto na UI */
+  unitValue: number;
   category: 'INTERNAL' | 'EXTERNAL';
 }
 
 export interface PlannedMaterial {
   materialId: string;
   quantity: number;
+  unitCost: number;
 }
 
 export interface PlannedService {
   serviceTypeId: string;
   hours: number;
+  unitCost: number;
 }
 
 export interface Project {
   id: string;
   code: string;
-  description: string; /* Título curto */
-  detailedDescription: string; /* Escopo detalhado */
-  location: string; /* Prédio/Setor */
-  city: string; /* Cidade/UF */
+  description: string;
+  detailedDescription: string;
+  location: string;
+  city: string;
   category: Category;
   reason: string;
   reasonType: OSType;
   responsible: string;
   area: string;
   costCenter: string;
-  estimatedValue: number; /* Orçamento monetário macro */
-  plannedMaterials: PlannedMaterial[]; /* Planejamento físico de materiais */
-  plannedServices: PlannedService[]; /* Planejamento físico de horas */
+  estimatedValue: number;
+  plannedMaterials: PlannedMaterial[];
+  plannedServices: PlannedService[];
   startDate: string;
   estimatedEndDate: string;
   slaDays: number;

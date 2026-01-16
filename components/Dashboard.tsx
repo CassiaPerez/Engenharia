@@ -1,10 +1,12 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Project, OS, Material, ServiceType, OSStatus, ProjectStatus } from '../types';
 import { calculateProjectCosts, formatDate } from '../services/engine';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Props {
   projects: Project[];
@@ -14,6 +16,8 @@ interface Props {
 }
 
 const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
+  const [showDetail, setShowDetail] = useState<Project | null>(null);
+
   const stats = useMemo(() => {
     const totalEstimated = projects.reduce((acc, p) => acc + p.estimatedValue, 0);
     const performanceData = projects.map(p => {
@@ -50,6 +54,137 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
       case ProjectStatus.CANCELED: return <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md text-sm font-bold uppercase border border-slate-200">Cancelado</span>;
       default: return <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-sm font-bold uppercase border border-slate-200">Planejado</span>;
     }
+  };
+
+  const getActualMaterialQty = (projectId: string, materialId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.materials.find(m => m.materialId === materialId)?.quantity || 0), 0);
+  const getActualServiceHours = (projectId: string, serviceId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.services.find(s => s.serviceTypeId === serviceId)?.quantity || 0), 0);
+
+  const generateProjectDetailPDF = (project: Project) => {
+    const doc = new jsPDF();
+    const costs = calculateProjectCosts(project, oss, materials, services);
+
+    // Header
+    doc.setFillColor(71, 122, 127); // Brand Primary Color
+    doc.rect(0, 0, 210, 20, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("FICHA TÉCNICA DE PROJETO (CAPEX)", 14, 13);
+    
+    // Project Info
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    
+    let yPos = 30;
+    doc.text(`Código: ${project.code}`, 14, yPos);
+    doc.text(`Status: ${project.status}`, 120, yPos);
+    
+    yPos += 6;
+    doc.text(`Descrição:`, 14, yPos);
+    doc.setFont("helvetica", "normal");
+    const descLines = doc.splitTextToSize(project.description, 170);
+    doc.text(descLines, 35, yPos);
+    yPos += descLines.length * 5;
+
+    if (project.detailedDescription) {
+        doc.setFont("helvetica", "bold");
+        doc.text(`Detalhes:`, 14, yPos);
+        doc.setFont("helvetica", "normal");
+        const detLines = doc.splitTextToSize(project.detailedDescription, 170);
+        doc.text(detLines, 35, yPos);
+        yPos += detLines.length * 5 + 2;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`Local: ${project.location || '-'} | Cidade: ${project.city || '-'}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Responsável: ${project.responsible || '-'} | Centro de Custo: ${project.costCenter || '-'}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Datas: Início ${formatDate(project.startDate)} | Fim Est. ${formatDate(project.estimatedEndDate)}`, 14, yPos);
+    
+    yPos += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, yPos, 196, yPos);
+    yPos += 10;
+
+    // Financial Summary
+    doc.setFontSize(11);
+    doc.setTextColor(71, 122, 127);
+    doc.text("RESUMO FINANCEIRO", 14, yPos);
+    yPos += 8;
+    
+    const summaryData = [
+        ["Orçamento Aprovado (Budget)", `R$ ${formatCurrency(project.estimatedValue)}`],
+        ["Custo Realizado (Total)", `R$ ${formatCurrency(costs.totalReal)}`],
+        ["Variação", `R$ ${formatCurrency(costs.variance)} (${costs.variancePercent.toFixed(1)}% utilizado)`]
+    ];
+    
+    autoTable(doc, {
+        startY: yPos,
+        head: [],
+        body: summaryData,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 2 },
+        columnStyles: { 0: { fontStyle: 'bold', width: 80 }, 1: { halign: 'right' } }
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+
+    // Materials Table
+    doc.text("PLANEJAMENTO DE MATERIAIS (FÍSICO)", 14, yPos);
+    yPos += 5;
+    
+    const materialRows = project.plannedMaterials.map(pm => {
+        const actual = getActualMaterialQty(project.id, pm.materialId);
+        const mat = materials.find(m => m.id === pm.materialId);
+        const diff = actual - pm.quantity;
+        return [
+            mat?.code || '-',
+            mat?.description || 'Item excluído',
+            pm.quantity.toString(),
+            actual.toString(),
+            diff > 0 ? `+${diff}` : diff.toString()
+        ];
+    });
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Cód', 'Material', 'Plan', 'Real', 'Var']],
+        body: materialRows,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [71, 122, 127] },
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'center' } }
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+
+    // Services Table
+    doc.text("PLANEJAMENTO DE SERVIÇOS (HH)", 14, yPos);
+    yPos += 5;
+
+    const serviceRows = project.plannedServices.map(ps => {
+        const actual = getActualServiceHours(project.id, ps.serviceTypeId);
+        const srv = services.find(s => s.id === ps.serviceTypeId);
+        const diff = actual - ps.hours;
+        return [
+            srv?.name || 'Serviço excluído',
+            ps.hours.toString(),
+            actual.toString(),
+            diff > 0 ? `+${diff}` : diff.toString()
+        ];
+    });
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Serviço', 'Plan (h)', 'Real (h)', 'Var']],
+        body: serviceRows,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [71, 122, 127] },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'center' } }
+    });
+
+    doc.save(`${project.code}_Detalhado.pdf`);
   };
 
   return (
@@ -182,7 +317,10 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
                         {getStatusBadge(p.status)}
                     </td>
                     <td className="px-6 py-5 text-center">
-                       <button className="text-slate-400 hover:text-clean-primary transition-colors text-base font-bold flex items-center justify-center gap-1 mx-auto">
+                       <button 
+                         onClick={() => setShowDetail(p)}
+                         className="text-slate-400 hover:text-clean-primary transition-colors text-base font-bold flex items-center justify-center gap-1 mx-auto"
+                       >
                           Ver <i className="fas fa-chevron-right text-xs"></i>
                        </button>
                     </td>
@@ -193,6 +331,76 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
           </table>
         </div>
       </div>
+
+      {showDetail && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col animate-in zoom-in duration-200">
+             <div className="p-8 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+                <div>
+                   <h3 className="text-xl font-bold text-slate-900">Detalhamento Físico-Financeiro</h3>
+                   <p className="text-base text-slate-600 mt-1 font-medium">{showDetail.code} - {showDetail.description}</p>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => generateProjectDetailPDF(showDetail)} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2 rounded-lg font-bold text-sm transition-all border border-slate-200 flex items-center gap-2">
+                        <i className="fas fa-print"></i> Imprimir PDF
+                    </button>
+                    <button onClick={() => setShowDetail(null)} className="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"><i className="fas fa-times text-xl"></i></button>
+                </div>
+             </div>
+             <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                {/* Tabelas de comparativo */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="border border-slate-200 rounded-xl p-6 shadow-sm">
+                        <h4 className="text-sm font-bold text-slate-900 uppercase mb-5 border-b border-slate-200 pb-3 flex items-center gap-2"><i className="fas fa-cubes text-slate-500"></i> Materiais (Plan x Real)</h4>
+                        <table className="w-full text-base">
+                            <thead>
+                                <tr className="text-slate-500 font-bold uppercase text-xs"><th className="text-left pb-3">Item</th><th className="text-right pb-3">Plan</th><th className="text-right pb-3">Real</th><th className="text-center pb-3">Var</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {showDetail.plannedMaterials.map(pm => {
+                                    const actual = getActualMaterialQty(showDetail.id, pm.materialId);
+                                    const mat = materials.find(m => m.id === pm.materialId);
+                                    const diff = actual - pm.quantity;
+                                    return (
+                                        <tr key={pm.materialId}>
+                                            <td className="py-3 text-slate-800 font-bold">{mat?.description}</td>
+                                            <td className="text-right text-slate-600 font-medium">{pm.quantity}</td>
+                                            <td className="text-right text-slate-900 font-bold">{actual}</td>
+                                            <td className="text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${diff > 0 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>{diff > 0 ? `+${diff}` : diff}</span></td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="border border-slate-200 rounded-xl p-6 shadow-sm">
+                        <h4 className="text-sm font-bold text-slate-900 uppercase mb-5 border-b border-slate-200 pb-3 flex items-center gap-2"><i className="fas fa-clock text-slate-500"></i> Serviços (Horas)</h4>
+                        <table className="w-full text-base">
+                            <thead>
+                                <tr className="text-slate-500 font-bold uppercase text-xs"><th className="text-left pb-3">Tipo</th><th className="text-right pb-3">Plan</th><th className="text-right pb-3">Real</th><th className="text-center pb-3">Var</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {showDetail.plannedServices.map(ps => {
+                                    const actual = getActualServiceHours(showDetail.id, ps.serviceTypeId);
+                                    const srv = services.find(s => s.id === ps.serviceTypeId);
+                                    const diff = actual - ps.hours;
+                                    return (
+                                        <tr key={ps.serviceTypeId}>
+                                            <td className="py-3 text-slate-800 font-bold">{srv?.name}</td>
+                                            <td className="text-right text-slate-600 font-medium">{ps.hours}</td>
+                                            <td className="text-right text-slate-900 font-bold">{actual}</td>
+                                            <td className="text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${diff > 0 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>{diff > 0 ? `+${diff}` : diff}</span></td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
