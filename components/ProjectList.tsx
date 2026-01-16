@@ -635,7 +635,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                                     {materials.map(m => <option key={m.id} value={m.id}>{m.description}</option>)}
                                 </select>
                                 <input type="number" className="w-20 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="Qtd" value={tempMatQty} onChange={e => setTempMatQty(e.target.value)} />
-                                <input type="number" className="w-24 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="R$ Unit" value={tempMatCost} onChange={e => setTempMatCost(e.target.value)} />
+                                <input type="number" step="0.01" className="w-24 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="R$ Unit" value={tempMatCost} onChange={e => setTempMatCost(e.target.value)} />
                                 <button type="button" onClick={addPlannedMaterial} className="h-12 px-4 bg-slate-800 hover:bg-slate-900 rounded-lg text-white shadow-sm transition-colors"><i className="fas fa-plus"></i></button>
                              </div>
                              <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
@@ -658,7 +658,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                                     {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                                 <input type="number" className="w-20 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="Hrs" value={tempSrvHrs} onChange={e => setTempSrvHrs(e.target.value)} />
-                                <input type="number" className="w-24 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="R$ Unit" value={tempSrvCost} onChange={e => setTempSrvCost(e.target.value)} />
+                                <input type="number" step="0.01" className="w-24 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="R$ Unit" value={tempSrvCost} onChange={e => setTempSrvCost(e.target.value)} />
                                 <button type="button" onClick={addPlannedService} className="h-12 px-4 bg-slate-800 hover:bg-slate-900 rounded-lg text-white shadow-sm transition-colors"><i className="fas fa-plus"></i></button>
                              </div>
                              <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">

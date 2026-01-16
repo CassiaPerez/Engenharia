@@ -139,6 +139,13 @@ export interface StockMovement {
   description: string;
 }
 
+export interface SupplierDoc {
+  name: string;
+  url: string; /* Base64 ou URL */
+  type: string;
+  uploadDate: string;
+}
+
 export interface Supplier {
   id: string;
   name: string;
@@ -149,6 +156,8 @@ export interface Supplier {
   rating: number;
   notes: string;
   categoryIds: string[];
+  status: 'PENDING' | 'HOMOLOGATED' | 'BLOCKED';
+  docs: SupplierDoc[];
 }
 
 export interface PurchaseRecord {

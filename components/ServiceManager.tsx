@@ -9,7 +9,7 @@ interface Props {
 
 const ServiceManager: React.FC<Props> = ({ services, setServices }) => {
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState<Partial<ServiceType>>({ costType: ServiceCostType.HOURLY, unitValue: 0, team: '' });
+  const [formData, setFormData] = useState<Partial<ServiceType>>({ costType: ServiceCostType.HOURLY, unitValue: 0, team: '', category: 'INTERNAL' });
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,10 +20,10 @@ const ServiceManager: React.FC<Props> = ({ services, setServices }) => {
       team: formData.team || 'Geral', 
       costType: ServiceCostType.HOURLY, 
       unitValue: Number(formData.unitValue) || 0, 
-      category: 'INTERNAL' 
+      category: formData.category || 'INTERNAL' 
     }]);
     setShowModal(false);
-    setFormData({ costType: ServiceCostType.HOURLY, unitValue: 0, team: '' });
+    setFormData({ costType: ServiceCostType.HOURLY, unitValue: 0, team: '', category: 'INTERNAL' });
   };
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -38,7 +38,9 @@ const ServiceManager: React.FC<Props> = ({ services, setServices }) => {
         {services.map(srv => (
            <div key={srv.id} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all">
                <div className="flex items-center gap-4 mb-4">
-                   <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-sm"><i className="fas fa-tools text-xl"></i></div>
+                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${srv.category === 'EXTERNAL' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
+                       <i className={`fas ${srv.category === 'EXTERNAL' ? 'fa-handshake' : 'fa-tools'} text-xl`}></i>
+                   </div>
                    <div>
                        <h3 className="font-bold text-slate-800 text-base">{srv.name}</h3>
                        <p className="text-xs font-bold text-clean-primary uppercase tracking-wide">{srv.team || 'Time Geral'}</p>
@@ -46,7 +48,10 @@ const ServiceManager: React.FC<Props> = ({ services, setServices }) => {
                </div>
                <p className="text-sm text-slate-500 line-clamp-3 h-12 leading-relaxed">{srv.description}</p>
                <div className="mt-5 pt-4 border-t border-slate-50 flex justify-between items-center">
-                  <div className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-400"></span> Interno</div>
+                  <div className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${srv.category === 'EXTERNAL' ? 'text-orange-500' : 'text-slate-400'}`}>
+                      <span className={`w-2 h-2 rounded-full ${srv.category === 'EXTERNAL' ? 'bg-orange-500' : 'bg-emerald-400'}`}></span> 
+                      {srv.category === 'EXTERNAL' ? 'Terceiro/Externo' : 'Interno'}
+                  </div>
                   <span className="text-sm font-bold text-slate-700 bg-slate-50 px-2 py-1 rounded">R$ {formatCurrency(srv.unitValue)} / h</span>
                </div>
            </div>
@@ -61,14 +66,26 @@ const ServiceManager: React.FC<Props> = ({ services, setServices }) => {
                         <label className="text-sm font-bold text-slate-700 mb-2 block">Nome do Serviço</label>
                         <input required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" onChange={e=>setFormData({...formData, name:e.target.value})} />
                       </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-bold text-slate-700 mb-2 block">Categoria</label>
+                            <select className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value as any})}>
+                                <option value="INTERNAL">Interno</option>
+                                <option value="EXTERNAL">Terceiro / Externo</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-bold text-slate-700 mb-2 block">Valor Unitário (R$/h)</label>
+                            <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" placeholder="0,00" value={formData.unitValue} onChange={e=>setFormData({...formData, unitValue: Number(e.target.value)})} />
+                          </div>
+                      </div>
+
                       <div>
                         <label className="text-sm font-bold text-slate-700 mb-2 block">Time / Equipe Responsável</label>
                         <input required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" placeholder="Ex: Manutenção Elétrica" onChange={e=>setFormData({...formData, team:e.target.value})} />
                       </div>
-                      <div>
-                        <label className="text-sm font-bold text-slate-700 mb-2 block">Valor Unitário (R$ / Hora)</label>
-                        <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" placeholder="0,00" value={formData.unitValue} onChange={e=>setFormData({...formData, unitValue: Number(e.target.value)})} />
-                      </div>
+                      
                       <div>
                         <label className="text-sm font-bold text-slate-700 mb-2 block">Descrição Detalhada</label>
                         <textarea className="w-full p-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary h-32" onChange={e=>setFormData({...formData, description:e.target.value})} />

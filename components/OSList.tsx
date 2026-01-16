@@ -524,7 +524,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
                                 </div>
                                 <div>
                                     <label className="text-sm font-bold text-slate-700 uppercase mb-2 block">R$ Unitário</label>
-                                    <input type="number" className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.cost} onChange={e=>setNewItem({...newItem, cost:Number(e.target.value)})} />
+                                    <input type="number" step="0.01" className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.cost} onChange={e=>setNewItem({...newItem, cost:Number(e.target.value)})} />
                                 </div>
                             </div>
                             <button onClick={activeSubTab==='services'?handleAddService:handleAddMaterial} className="w-full h-14 bg-slate-800 text-white rounded-lg text-base font-bold hover:bg-slate-900 mt-2 shadow-lg transition-all transform hover:-translate-y-0.5">
