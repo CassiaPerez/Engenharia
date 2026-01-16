@@ -7,41 +7,104 @@ const Documentation: React.FC = () => {
       <div className="bg-white border border-slate-200 rounded-lg p-8 shadow-sm">
         <header className="mb-8 border-b border-slate-100 pb-6">
             <div className="flex items-center gap-2 mb-3">
-                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded">v1.0.0</span>
-                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase rounded">Stable</span>
+                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded">v1.2.0</span>
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase rounded">Database Ready</span>
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Documentação Técnica</h1>
-            <p className="text-slate-500 mt-2 text-lg">Manual de referência do Crop Service.</p>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Documentação Técnica & Setup</h1>
+            <p className="text-slate-500 mt-2 text-lg">Manual de configuração do banco de dados.</p>
         </header>
 
         <div className="prose prose-slate max-w-none prose-headings:font-bold prose-a:text-clean-primary">
-            <h3>1. Visão Geral</h3>
-            <p>O <strong>Crop Service</strong> é um sistema ERP modular focado em Engenharia e Manutenção, projetado para gerenciar de forma integrada o ciclo completo de projetos industriais (Capex) e operações (Opex).</p>
+            <h3>1. Inicialização do Banco de Dados (Supabase)</h3>
+            <p>Para persistir todos os dados do sistema, copie o script abaixo e execute-o na aba <strong>SQL Editor</strong> do seu painel Supabase.</p>
+            <p>Este script cria as tabelas no formato <em>JSON Document Store</em>, garantindo compatibilidade total com os tipos de dados da aplicação React.</p>
             
-            <h3>2. Módulos Principais</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 not-prose my-6">
-                <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
-                    <h4 className="font-bold text-slate-800 mb-2">Gestão de Projetos (Capex)</h4>
-                    <p className="text-sm text-slate-600">Controle orçamentário, físico e cronograma. Auditoria de realizado vs orçado.</p>
+            <div className="bg-slate-900 text-slate-200 p-6 rounded-xl text-xs font-mono overflow-x-auto my-6 shadow-lg border border-slate-800">
+                <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                    <span className="text-emerald-400 font-bold">setup_database.sql</span>
+                    <span className="text-slate-500">PostgreSQL</span>
                 </div>
-                <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
-                    <h4 className="font-bold text-slate-800 mb-2">Ordens de Serviço (Opex)</h4>
-                    <p className="text-sm text-slate-600">Execução de manutenção, apontamento de horas e requisição de materiais.</p>
-                </div>
+                <pre>{`
+-- 1. Tabela de Projetos (Capex)
+create table if not exists projects (
+  id text primary key,
+  json_content jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- 2. Tabela de Materiais (Almoxarifado)
+create table if not exists materials (
+  id text primary key,
+  json_content jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- 3. Tabela de Ordens de Serviço (Opex)
+create table if not exists oss (
+  id text primary key,
+  json_content jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- 4. Tabela de Serviços (Catálogo)
+create table if not exists services (
+  id text primary key,
+  json_content jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- 5. Tabela de Movimentações de Estoque (Kardex)
+create table if not exists stock_movements (
+  id text primary key,
+  json_content jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- 6. Tabela de Fornecedores
+create table if not exists suppliers (
+  id text primary key,
+  json_content jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- --- SEGURANÇA (RLS) ---
+-- Habilita Row Level Security em todas as tabelas
+alter table projects enable row level security;
+alter table materials enable row level security;
+alter table oss enable row level security;
+alter table services enable row level security;
+alter table stock_movements enable row level security;
+alter table suppliers enable row level security;
+
+-- Cria políticas de acesso PÚBLICO (Para uso imediato com a chave Anon Key)
+-- Nota: Em produção real com Login, alterar 'true' para checagem de auth.uid()
+
+-- Projects
+create policy "Enable all access for projects" on projects for all using (true) with check (true);
+
+-- Materials
+create policy "Enable all access for materials" on materials for all using (true) with check (true);
+
+-- OSS
+create policy "Enable all access for oss" on oss for all using (true) with check (true);
+
+-- Services
+create policy "Enable all access for services" on services for all using (true) with check (true);
+
+-- Stock Movements
+create policy "Enable all access for stock_movements" on stock_movements for all using (true) with check (true);
+
+-- Suppliers
+create policy "Enable all access for suppliers" on suppliers for all using (true) with check (true);
+                `}</pre>
             </div>
 
-            <h3>3. Arquitetura</h3>
-            <ul className="list-disc pl-5 space-y-1 text-sm text-slate-700">
-                <li><strong>Frontend:</strong> React 19, TypeScript, Tailwind CSS.</li>
-                <li><strong>State:</strong> React Hooks + LocalStorage (Persistência local).</li>
-                <li><strong>Design:</strong> Enterprise UI System (Clean, Density-focused).</li>
+            <h3>2. Como funciona a Sincronização?</h3>
+            <ul className="list-disc pl-5 space-y-2 text-sm text-slate-700">
+                <li><strong>Híbrido:</strong> O sistema carrega dados do Supabase ao iniciar. Se falhar, usa o cache local do navegador.</li>
+                <li><strong>Auto-Save:</strong> As alterações são salvas automaticamente a cada 2 segundos após parar de digitar (Debounce).</li>
+                <li><strong>Estrutura de Dados:</strong> Utilizamos colunas <code>jsonb</code>. Isso significa que não precisamos fazer "Joins" complexos no banco; o objeto JSON salvo é exatamente o objeto TypeScript usado no Frontend.</li>
             </ul>
-
-            <h3>4. Roadmap</h3>
-            <div className="flex items-center gap-4 text-sm mt-4">
-                <span className="w-3 h-3 bg-emerald-500 rounded-full"></span> <span>Curto Prazo: Perfis de Acesso</span>
-                <span className="w-3 h-3 bg-blue-500 rounded-full"></span> <span>Médio Prazo: API Integration</span>
-            </div>
         </div>
       </div>
     </div>

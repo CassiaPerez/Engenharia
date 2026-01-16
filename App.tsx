@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Project, OS, Material, ServiceType, StockMovement, 
   UserRole, OSStatus, ProjectStatus
@@ -12,6 +12,7 @@ import Inventory from './components/Inventory';
 import ServiceManager from './components/ServiceManager';
 import SupplierManager from './components/SupplierManager';
 import Documentation from './components/Documentation';
+import { supabase, mapFromSupabase, mapToSupabase } from './services/supabase';
 
 // Definição da estrutura do Menu
 const MENU_GROUPS = [
@@ -52,26 +53,114 @@ const App: React.FC = () => {
   const [purchases, setPurchases] = useState<any[]>([]);
   const [userRole] = useState<UserRole>('ADMIN');
 
+  // Estado de Sincronização
+  const [syncStatus, setSyncStatus] = useState<'online' | 'syncing' | 'offline' | 'error'>('online');
+  const [firstLoad, setFirstLoad] = useState(true);
+
+  // Refs para debounce de salvamento
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Carregamento Inicial Híbrido (Supabase > LocalStorage > Initial)
   useEffect(() => {
-    const stored = localStorage.getItem('crop_service_v3_data');
-    if (stored) {
+    const loadData = async () => {
+      setSyncStatus('syncing');
       try {
-        const data = JSON.parse(stored);
-        if (data.projects) setProjects(data.projects);
-        if (data.materials) setMaterials(data.materials);
-        if (data.services) setServices(data.services);
-        if (data.oss) setOss(data.oss);
-        if (data.movements) setMovements(data.movements);
-        if (data.suppliers) setSuppliers(data.suppliers);
-      } catch (e) {
-        console.error("Erro ao carregar dados", e);
+        // Tenta buscar do Supabase
+        const [p, m, s, o, mov, sup] = await Promise.all([
+          supabase.from('projects').select('*'),
+          supabase.from('materials').select('*'),
+          supabase.from('services').select('*'),
+          supabase.from('oss').select('*'),
+          supabase.from('stock_movements').select('*'),
+          supabase.from('suppliers').select('*')
+        ]);
+
+        if (p.error || m.error) throw new Error("Erro de conexão com DB");
+
+        const dbProjects = mapFromSupabase<Project>(p.data);
+        const dbMaterials = mapFromSupabase<Material>(m.data);
+        
+        // Se o banco retornar dados, usamos eles. Se estiver vazio (tabela nova), tentamos localStorage
+        if (dbProjects.length > 0 || dbMaterials.length > 0) {
+            setProjects(dbProjects.length ? dbProjects : INITIAL_PROJECTS);
+            setMaterials(dbMaterials.length ? dbMaterials : INITIAL_MATERIALS);
+            setServices(mapFromSupabase<ServiceType>(s.data).length ? mapFromSupabase<ServiceType>(s.data) : INITIAL_SERVICES);
+            setOss(mapFromSupabase<OS>(o.data));
+            setMovements(mapFromSupabase<StockMovement>(mov.data));
+            setSuppliers(mapFromSupabase<any>(sup.data));
+            setSyncStatus('online');
+        } else {
+            // Fallback para LocalStorage se o banco estiver vazio (primeiro uso)
+            const stored = localStorage.getItem('crop_service_v3_data');
+            if (stored) {
+                const data = JSON.parse(stored);
+                if (data.projects) setProjects(data.projects);
+                if (data.materials) setMaterials(data.materials);
+                if (data.services) setServices(data.services);
+                if (data.oss) setOss(data.oss);
+                if (data.movements) setMovements(data.movements);
+                if (data.suppliers) setSuppliers(data.suppliers);
+            }
+            setSyncStatus('online'); // Consideramos online mas vazio
+        }
+      } catch (err) {
+        console.warn("Supabase não conectado ou tabelas inexistentes. Usando LocalStorage.", err);
+        // Fallback completo para LocalStorage
+        const stored = localStorage.getItem('crop_service_v3_data');
+        if (stored) {
+          const data = JSON.parse(stored);
+          if (data.projects) setProjects(data.projects);
+          if (data.materials) setMaterials(data.materials);
+          if (data.services) setServices(data.services);
+          if (data.oss) setOss(data.oss);
+          if (data.movements) setMovements(data.movements);
+          if (data.suppliers) setSuppliers(data.suppliers);
+        }
+        setSyncStatus('offline');
+      } finally {
+        setFirstLoad(false);
       }
-    }
+    };
+
+    loadData();
   }, []);
 
+  // Sincronização e Persistência
   useEffect(() => {
+    if (firstLoad) return;
+
+    // 1. Salva Localmente
     localStorage.setItem('crop_service_v3_data', JSON.stringify({ projects, materials, services, oss, movements, suppliers }));
-  }, [projects, materials, services, oss, movements, suppliers]);
+
+    // 2. Debounce para salvar no Supabase
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    
+    timeoutRef.current = setTimeout(async () => {
+       if (syncStatus === 'offline') return;
+       
+       setSyncStatus('syncing');
+       try {
+          // Upsert em Batch para cada tabela
+          // Nota: Isso é uma estratégia simplificada "Document-Store". 
+          // Em produção real, faríamos apenas o diff ou endpoints específicos.
+          
+          await Promise.all([
+             ...projects.map(item => supabase.from('projects').upsert(mapToSupabase(item))),
+             ...materials.map(item => supabase.from('materials').upsert(mapToSupabase(item))),
+             ...services.map(item => supabase.from('services').upsert(mapToSupabase(item))),
+             ...oss.map(item => supabase.from('oss').upsert(mapToSupabase(item))),
+             ...movements.map(item => supabase.from('stock_movements').upsert(mapToSupabase(item))),
+             ...suppliers.map(item => supabase.from('suppliers').upsert(mapToSupabase(item))),
+          ]);
+          setSyncStatus('online');
+       } catch (e) {
+          console.error("Erro ao sincronizar", e);
+          setSyncStatus('error');
+       }
+    }, 2000); // 2 segundos de inatividade para disparar o sync
+
+    return () => { if(timeoutRef.current) clearTimeout(timeoutRef.current); };
+  }, [projects, materials, services, oss, movements, suppliers, firstLoad]);
 
   const handleStockChange = (mId: string, qty: number, osNumber: string) => {
     setMaterials(prev => prev.map(m => 
@@ -189,6 +278,14 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-6">
+             {/* Status Sync */}
+             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
+                <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'online' ? 'bg-emerald-500' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
+                <span className="text-xs font-bold text-slate-600 uppercase">
+                    {syncStatus === 'online' ? 'Conectado' : syncStatus === 'syncing' ? 'Sincronizando...' : syncStatus === 'error' ? 'Erro Sync' : 'Offline'}
+                </span>
+             </div>
+
              <div className="relative">
                 <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
                 <input type="text" placeholder="Pesquisar..." className="pl-11 pr-5 h-11 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-clean-primary/20 focus:bg-white focus:border-clean-primary w-72 transition-all shadow-sm placeholder:text-slate-400" />
