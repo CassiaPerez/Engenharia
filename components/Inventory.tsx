@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Material, StockMovement } from '../types';
 
 interface Props {
@@ -14,157 +14,102 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleManualAdjustment = (mId: string, type: 'IN' | 'OUT' | 'ADJUST' | 'RETURN', qty: number, reason: string) => {
+    if (isNaN(qty) || qty <= 0) return;
     setMaterials(prev => prev.map(m => {
       if (m.id === mId) {
         let newQty = m.currentStock;
         if (type === 'IN' || type === 'RETURN') newQty += qty;
-        else if (type === 'OUT') {
-           if (m.currentStock < qty) {
-             alert("Erro Industrial: Saldo insuficiente para requisição.");
-             return m;
-           }
-           newQty -= qty;
-        }
+        else if (type === 'OUT' && m.currentStock >= qty) newQty -= qty;
         else if (type === 'ADJUST') newQty = qty;
-        
-        onAddMovement({
-          id: Math.random().toString(36).substr(2, 9),
-          type,
-          materialId: mId,
-          quantity: qty,
-          date: new Date().toISOString(),
-          userId: 'ALMOXARIFE_MASTER',
-          description: reason
-        });
-        
+        else return m; 
+        onAddMovement({ id: Math.random().toString(36).substr(2, 9), type, materialId: mId, quantity: qty, date: new Date().toISOString(), userId: 'ADMIN', description: reason });
         return { ...m, currentStock: newQty };
       }
       return m;
     }));
   };
 
-  const filteredMaterials = materials.filter(m => 
-    m.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    m.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMaterials = materials.filter(m => m.description.toLowerCase().includes(searchTerm.toLowerCase()) || m.code.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <header className="flex justify-between items-center border-b border-slate-200 pb-6">
         <div>
-          <h2 className="text-3xl font-display font-black text-slate-950 tracking-tight">Almoxarifado Industrial</h2>
-          <p className="text-slate-500 font-medium text-sm">Giro de estoque e rastreabilidade de peças e insumos.</p>
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Almoxarifado Central</h2>
+          <p className="text-slate-500 text-base mt-1">Controle físico de estoque e auditoria.</p>
         </div>
-        <div className="flex gap-2 bg-slate-200 p-1.5 rounded-2xl self-stretch md:self-auto">
-          <button 
-            onClick={() => setView('stock')}
-            className={`flex-1 md:px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'stock' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-          >Itens em Estoque</button>
-          <button 
-            onClick={() => setView('history')}
-            className={`flex-1 md:px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'history' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-          >Movimentação Realtime</button>
+        <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+          <button onClick={() => setView('stock')} className={`px-6 py-2.5 rounded-lg text-sm font-bold uppercase transition-all ${view === 'stock' ? 'bg-white text-slate-800 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-700'}`}>Saldo Atual</button>
+          <button onClick={() => setView('history')} className={`px-6 py-2.5 rounded-lg text-sm font-bold uppercase transition-all ${view === 'history' ? 'bg-white text-slate-800 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-700'}`}>Kardex</button>
         </div>
       </header>
 
       {view === 'stock' ? (
         <>
-          <div className="flex bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm max-w-xl group focus-within:border-blue-500 transition-all">
-            <i className="fas fa-search text-slate-300 mr-4 mt-1"></i>
-            <input 
-              type="text" 
-              placeholder="Pesquisar por Código SAP, Descrição ou Grupo..." 
-              className="bg-transparent text-sm font-bold outline-none w-full text-slate-700 placeholder:text-slate-300"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+          <div className="relative max-w-lg">
+            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
+            <input type="text" placeholder="Filtrar materiais por nome ou código..." className="w-full pl-12 pr-4 h-12 bg-white border border-slate-300 rounded-xl text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredMaterials.map(m => (
-              <div key={m.id} className={`bg-white rounded-[2.5rem] p-8 shadow-sm border transition-all group ${m.currentStock <= m.minStock ? 'border-red-200 bg-red-50/10' : 'border-slate-200 hover:shadow-2xl'}`}>
-                <div className="flex justify-between items-start mb-8">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${m.currentStock <= m.minStock ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-950 group-hover:text-white'}`}>
-                    <i className="fas fa-box-open text-2xl"></i>
-                  </div>
-                  {m.currentStock <= m.minStock && (
-                     <div className="bg-red-100 text-red-700 px-3 py-1 rounded-lg text-[9px] font-black uppercase animate-pulse">Estoque Baixo</div>
-                  )}
-                </div>
-                <h4 className="font-display font-black text-slate-900 text-lg mb-1 leading-tight min-h-[3rem]">{m.description}</h4>
-                <div className="flex gap-2 mb-8">
-                   <span className="text-[9px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 uppercase tracking-widest">{m.code}</span>
-                   <span className="text-[9px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 uppercase tracking-widest">{m.group || 'Geral'}</span>
-                </div>
-                
-                <div className="flex justify-between items-end mb-8">
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Saldo Físico</p>
-                    <p className={`text-4xl font-display font-black ${m.currentStock <= m.minStock ? 'text-red-600' : 'text-slate-950'}`}>{m.currentStock} <span className="text-sm text-slate-400 font-sans font-bold">{m.unit}</span></p>
-                  </div>
-                </div>
-
-                <div className="pt-8 border-t border-slate-100 grid grid-cols-2 gap-2">
-                  <button onClick={() => { const q = prompt("Quantidade para Entrada Industrial:"); if (q) handleManualAdjustment(m.id, 'IN', Number(q), 'Entrada de Mercadoria'); }} className="py-4 bg-slate-950 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-slate-800 transition-all">Entrada</button>
-                  <button onClick={() => { const q = prompt("Quantidade para Devolução:"); if (q) handleManualAdjustment(m.id, 'RETURN', Number(q), 'Devolução de Material'); }} className="py-4 bg-white border border-slate-200 text-slate-600 text-[10px] font-black uppercase rounded-2xl hover:bg-slate-50 transition-all">Devolução</button>
-                </div>
-              </div>
-            ))}
-            {filteredMaterials.length === 0 && (
-              <div className="col-span-full py-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
-                 <i className="fas fa-box-archive text-5xl text-slate-200 mb-4"></i>
-                 <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Nenhum item encontrado no catálogo industrial.</p>
-              </div>
-            )}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+             <table className="w-full text-base text-left">
+                <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-xs tracking-wider">
+                   <tr>
+                      <th className="px-8 py-5">Código</th>
+                      <th className="px-8 py-5">Descrição</th>
+                      <th className="px-8 py-5">Grupo</th>
+                      <th className="px-8 py-5 text-right">Mínimo</th>
+                      <th className="px-8 py-5 text-right">Saldo</th>
+                      <th className="px-8 py-5 text-center">Status</th>
+                      <th className="px-8 py-5 text-center">Ações</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                   {filteredMaterials.map(m => (
+                       <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
+                           <td className="px-8 py-5 font-mono text-sm text-slate-500 font-bold">{m.code}</td>
+                           <td className="px-8 py-5 font-bold text-slate-800">{m.description}</td>
+                           <td className="px-8 py-5 text-slate-500">{m.group}</td>
+                           <td className="px-8 py-5 text-right text-slate-400">{m.minStock}</td>
+                           <td className="px-8 py-5 text-right font-black text-slate-800 text-lg">{m.currentStock} <span className="text-xs text-slate-400 font-medium ml-1">{m.unit}</span></td>
+                           <td className="px-8 py-5 text-center">
+                               {m.currentStock <= m.minStock ? (
+                                   <span className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide border border-red-200">Repor</span>
+                               ) : (
+                                   <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide border border-emerald-200">OK</span>
+                               )}
+                           </td>
+                           <td className="px-8 py-5 text-center">
+                               <div className="flex justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                   <button onClick={() => { const q = prompt("Qtd Entrada:"); if(q) handleManualAdjustment(m.id, 'IN', Number(q), 'Entrada Manual'); }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-blue-600 border border-slate-200 rounded-lg transition-all" title="Entrada"><i className="fas fa-plus"></i></button>
+                                   <button onClick={() => { const q = prompt("Qtd Saída:"); if(q) handleManualAdjustment(m.id, 'OUT', Number(q), 'Baixa Manual'); }} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-red-600 border border-slate-200 rounded-lg transition-all" title="Saída"><i className="fas fa-minus"></i></button>
+                               </div>
+                           </td>
+                       </tr>
+                   ))}
+                </tbody>
+             </table>
           </div>
         </>
       ) : (
-        <div className="bg-white rounded-[3rem] shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-500">
-          <div className="p-10 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-             <h3 className="font-display font-black text-slate-900 text-xl tracking-tight">Registro de Auditoria Logística (Giro)</h3>
-             <button onClick={() => window.print()} className="text-[10px] font-black text-blue-600 border border-blue-600 px-6 py-3 rounded-xl uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">
-                Exportar Histórico
-             </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timestamp</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase text-center">Tipo Operação</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase">Item / Descrição</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase text-center">Volume</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase">Vínculo OS / Motivo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {[...movements].reverse().map(mov => (
-                  <tr key={mov.id} className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-10 py-6 text-xs font-bold text-slate-500">{new Date(mov.date).toLocaleString('pt-BR')}</td>
-                    <td className="px-10 py-6 text-center">
-                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                        mov.type === 'IN' ? 'bg-emerald-100 text-emerald-700' : 
-                        mov.type === 'OUT' ? 'bg-rose-100 text-rose-700' : 
-                        mov.type === 'RETURN' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
-                      }`}>{mov.type}</span>
-                    </td>
-                    <td className="px-10 py-6">
-                      <p className="font-black text-slate-950 text-sm">{materials.find(x=>x.id===mov.materialId)?.description || 'Item Excluído'}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">{materials.find(x=>x.id===mov.materialId)?.code}</p>
-                    </td>
-                    <td className="px-10 py-6 text-center font-display font-black text-slate-950 text-xl">{mov.quantity}</td>
-                    <td className="px-10 py-6">
-                      <p className="text-xs text-slate-900 font-black uppercase tracking-tight">{mov.osId ? `Requisição: ${mov.osId}` : 'Ajuste Sistêmico'}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{mov.description}</p>
-                    </td>
-                  </tr>
-                ))}
-                {movements.length === 0 && (
-                  <tr><td colSpan={5} className="p-32 text-center text-slate-400 italic font-bold text-lg uppercase tracking-widest">Sem registros de giro físico.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
+           <h3 className="font-bold text-xl text-slate-800 mb-6 flex items-center gap-2"><i className="fas fa-history text-clean-primary"></i> Histórico de Movimentação (Kardex)</h3>
+           <div className="overflow-x-auto">
+               <table className="w-full text-sm text-left">
+                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider"><tr className="border-b border-slate-200"><th className="p-4">Data</th><th className="p-4">Tipo</th><th className="p-4">Material</th><th className="p-4 text-right">Qtd</th><th className="p-4">Origem / Justificativa</th></tr></thead>
+                   <tbody className="divide-y divide-slate-100">
+                       {movements.sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()).map(mov => (
+                           <tr key={mov.id} className="hover:bg-slate-50">
+                               <td className="p-4 text-slate-500 font-mono">{new Date(mov.date).toLocaleString()}</td>
+                               <td className="p-4"><span className={`font-black text-xs px-3 py-1.5 rounded-lg border uppercase tracking-wide ${mov.type==='IN'?'bg-emerald-50 text-emerald-700 border-emerald-200':mov.type==='OUT'?'bg-amber-50 text-amber-700 border-amber-200':'bg-blue-50 text-blue-700 border-blue-200'}`}>{mov.type}</span></td>
+                               <td className="p-4 font-bold text-slate-700">{materials.find(m=>m.id===mov.materialId)?.description || '---'}</td>
+                               <td className="p-4 text-right font-mono font-bold text-base">{mov.quantity}</td>
+                               <td className="p-4 text-slate-500 font-medium">{mov.description}</td>
+                           </tr>
+                       ))}
+                   </tbody>
+               </table>
+           </div>
         </div>
       )}
     </div>

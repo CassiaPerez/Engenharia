@@ -2,33 +2,42 @@
 import { Material, ServiceType, Project, ProjectStatus, Category, OSType, ServiceCostType } from './types';
 
 export const INITIAL_MATERIALS: Material[] = [
-  // Fixed: Added missing 'group' property to Material objects
   { id: 'm1', code: 'CIM-001', description: 'Cimento CP-II 50kg', group: 'Construção', unit: 'Saco', unitCost: 32.5, minStock: 20, currentStock: 45, location: 'Ala A-01', status: 'ACTIVE' },
   { id: 'm2', code: 'ACO-010', description: 'Barra de Aço 10mm', group: 'Metalurgia', unit: 'Barra', unitCost: 45.9, minStock: 50, currentStock: 120, location: 'Ala B-05', status: 'ACTIVE' },
   { id: 'm3', code: 'TUB-075', description: 'Tubo PVC 75mm 6m', group: 'Hidráulica', unit: 'Un', unitCost: 89.0, minStock: 10, currentStock: 8, location: 'Ala C-02', status: 'ACTIVE' },
 ];
 
 export const INITIAL_SERVICES: ServiceType[] = [
-  // Fixed: Added missing 'category' property to ServiceType objects
-  { id: 's1', name: 'Alvenaria', description: 'Levantamento de paredes e reboco', costType: ServiceCostType.HOURLY, unitValue: 45.0, category: 'INTERNAL' },
-  { id: 's2', name: 'Elétrica', description: 'Instalações elétricas prediais', costType: ServiceCostType.HOURLY, unitValue: 65.0, category: 'EXTERNAL' },
-  { id: 's3', name: 'Hidráulica', description: 'Instalações de tubulações e esgoto', costType: ServiceCostType.HOURLY, unitValue: 60.0, category: 'INTERNAL' },
-  { id: 's4', name: 'Laudo Técnico', description: 'Emissão de ART e vistoria', costType: ServiceCostType.FIXED, unitValue: 850.0, category: 'EXTERNAL' },
+  { id: 's1', name: 'Alvenaria', description: 'Levantamento de paredes e reboco', costType: ServiceCostType.HOURLY, unitValue: 0, category: 'INTERNAL' },
+  { id: 's2', name: 'Elétrica', description: 'Instalações elétricas prediais', costType: ServiceCostType.HOURLY, unitValue: 0, category: 'INTERNAL' },
+  { id: 's3', name: 'Hidráulica', description: 'Instalações de tubulações e esgoto', costType: ServiceCostType.HOURLY, unitValue: 0, category: 'INTERNAL' },
+  { id: 's4', name: 'Vistoria Técnica', description: 'Laudo de conformidade técnica', costType: ServiceCostType.FIXED, unitValue: 0, category: 'INTERNAL' },
 ];
 
 export const INITIAL_PROJECTS: Project[] = [
   { 
     id: 'p1', 
     code: 'PRJ-2024-001', 
-    description: 'Reforma Galpão Sul', 
+    description: 'Reforma Galpão Sul',
+    detailedDescription: 'Substituição integral da cobertura metálica, aplicação de manta térmica e revisão de todo o sistema elétrico de iluminação.',
+    location: 'Galpão Logístico G01',
+    city: 'Jundiaí - SP',
     category: Category.WORK, 
     reason: 'Manutenção estrutural telhado', 
     reasonType: OSType.PREVENTIVE, 
     responsible: 'Eng. Ricardo Silva', 
-    // Fixed: Added missing area, costCenter and auditLogs properties
     area: 'Logística',
     costCenter: 'CC-MANUT-001',
     estimatedValue: 150000, 
+    /* Planejamento Físico Inicial */
+    plannedMaterials: [
+        { materialId: 'm1', quantity: 50 },
+        { materialId: 'm2', quantity: 20 }
+    ],
+    plannedServices: [
+        { serviceTypeId: 's1', hours: 120 },
+        { serviceTypeId: 's4', hours: 8 }
+    ],
     startDate: '2024-01-15', 
     estimatedEndDate: '2024-06-15', 
     slaDays: 150, 
