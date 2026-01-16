@@ -44,11 +44,11 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
 
   const getStatusBadge = (status: ProjectStatus) => {
     switch (status) {
-      case ProjectStatus.FINISHED: return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold uppercase border border-emerald-200">Concluído</span>;
-      case ProjectStatus.IN_PROGRESS: return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold uppercase border border-blue-200">Em Andamento</span>;
-      case ProjectStatus.PAUSED: return <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-bold uppercase border border-amber-200">Pausado</span>;
-      case ProjectStatus.CANCELED: return <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-bold uppercase border border-slate-200">Cancelado</span>;
-      default: return <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold uppercase border border-slate-200">Planejado</span>;
+      case ProjectStatus.FINISHED: return <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-md text-sm font-bold uppercase border border-emerald-200">Concluído</span>;
+      case ProjectStatus.IN_PROGRESS: return <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-md text-sm font-bold uppercase border border-blue-200">Em Andamento</span>;
+      case ProjectStatus.PAUSED: return <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-md text-sm font-bold uppercase border border-amber-200">Pausado</span>;
+      case ProjectStatus.CANCELED: return <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md text-sm font-bold uppercase border border-slate-200">Cancelado</span>;
+      default: return <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-sm font-bold uppercase border border-slate-200">Planejado</span>;
     }
   };
 
@@ -56,11 +56,11 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Painel de Governança</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Visão consolidada de custos e performance industrial.</p>
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Painel de Governança</h2>
+          <p className="text-slate-600 text-lg mt-1 font-medium">Visão consolidada de custos e performance industrial.</p>
         </div>
-        <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5">
-           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Sistema Operante
+        <span className="text-sm font-bold text-emerald-700 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-200 flex items-center gap-2">
+           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sistema Operante
         </span>
       </div>
 
@@ -79,22 +79,22 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
               Performance Orçamentária (Budget vs Real)
             </h3>
-            <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">Ver Detalhes <i className="fas fa-arrow-right ml-1"></i></button>
+            <button className="text-sm text-blue-600 hover:text-blue-800 font-bold">Ver Detalhes <i className="fas fa-arrow-right ml-1"></i></button>
           </div>
           <div className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.performanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barGap={2}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }} />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '14px', fontWeight: 500 }}
                   formatter={(value: number) => [`R$ ${formatCurrency(value)}`, '']}
                 />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
-                <Bar dataKey="budget" name="Orçamento (R$)" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={24} />
-                <Bar dataKey="real" name="Realizado (R$)" radius={[4, 4, 0, 0]} barSize={24}>
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '14px', paddingTop: '20px', fontWeight: 500 }} />
+                <Bar dataKey="budget" name="Orçamento (R$)" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={32} />
+                <Bar dataKey="real" name="Realizado (R$)" radius={[4, 4, 0, 0]} barSize={32}>
                   {stats.performanceData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.real > entry.budget ? '#ef4444' : '#0ea5e9'} />
                   ))}
@@ -105,55 +105,55 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
         </div>
 
         {/* Card Lateral de Insights */}
-        <div className="bg-slate-900 p-6 rounded-lg shadow-lg flex flex-col justify-between text-white relative overflow-hidden group">
+        <div className="bg-slate-900 p-8 rounded-lg shadow-lg flex flex-col justify-between text-white relative overflow-hidden group">
            <div className="relative z-10">
-             <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center mb-4 border border-white/5">
-               <i className="fas fa-lightbulb text-yellow-400"></i>
+             <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mb-6 border border-white/5">
+               <i className="fas fa-lightbulb text-yellow-400 text-xl"></i>
              </div>
-             <h4 className="text-lg font-bold tracking-tight">Eficiência Global</h4>
-             <div className="mt-4 mb-2">
-                <span className="text-4xl font-bold">{((stats.totalSpent / (stats.totalEstimated || 1)) * 100).toFixed(1)}%</span>
-                <span className="text-xs text-slate-400 ml-2 uppercase font-medium">Do Budget Consumido</span>
+             <h4 className="text-xl font-bold tracking-tight mb-4">Eficiência Global</h4>
+             <div className="mb-2">
+                <span className="text-5xl font-bold">{((stats.totalSpent / (stats.totalEstimated || 1)) * 100).toFixed(1)}%</span>
+                <span className="text-sm text-slate-300 ml-2 uppercase font-bold">Do Budget</span>
              </div>
-             <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-2">
+             <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden mt-4">
                 <div className="bg-clean-primary h-full rounded-full" style={{ width: `${Math.min(((stats.totalSpent / (stats.totalEstimated || 1)) * 100), 100)}%` }}></div>
              </div>
-             <p className="text-xs text-slate-400 mt-6 leading-relaxed">
+             <p className="text-base text-slate-300 mt-8 leading-relaxed font-medium">
                Monitore de perto os projetos com barra vermelha no gráfico. Eles representam estouro orçamentário que impacta o resultado operacional.
              </p>
            </div>
            
            <div className="mt-8 relative z-10">
-              <button className="w-full py-3 bg-clean-primary hover:bg-clean-primary/90 text-white text-xs font-bold uppercase tracking-wider rounded-md transition-all">
-                Exportar Relatório Executivo
+              <button className="w-full py-4 bg-clean-primary hover:bg-clean-primary/90 text-white text-sm font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg">
+                Exportar Relatório
               </button>
            </div>
 
-           <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-clean-primary/20 rounded-full blur-3xl group-hover:bg-clean-primary/30 transition-all duration-700"></div>
+           <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-clean-primary/20 rounded-full blur-3xl group-hover:bg-clean-primary/30 transition-all duration-700"></div>
         </div>
       </div>
 
       {/* Nova Tabela de Detalhamento de Projetos */}
       <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-200 bg-slate-50">
-          <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
             <i className="fas fa-table-list text-clean-primary"></i> Detalhamento de Custos por Projeto
           </h3>
-          <p className="text-xs text-slate-500 mt-1">Ordenado por data de início do projeto.</p>
+          <p className="text-sm text-slate-500 mt-1 font-medium">Ordenado por data de início do projeto.</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-white text-slate-500 font-bold uppercase text-xs border-b border-slate-200">
+          <table className="w-full text-base text-left">
+            <thead className="bg-white text-slate-500 font-bold uppercase text-xs border-b border-slate-200 tracking-wider">
               <tr>
-                <th className="px-6 py-4">Código</th>
-                <th className="px-6 py-4">Descrição</th>
-                <th className="px-6 py-4 text-center">Início</th>
-                <th className="px-6 py-4 text-right">Orçamento (Plan)</th>
-                <th className="px-6 py-4 text-right">Custo Real</th>
-                <th className="px-6 py-4 text-right">Variação (R$)</th>
-                <th className="px-6 py-4 text-right">Var (%)</th>
-                <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-center">Ações</th>
+                <th className="px-6 py-5">Código</th>
+                <th className="px-6 py-5">Descrição</th>
+                <th className="px-6 py-5 text-center">Início</th>
+                <th className="px-6 py-5 text-right">Orçamento (Plan)</th>
+                <th className="px-6 py-5 text-right">Custo Real</th>
+                <th className="px-6 py-5 text-right">Variação (R$)</th>
+                <th className="px-6 py-5 text-right">Var (%)</th>
+                <th className="px-6 py-5 text-center">Status</th>
+                <th className="px-6 py-5 text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -165,25 +165,25 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
                 
                 return (
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-mono font-bold text-slate-700">{p.code}</td>
-                    <td className="px-6 py-4 font-medium text-slate-800">{p.description}</td>
-                    <td className="px-6 py-4 text-center text-slate-500">{formatDate(p.startDate)}</td>
-                    <td className="px-6 py-4 text-right text-slate-600">R$ {formatCurrency(p.estimatedValue)}</td>
-                    <td className="px-6 py-4 text-right font-bold text-slate-800">R$ {formatCurrency(costs.totalReal)}</td>
-                    <td className={`px-6 py-4 text-right font-bold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <td className="px-6 py-5 font-mono font-bold text-slate-700">{p.code}</td>
+                    <td className="px-6 py-5 font-bold text-slate-800">{p.description}</td>
+                    <td className="px-6 py-5 text-center text-slate-500 font-medium">{formatDate(p.startDate)}</td>
+                    <td className="px-6 py-5 text-right text-slate-600 font-medium">R$ {formatCurrency(p.estimatedValue)}</td>
+                    <td className="px-6 py-5 text-right font-bold text-slate-900">R$ {formatCurrency(costs.totalReal)}</td>
+                    <td className={`px-6 py-5 text-right font-black ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
                       {isPositive ? '+' : ''} R$ {formatCurrency(variance)}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                       <span className={`px-2 py-1 rounded text-xs font-bold border ${variancePercent > 100 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                    <td className="px-6 py-5 text-right">
+                       <span className={`px-2.5 py-1 rounded-md text-sm font-bold border ${variancePercent > 100 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
                          {variancePercent.toFixed(1)}%
                        </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-5 text-center">
                         {getStatusBadge(p.status)}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                       <button className="text-slate-400 hover:text-clean-primary transition-colors text-sm font-bold flex items-center justify-center gap-1 mx-auto">
-                          Ver Detalhes <i className="fas fa-chevron-right text-xs"></i>
+                    <td className="px-6 py-5 text-center">
+                       <button className="text-slate-400 hover:text-clean-primary transition-colors text-base font-bold flex items-center justify-center gap-1 mx-auto">
+                          Ver <i className="fas fa-chevron-right text-xs"></i>
                        </button>
                     </td>
                   </tr>
@@ -199,25 +199,25 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
 
 const KpiCard = ({ title, value, icon, color, sub }: any) => {
   const styles: any = {
-    blue: { icon: 'text-blue-600 bg-blue-50', border: 'border-l-4 border-l-blue-500' },
-    emerald: { icon: 'text-emerald-600 bg-emerald-50', border: 'border-l-4 border-l-emerald-500' },
-    red: { icon: 'text-rose-600 bg-rose-50', border: 'border-l-4 border-l-rose-500' },
-    purple: { icon: 'text-purple-600 bg-purple-50', border: 'border-l-4 border-l-purple-500' },
-    slate: { icon: 'text-slate-600 bg-slate-100', border: 'border-l-4 border-l-slate-400' }
+    blue: { icon: 'text-blue-600 bg-blue-50', border: 'border-l-[6px] border-l-blue-500' },
+    emerald: { icon: 'text-emerald-600 bg-emerald-50', border: 'border-l-[6px] border-l-emerald-500' },
+    red: { icon: 'text-rose-600 bg-rose-50', border: 'border-l-[6px] border-l-rose-500' },
+    purple: { icon: 'text-purple-600 bg-purple-50', border: 'border-l-[6px] border-l-purple-500' },
+    slate: { icon: 'text-slate-600 bg-slate-100', border: 'border-l-[6px] border-l-slate-400' }
   };
   
   const activeStyle = styles[color] || styles.slate;
 
   return (
-    <div className={`bg-white p-5 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all ${activeStyle.border}`}>
+    <div className={`bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all ${activeStyle.border}`}>
       <div className="flex justify-between items-start">
         <div>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{title}</p>
-          <p className="text-2xl font-bold text-slate-800 mt-1">{value}</p>
-          <p className="text-[10px] font-medium text-slate-400 mt-1">{sub}</p>
+          <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">{title}</p>
+          <p className="text-3xl font-bold text-slate-800 mt-2">{value}</p>
+          <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wider">{sub}</p>
         </div>
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${activeStyle.icon}`}>
-          <i className={`fas ${icon} text-lg`}></i>
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${activeStyle.icon}`}>
+          <i className={`fas ${icon} text-xl`}></i>
         </div>
       </div>
     </div>

@@ -217,7 +217,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row antialiased font-sans text-slate-900 font-medium">
+    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row antialiased font-sans text-slate-900 font-medium text-base">
       {/* Sidebar - Aumentada e com melhor contraste */}
       <aside className="w-full md:w-20 lg:w-72 bg-slate-900 flex-shrink-0 flex flex-col z-50 border-r border-slate-800">
         <div className="h-24 flex items-center px-6 border-b border-slate-800/50 bg-slate-950">
@@ -270,35 +270,35 @@ const App: React.FC = () => {
         {/* Header - Mais alto e com busca clara */}
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 flex-shrink-0 z-40 shadow-sm">
           <div className="flex items-center gap-3 text-base text-slate-600">
-             <i className="fas fa-home text-slate-400"></i>
+             <i className="fas fa-home text-slate-400 text-lg"></i>
              <i className="fas fa-chevron-right text-xs text-slate-300"></i>
              <span className="font-semibold text-slate-800">Planta Industrial A01</span>
              <i className="fas fa-chevron-right text-xs text-slate-300"></i>
-             <span className="font-bold text-clean-primary text-lg">{MENU_GROUPS.reduce((acc, g) => [...acc, ...g.items], [] as any[]).find(i => i.id === activeTab)?.label}</span>
+             <span className="font-bold text-clean-primary text-xl">{MENU_GROUPS.reduce((acc, g) => [...acc, ...g.items], [] as any[]).find(i => i.id === activeTab)?.label}</span>
           </div>
           
           <div className="flex items-center gap-6">
              {/* Status Sync */}
              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
-                <span className={`w-2.5 h-2.5 rounded-full ${syncStatus === 'online' ? 'bg-emerald-500' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
+                <span className={`w-3 h-3 rounded-full ${syncStatus === 'online' ? 'bg-emerald-500' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
                 <span className="text-xs font-bold text-slate-600 uppercase">
                     {syncStatus === 'online' ? 'Conectado' : syncStatus === 'syncing' ? 'Sincronizando...' : syncStatus === 'error' ? 'Erro Sync' : 'Offline'}
                 </span>
              </div>
 
              <div className="relative">
-                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-                <input type="text" placeholder="Pesquisar..." className="pl-11 pr-5 h-11 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-clean-primary/20 focus:bg-white focus:border-clean-primary w-72 transition-all shadow-sm placeholder:text-slate-400" />
+                <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-base"></i>
+                <input type="text" placeholder="Pesquisar..." className="pl-11 pr-5 h-12 bg-slate-50 border border-slate-300 rounded-lg text-base font-medium text-slate-800 focus:ring-2 focus:ring-clean-primary/20 focus:bg-white focus:border-clean-primary w-80 transition-all shadow-sm placeholder:text-slate-400" />
              </div>
-             <button className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 border border-slate-300 flex items-center justify-center text-slate-600 transition-all relative shadow-sm hover:shadow">
-                <i className="fas fa-bell text-lg"></i>
-                <span className="absolute top-2.5 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+             <button className="w-12 h-12 rounded-full bg-white hover:bg-slate-50 border border-slate-300 flex items-center justify-center text-slate-600 transition-all relative shadow-sm hover:shadow">
+                <i className="fas fa-bell text-xl"></i>
+                <span className="absolute top-3 right-3.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
              </button>
           </div>
         </header>
 
         <section className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10">
-          <div className="max-w-[1800px] mx-auto">
+          <div className="max-w-[1920px] mx-auto">
             {renderContent()}
           </div>
         </section>
@@ -317,16 +317,16 @@ interface SidebarLinkProps {
 const SidebarLink: React.FC<SidebarLinkProps> = ({ active, onClick, icon, label }) => (
   <button 
     onClick={onClick}
-    className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl transition-all group relative ${
+    className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl transition-all group relative ${
       active 
         ? 'bg-clean-primary text-white font-bold shadow-lg shadow-clean-primary/25' 
-        : 'text-slate-300 hover:bg-white/5 hover:text-white font-semibold'
+        : 'text-slate-300 hover:bg-white/5 hover:text-white font-medium'
     }`}
   >
     <div className={`w-6 flex justify-center ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>
-      <i className={`fas ${icon} text-lg`}></i>
+      <i className={`fas ${icon} text-xl`}></i>
     </div>
-    <span className="hidden lg:block text-base tracking-tight">{label}</span>
+    <span className="hidden lg:block text-lg tracking-tight">{label}</span>
   </button>
 );
 
