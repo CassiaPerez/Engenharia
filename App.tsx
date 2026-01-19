@@ -189,7 +189,7 @@ const App: React.FC = () => {
       case 'dash':
         return <Dashboard projects={projects} oss={oss} materials={materials} services={services} />;
       case 'calendar':
-        return <Calendar projects={projects} oss={oss} />;
+        return <Calendar projects={projects} oss={oss} materials={materials} services={services} />;
       case 'projects':
         return <ProjectList projects={projects} setProjects={setProjects} oss={oss} materials={materials} services={services} />;
       case 'os': 

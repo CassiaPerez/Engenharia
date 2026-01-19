@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Project, OS } from '../types';
+import { Project, OS, Material, ServiceType } from '../types';
 
 interface Props {
   projects: Project[];
   oss: OS[];
+  materials?: Material[];
+  services?: ServiceType[];
 }
 
 interface CalendarEvent {
@@ -14,11 +16,13 @@ interface CalendarEvent {
   type: 'project' | 'os';
   status: string;
   color: string;
+  data: Project | OS;
 }
 
-const Calendar: React.FC<Props> = ({ projects, oss }) => {
+const Calendar: React.FC<Props> = ({ projects, oss, materials = [], services = [] }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week'>('month');
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   const events: CalendarEvent[] = useMemo(() => {
     const projectEvents: CalendarEvent[] = projects.map(p => ({
@@ -28,7 +32,8 @@ const Calendar: React.FC<Props> = ({ projects, oss }) => {
       end: new Date(p.estimatedEndDate),
       type: 'project' as const,
       status: p.status,
-      color: getProjectColor(p.status)
+      color: getProjectColor(p.status),
+      data: p
     }));
 
     const osEvents: CalendarEvent[] = oss.map(o => ({
@@ -38,7 +43,8 @@ const Calendar: React.FC<Props> = ({ projects, oss }) => {
       end: new Date(o.limitDate),
       type: 'os' as const,
       status: o.status,
-      color: getOSColor(o.priority)
+      color: getOSColor(o.priority),
+      data: o
     }));
 
     return [...projectEvents, ...osEvents];
@@ -120,9 +126,38 @@ const Calendar: React.FC<Props> = ({ projects, oss }) => {
     setCurrentDate(new Date());
   };
 
+  const handleEventClick = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+  };
+
+  const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatDate = (date: string) => new Date(date).toLocaleDateString('pt-BR');
+
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  const getStatusLabel = (status: string, type: 'project' | 'os') => {
+    if (type === 'project') {
+      const labels: Record<string, string> = {
+        PLANNED: 'Planejado',
+        IN_PROGRESS: 'Em Progresso',
+        PAUSED: 'Pausado',
+        FINISHED: 'Finalizado',
+        CANCELED: 'Cancelado'
+      };
+      return labels[status] || status;
+    } else {
+      const labels: Record<string, string> = {
+        OPEN: 'Aberto',
+        IN_PROGRESS: 'Em Progresso',
+        PAUSED: 'Pausado',
+        COMPLETED: 'Concluído',
+        CANCELED: 'Cancelado'
+      };
+      return labels[status] || status;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -221,6 +256,7 @@ const Calendar: React.FC<Props> = ({ projects, oss }) => {
                         {dayEvents.slice(0, 3).map(event => (
                           <div
                             key={event.id}
+                            onClick={() => handleEventClick(event)}
                             className={`text-xs p-1.5 rounded ${event.color} truncate cursor-pointer hover:opacity-80 transition-opacity`}
                             title={event.title}
                           >
@@ -269,6 +305,7 @@ const Calendar: React.FC<Props> = ({ projects, oss }) => {
                     {dayEvents.map(event => (
                       <div
                         key={event.id}
+                        onClick={() => handleEventClick(event)}
                         className={`text-xs p-2 rounded-lg ${event.color} cursor-pointer hover:opacity-80 transition-opacity`}
                       >
                         <div className="font-bold flex items-center gap-1 mb-1">
@@ -360,6 +397,239 @@ const Calendar: React.FC<Props> = ({ projects, oss }) => {
           </div>
         </div>
       </div>
+
+      {selectedEvent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className={`p-6 border-b border-slate-200 ${
+              selectedEvent.type === 'project' ? 'bg-blue-50' : 'bg-orange-50'
+            }`}>
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-4">
+                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center shadow-sm ${
+                    selectedEvent.type === 'project'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-orange-500 text-white'
+                  }`}>
+                    <i className={`fas ${
+                      selectedEvent.type === 'project' ? 'fa-folder' : 'fa-wrench'
+                    } text-2xl`}></i>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-800">
+                      {selectedEvent.type === 'project' ? 'Projeto' : 'Ordem de Serviço'}
+                    </h3>
+                    <p className="text-sm text-slate-600 mt-1">
+                      {selectedEvent.type === 'project'
+                        ? (selectedEvent.data as Project).code
+                        : `OS ${(selectedEvent.data as OS).number}`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="w-10 h-10 rounded-lg hover:bg-white/50 flex items-center justify-center text-slate-600 transition-colors"
+                >
+                  <i className="fas fa-times text-xl"></i>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {selectedEvent.type === 'project' ? (
+                <>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição</label>
+                    <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as Project).description}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Status</label>
+                      <p className="text-base text-slate-800 mt-1 font-bold">
+                        {getStatusLabel((selectedEvent.data as Project).status, 'project')}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
+                      <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as Project).category}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Data Início</label>
+                      <p className="text-base text-slate-800 mt-1">
+                        {formatDate((selectedEvent.data as Project).startDate)}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Previsão Término</label>
+                      <p className="text-base text-slate-800 mt-1">
+                        {formatDate((selectedEvent.data as Project).estimatedEndDate)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Local</label>
+                      <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as Project).location}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cidade</label>
+                      <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as Project).city}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Responsável</label>
+                    <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as Project).responsible}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Área</label>
+                      <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as Project).area}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Centro de Custo</label>
+                      <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as Project).costCenter}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
+                    <label className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Valor Estimado</label>
+                    <p className="text-2xl font-bold text-emerald-700 mt-1">
+                      {formatCurrency((selectedEvent.data as Project).estimatedValue)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição Detalhada</label>
+                    <p className="text-sm text-slate-600 mt-2 leading-relaxed whitespace-pre-wrap">
+                      {(selectedEvent.data as Project).detailedDescription || 'Sem descrição detalhada'}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição</label>
+                    <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as OS).description}</p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Status</label>
+                      <p className="text-base text-slate-800 mt-1 font-bold">
+                        {getStatusLabel((selectedEvent.data as OS).status, 'os')}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tipo</label>
+                      <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as OS).type}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Prioridade</label>
+                      <p className={`text-base mt-1 font-bold ${
+                        (selectedEvent.data as OS).priority === 'CRITICAL' ? 'text-red-600' :
+                        (selectedEvent.data as OS).priority === 'HIGH' ? 'text-orange-600' :
+                        (selectedEvent.data as OS).priority === 'MEDIUM' ? 'text-blue-600' :
+                        'text-slate-600'
+                      }`}>
+                        {(selectedEvent.data as OS).priority === 'CRITICAL' ? 'Crítica' :
+                         (selectedEvent.data as OS).priority === 'HIGH' ? 'Alta' :
+                         (selectedEvent.data as OS).priority === 'MEDIUM' ? 'Média' : 'Baixa'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Data Abertura</label>
+                      <p className="text-base text-slate-800 mt-1">
+                        {formatDate((selectedEvent.data as OS).openDate)}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Data Limite</label>
+                      <p className="text-base text-slate-800 mt-1">
+                        {formatDate((selectedEvent.data as OS).limitDate)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">SLA</label>
+                    <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as OS).slaHours} horas</p>
+                  </div>
+
+                  {(selectedEvent.data as OS).executorId && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Executor</label>
+                      <p className="text-base text-slate-800 mt-1">{(selectedEvent.data as OS).executorId}</p>
+                    </div>
+                  )}
+
+                  {(selectedEvent.data as OS).materials && (selectedEvent.data as OS).materials.length > 0 && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Materiais Utilizados</label>
+                      <div className="space-y-2">
+                        {(selectedEvent.data as OS).materials.map((mat, idx) => {
+                          const material = materials.find(m => m.id === mat.materialId);
+                          return (
+                            <div key={idx} className="bg-slate-50 rounded-lg p-3 flex justify-between items-center">
+                              <div>
+                                <p className="text-sm font-bold text-slate-800">{material?.description || mat.materialId}</p>
+                                <p className="text-xs text-slate-500">Quantidade: {mat.quantity}</p>
+                              </div>
+                              <span className="text-sm font-bold text-slate-700">
+                                {formatCurrency(mat.unitCost * mat.quantity)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedEvent.data as OS).services && (selectedEvent.data as OS).services.length > 0 && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Serviços Executados</label>
+                      <div className="space-y-2">
+                        {(selectedEvent.data as OS).services.map((srv, idx) => {
+                          const service = services.find(s => s.id === srv.serviceTypeId);
+                          return (
+                            <div key={idx} className="bg-slate-50 rounded-lg p-3 flex justify-between items-center">
+                              <div>
+                                <p className="text-sm font-bold text-slate-800">{service?.name || srv.serviceTypeId}</p>
+                                <p className="text-xs text-slate-500">Horas: {srv.quantity}</p>
+                              </div>
+                              <span className="text-sm font-bold text-slate-700">
+                                {formatCurrency(srv.unitCost * srv.quantity)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-slate-200 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setSelectedEvent(null)}
+                className="px-6 py-3 bg-clean-primary text-white rounded-lg text-base font-bold hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/30 transition-all"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
