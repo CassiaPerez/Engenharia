@@ -12,6 +12,7 @@ import Inventory from './components/Inventory';
 import ServiceManager from './components/ServiceManager';
 import SupplierManager from './components/SupplierManager';
 import Documentation from './components/Documentation';
+import Calendar from './components/Calendar';
 import { supabase, mapFromSupabase, mapToSupabase } from './services/supabase';
 
 // Definição da estrutura do Menu
@@ -20,6 +21,7 @@ const MENU_GROUPS = [
     title: "Estratégico",
     items: [
       { id: 'dash', icon: 'fa-chart-pie', label: 'Dashboard' },
+      { id: 'calendar', icon: 'fa-calendar-days', label: 'Calendário' },
       { id: 'projects', icon: 'fa-folder-tree', label: 'Projetos (Capex)' },
       { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço' }
     ]
@@ -184,9 +186,11 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dash': 
+      case 'dash':
         return <Dashboard projects={projects} oss={oss} materials={materials} services={services} />;
-      case 'projects': 
+      case 'calendar':
+        return <Calendar projects={projects} oss={oss} />;
+      case 'projects':
         return <ProjectList projects={projects} setProjects={setProjects} oss={oss} materials={materials} services={services} />;
       case 'os': 
         return (
