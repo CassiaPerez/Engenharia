@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Project, OS, Material, ServiceType, StockMovement, 
@@ -12,7 +11,7 @@ import Inventory from './components/Inventory';
 import ServiceManager from './components/ServiceManager';
 import SupplierManager from './components/SupplierManager';
 import Documentation from './components/Documentation';
-import Calendar from './components/Calendar';
+import CalendarView from './components/CalendarView';
 import { supabase, mapFromSupabase, mapToSupabase } from './services/supabase';
 
 // Definição da estrutura do Menu
@@ -21,7 +20,6 @@ const MENU_GROUPS = [
     title: "Estratégico",
     items: [
       { id: 'dash', icon: 'fa-chart-pie', label: 'Dashboard' },
-      { id: 'calendar', icon: 'fa-calendar-days', label: 'Calendário' },
       { id: 'projects', icon: 'fa-folder-tree', label: 'Projetos (Capex)' },
       { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço' }
     ]
@@ -29,6 +27,7 @@ const MENU_GROUPS = [
   {
     title: "Operacional",
     items: [
+      { id: 'calendar', icon: 'fa-calendar-days', label: 'Agenda de Serviços' },
       { id: 'inventory', icon: 'fa-warehouse', label: 'Almoxarifado' },
       { id: 'services', icon: 'fa-users-gear', label: 'Serviços' },
       { id: 'suppliers', icon: 'fa-handshake', label: 'Fornecedores' }
@@ -63,7 +62,7 @@ const App: React.FC = () => {
   const [firstLoad, setFirstLoad] = useState(true);
 
   // Refs para debounce de salvamento
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Carregamento Inicial Híbrido (Supabase > LocalStorage > Initial)
   useEffect(() => {
@@ -186,11 +185,9 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dash':
+      case 'dash': 
         return <Dashboard projects={projects} oss={oss} materials={materials} services={services} />;
-      case 'calendar':
-        return <Calendar projects={projects} oss={oss} materials={materials} services={services} />;
-      case 'projects':
+      case 'projects': 
         return <ProjectList projects={projects} setProjects={setProjects} oss={oss} materials={materials} services={services} />;
       case 'os': 
         return (
@@ -203,6 +200,8 @@ const App: React.FC = () => {
             onStockChange={handleStockChange}
           />
         );
+      case 'calendar':
+        return <CalendarView oss={oss} projects={projects} materials={materials} services={services} />;
       case 'inventory': 
         return (
           <Inventory 
