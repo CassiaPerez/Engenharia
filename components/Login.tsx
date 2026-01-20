@@ -41,7 +41,7 @@ const Login: React.FC<Props> = ({ users, onLogin }) => {
                <div className="w-10 h-10 text-emerald-400 text-3xl">
                   <i className="fas fa-fingerprint"></i>
                </div>
-               <span className="text-3xl font-black text-white tracking-tighter">GCF</span>
+               <span className="text-3xl font-black text-white tracking-tighter">CropService</span>
             </div>
          </div>
 
@@ -59,7 +59,7 @@ const Login: React.FC<Props> = ({ users, onLogin }) => {
              <div className="text-center lg:text-left">
                 <div className="lg:hidden flex justify-center items-center gap-2 mb-6 text-slate-900">
                     <i className="fas fa-fingerprint text-emerald-500 text-3xl"></i>
-                    <span className="text-3xl font-black tracking-tighter">GCF</span>
+                    <span className="text-3xl font-black tracking-tighter">CropService</span>
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo de volta</h2>
                 <p className="text-slate-500 mt-2">Acesse sua conta corporativa para continuar.</p>
@@ -116,7 +116,7 @@ const Login: React.FC<Props> = ({ users, onLogin }) => {
              
              <div className="pt-8 border-t border-slate-100 text-center">
                 <p className="text-xs text-slate-400 font-medium">
-                   &copy; {new Date().getFullYear()} GCF Engineering Systems.
+                   &copy; {new Date().getFullYear()} CropService Engineering.
                    <br/>Acesso monitorado e restrito.
                 </p>
              </div>

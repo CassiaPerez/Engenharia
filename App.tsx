@@ -288,12 +288,12 @@ const App: React.FC = () => {
         {/* Brand Header */}
         <div className="h-20 flex items-center px-6 border-b border-slate-800 bg-slate-950 shrink-0 justify-between md:justify-center lg:justify-start relative overflow-hidden group">
           <div className="flex items-center gap-3 relative z-10">
-             {/* Logo Icon Style - imitating the GCF fingerprint logo */}
+             {/* Logo Icon Style - imitating the fingerprint logo */}
              <div className="w-10 h-10 flex items-center justify-center text-emerald-500 text-2xl group-hover:scale-110 transition-transform">
                <i className="fas fa-fingerprint"></i>
              </div>
              <div className="block md:hidden lg:block">
-               <h1 className="text-2xl font-black text-white tracking-tighter leading-none">GCF</h1>
+               <h1 className="text-xl font-black text-white tracking-tighter leading-none">CropService</h1>
                <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest block -mt-1">Engineering</span>
              </div>
           </div>
@@ -362,7 +362,7 @@ const App: React.FC = () => {
              </button>
 
              <div className="flex items-center gap-2 truncate">
-               <span className="font-bold text-slate-400 hidden sm:block">GCF <span className="text-emerald-500">/</span></span>
+               <span className="font-bold text-slate-400 hidden sm:block">CropService <span className="text-emerald-500">/</span></span>
                <span className="font-bold text-slate-900 text-lg sm:text-xl truncate">
                  {MENU_GROUPS.reduce((acc, g) => [...acc, ...g.items], [] as any[]).find(i => i.id === activeTab)?.label || 'Bem-vindo'}
                </span>
