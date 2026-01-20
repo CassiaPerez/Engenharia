@@ -170,4 +170,20 @@ export interface PurchaseRecord {
   invoiceNumber: string;
 }
 
-export type UserRole = 'ADMIN' | 'ENGINEERING' | 'EXECUTOR' | 'STOCK' | 'MANAGER';
+// User Role Definitions
+// ADMIN: Acesso Total
+// MANAGER: Gestão (Sem criar usuários)
+// EXECUTOR: Prestador de Serviço (Foco Operacional)
+// USER: Usuário Comum (Visualização)
+export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR' | 'USER';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string; // Em produção, usar hash ou Auth Provider externo
+  role: UserRole;
+  department?: string;
+  active: boolean;
+  avatar?: string;
+}

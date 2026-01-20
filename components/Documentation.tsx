@@ -7,11 +7,11 @@ const Documentation: React.FC = () => {
       <div className="bg-white border border-slate-200 rounded-lg p-8 shadow-sm">
         <header className="mb-8 border-b border-slate-100 pb-6">
             <div className="flex items-center gap-2 mb-3">
-                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded">v1.2.0</span>
-                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase rounded">Database Ready</span>
+                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded">v1.4.0</span>
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase rounded">Database Full Sync</span>
             </div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Documentação Técnica & Setup</h1>
-            <p className="text-slate-500 mt-2 text-lg">Manual de configuração do banco de dados.</p>
+            <p className="text-slate-500 mt-2 text-lg">Manual de configuração do banco de dados e usuários.</p>
         </header>
 
         <div className="prose prose-slate max-w-none prose-headings:font-bold prose-a:text-clean-primary">
@@ -67,6 +67,20 @@ create table if not exists suppliers (
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
 
+-- 7. Tabela de Usuários (RBAC)
+create table if not exists users (
+  id text primary key,
+  json_content jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- 8. Tabela de Compras (Purchases)
+create table if not exists purchases (
+  id text primary key,
+  json_content jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
 -- --- SEGURANÇA (RLS) ---
 -- Habilita Row Level Security em todas as tabelas
 alter table projects enable row level security;
@@ -75,35 +89,28 @@ alter table oss enable row level security;
 alter table services enable row level security;
 alter table stock_movements enable row level security;
 alter table suppliers enable row level security;
+alter table users enable row level security;
+alter table purchases enable row level security;
 
 -- Cria políticas de acesso PÚBLICO (Para uso imediato com a chave Anon Key)
 -- Nota: Em produção real com Login, alterar 'true' para checagem de auth.uid()
 
--- Projects
 create policy "Enable all access for projects" on projects for all using (true) with check (true);
-
--- Materials
 create policy "Enable all access for materials" on materials for all using (true) with check (true);
-
--- OSS
 create policy "Enable all access for oss" on oss for all using (true) with check (true);
-
--- Services
 create policy "Enable all access for services" on services for all using (true) with check (true);
-
--- Stock Movements
 create policy "Enable all access for stock_movements" on stock_movements for all using (true) with check (true);
-
--- Suppliers
 create policy "Enable all access for suppliers" on suppliers for all using (true) with check (true);
+create policy "Enable all access for users" on users for all using (true) with check (true);
+create policy "Enable all access for purchases" on purchases for all using (true) with check (true);
                 `}</pre>
             </div>
 
-            <h3>2. Como funciona a Sincronização?</h3>
+            <h3>2. Como funciona a Autenticação?</h3>
             <ul className="list-disc pl-5 space-y-2 text-sm text-slate-700">
-                <li><strong>Híbrido:</strong> O sistema carrega dados do Supabase ao iniciar. Se falhar, usa o cache local do navegador.</li>
-                <li><strong>Auto-Save:</strong> As alterações são salvas automaticamente a cada 2 segundos após parar de digitar (Debounce).</li>
-                <li><strong>Estrutura de Dados:</strong> Utilizamos colunas <code>jsonb</code>. Isso significa que não precisamos fazer "Joins" complexos no banco; o objeto JSON salvo é exatamente o objeto TypeScript usado no Frontend.</li>
+                <li><strong>Mock Authentication:</strong> Atualmente, os usuários são armazenados na tabela <code>users</code> como objetos JSON.</li>
+                <li><strong>Admin Padrão:</strong> Se nenhum usuário existir, o sistema cria o <code>admin@crop.com</code> com senha <code>123</code>.</li>
+                <li><strong>Segurança:</strong> Em produção, esta lógica deve ser substituída pelo <strong>Supabase Auth</strong> nativo para segurança de senhas e tokens JWT.</li>
             </ul>
         </div>
       </div>

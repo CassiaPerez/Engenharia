@@ -1,5 +1,5 @@
 
-import { Material, ServiceType, Project, ProjectStatus, Category, OSType, ServiceCostType } from './types';
+import { Material, ServiceType, Project, ProjectStatus, Category, OSType, ServiceCostType, User } from './types';
 
 export const INITIAL_MATERIALS: Material[] = [
   { id: 'm1', code: 'CIM-001', description: 'Cimento CP-II 50kg', group: 'Construção', unit: 'Saco', unitCost: 32.5, minStock: 20, currentStock: 45, location: 'Ala A-01', status: 'ACTIVE' },
@@ -44,5 +44,18 @@ export const INITIAL_PROJECTS: Project[] = [
     status: ProjectStatus.IN_PROGRESS, 
     postponementHistory: [],
     auditLogs: [{ date: '2024-01-15T10:00:00Z', action: 'Início do Projeto', user: 'Ricardo Silva' }]
+  }
+];
+
+export const INITIAL_USERS: User[] = [
+  {
+    id: 'admin',
+    name: 'Administrador Principal',
+    email: 'admin@crop.com',
+    password: '123', // Demo
+    role: 'ADMIN',
+    department: 'Diretoria Técnica',
+    active: true,
+    avatar: 'AD'
   }
 ];
