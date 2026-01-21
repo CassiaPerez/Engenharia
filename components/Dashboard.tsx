@@ -2,9 +2,6 @@
 import React, { useMemo, useState } from 'react';
 import { Project, OS, Material, ServiceType, OSStatus, ProjectStatus } from '../types';
 import { calculateProjectCosts, formatDate } from '../services/engine';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
-} from 'recharts';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -20,23 +17,16 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
 
   const stats = useMemo(() => {
     const totalEstimated = projects.reduce((acc, p) => acc + p.estimatedValue, 0);
-    const performanceData = projects.map(p => {
-      const costs = calculateProjectCosts(p, oss, materials, services);
-      return {
-        name: p.code,
-        budget: p.estimatedValue,
-        real: costs.totalReal,
-        over: costs.totalReal > p.estimatedValue
-      };
-    });
-    const delayedOS = oss.filter(o => o.status !== OSStatus.COMPLETED && new Date(o.limitDate) < new Date()).length;
     
+    // Calcula totais
     let totalSpent = 0;
     projects.forEach(p => {
       totalSpent += calculateProjectCosts(p, oss, materials, services).totalReal;
     });
 
-    return { totalEstimated, totalSpent, performanceData, delayedOS };
+    const delayedOS = oss.filter(o => o.status !== OSStatus.COMPLETED && new Date(o.limitDate) < new Date()).length;
+    
+    return { totalEstimated, totalSpent, delayedOS };
   }, [projects, oss, materials, services]);
 
   // Ordenação dos projetos por data de início
@@ -207,74 +197,13 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
         <KpiCard title="Projetos Ativos" value={projects.length.toString()} icon="fa-network-wired" color="purple" sub="Em Andamento" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Gráfico Principal */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
-              Performance Orçamentária (Budget vs Real)
-            </h3>
-            <button className="text-sm text-blue-600 hover:text-blue-800 font-bold">Ver Detalhes <i className="fas fa-arrow-right ml-1"></i></button>
-          </div>
-          <div className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.performanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barGap={2}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }} />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '14px', fontWeight: 500 }}
-                  formatter={(value: number) => [`R$ ${formatCurrency(value)}`, '']}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: '14px', paddingTop: '20px', fontWeight: 500 }} />
-                <Bar dataKey="budget" name="Orçamento (R$)" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={32} />
-                <Bar dataKey="real" name="Realizado (R$)" radius={[4, 4, 0, 0]} barSize={32}>
-                  {stats.performanceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.real > entry.budget ? '#ef4444' : '#0ea5e9'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Card Lateral de Insights */}
-        <div className="bg-slate-900 p-8 rounded-lg shadow-lg flex flex-col justify-between text-white relative overflow-hidden group">
-           <div className="relative z-10">
-             <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mb-6 border border-white/5">
-               <i className="fas fa-lightbulb text-yellow-400 text-xl"></i>
-             </div>
-             <h4 className="text-xl font-bold tracking-tight mb-4">Eficiência Global</h4>
-             <div className="mb-2">
-                <span className="text-5xl font-bold">{((stats.totalSpent / (stats.totalEstimated || 1)) * 100).toFixed(1)}%</span>
-                <span className="text-sm text-slate-300 ml-2 uppercase font-bold">Do Budget</span>
-             </div>
-             <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden mt-4">
-                <div className="bg-clean-primary h-full rounded-full" style={{ width: `${Math.min(((stats.totalSpent / (stats.totalEstimated || 1)) * 100), 100)}%` }}></div>
-             </div>
-             <p className="text-base text-slate-300 mt-8 leading-relaxed font-medium">
-               Monitore de perto os projetos com barra vermelha no gráfico. Eles representam estouro orçamentário que impacta o resultado operacional.
-             </p>
-           </div>
-           
-           <div className="mt-8 relative z-10">
-              <button className="w-full py-4 bg-clean-primary hover:bg-clean-primary/90 text-white text-sm font-bold uppercase tracking-wider rounded-lg transition-all shadow-lg">
-                Exportar Relatório
-              </button>
-           </div>
-
-           <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-clean-primary/20 rounded-full blur-3xl group-hover:bg-clean-primary/30 transition-all duration-700"></div>
-        </div>
-      </div>
-
-      {/* Nova Tabela de Detalhamento de Projetos */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+      {/* Tabela de Detalhamento de Projetos */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden mt-6">
         <div className="p-6 border-b border-slate-200 bg-slate-50">
           <h3 className="text-lg font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
             <i className="fas fa-table-list text-clean-primary"></i> Detalhamento de Custos por Projeto
           </h3>
-          <p className="text-sm text-slate-500 mt-1 font-medium">Ordenado por data de início do projeto.</p>
+          <p className="text-sm text-slate-500 mt-1 font-medium">Acompanhamento físico-financeiro detalhado.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-base text-left">
