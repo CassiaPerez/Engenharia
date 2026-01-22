@@ -2,6 +2,7 @@
   "name": "CropService - Gestão de Engenharia e Governança",
   "description": "Sistema ERP industrial modular para gestão de projetos Capex/Opex, manutenção preditiva, controle rigoroso de almoxarifado com auditoria e conformidade de SLA.",
   "requestFramePermissions": [
-    "geolocation"
+    "geolocation",
+    "camera"
   ]
 }

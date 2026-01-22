@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { OS, OSStatus, Project, Material, ServiceType, OSService, OSItem, OSType } from '../types';
+import { OS, OSStatus, Project, Material, ServiceType, OSService, OSItem, OSType, Building, User } from '../types';
 import { calculateOSCosts } from '../services/engine';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -9,29 +9,41 @@ interface Props {
   oss: OS[];
   setOss: React.Dispatch<React.SetStateAction<OS[]>>;
   projects: Project[];
+  buildings: Building[]; 
   materials: Material[];
   services: ServiceType[];
+  users: User[]; // Lista de usuários para selecionar o executor
+  setUsers: React.Dispatch<React.SetStateAction<User[]>>; // Para adicionar novos executores
   onStockChange: (mId: string, qty: number, osNumber: string) => void;
 }
 
 const ITEMS_PER_PAGE = 9;
 
-const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, onStockChange }) => {
+const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, services, users, setUsers, onStockChange }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   
   // Filtros
-  const [searchInput, setSearchInput] = useState(''); // Valor visual do input
-  const [searchTerm, setSearchTerm] = useState('');   // Valor efetivo para o filtro (Debounced)
+  const [searchInput, setSearchInput] = useState(''); 
+  const [searchTerm, setSearchTerm] = useState(''); 
   const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
 
+  // Estado para criação
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
+  const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING'>('PROJECT');
   
-  // Estado para novo item na OS (agora com Custo)
+  // Estado para novo item na OS
   const [newItem, setNewItem] = useState<{ id: string, qty: number | '', cost: number | '' }>({ id: '', qty: '', cost: '' });
+
+  // Estado para criação rápida de Executor
+  const [showExecutorModal, setShowExecutorModal] = useState(false);
+  const [newExecutorData, setNewExecutorData] = useState({ name: '', email: '', department: '' });
+
+  // Lista de Executores (Prestadores de Serviço)
+  const executors = useMemo(() => users.filter(u => u.role === 'EXECUTOR'), [users]);
 
   // Debounce do Search Input
   useEffect(() => {
@@ -56,7 +68,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
   const totalPages = Math.ceil(filteredOSs.length / ITEMS_PER_PAGE);
   const currentOSs = filteredOSs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  // Lógica de Workflow de Status
   const handleStatusChange = (osId: string, newStatus: OSStatus) => {
     const now = new Date().toISOString();
     
@@ -65,17 +76,12 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
       
       const updates: Partial<OS> = { status: newStatus };
       
-      // Início automático do timer
       if (newStatus === OSStatus.IN_PROGRESS && o.status === OSStatus.OPEN) {
         updates.startTime = now;
       }
-      
-      // Encerramento automático
       if (newStatus === OSStatus.COMPLETED) {
         updates.endTime = now;
       }
-
-      // Reabertura (limpa data fim se voltar para execução)
       if (o.status === OSStatus.COMPLETED && newStatus === OSStatus.IN_PROGRESS) {
         updates.endTime = undefined;
       }
@@ -100,7 +106,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const id = e.target.value;
       let cost: number | '' = '';
-      
       if (id) {
           if (activeSubTab === 'services') {
               const s = services.find(s => s.id === id);
@@ -118,9 +123,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
     const serviceTemplate = services.find(s => s.id === newItem.id);
     if (!serviceTemplate) return;
     
-    // Usa o custo manual ou o do template
     const finalCost = Number(newItem.cost);
-
     const newEntry: OSService = { serviceTypeId: serviceTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
     const updatedOS = { ...selectedOS, services: [...selectedOS.services, newEntry] };
     setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
@@ -132,9 +135,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
     const materialTemplate = materials.find(m => m.id === newItem.id);
     if (!materialTemplate || materialTemplate.currentStock < Number(newItem.qty)) { alert("Estoque insuficiente."); return; }
     
-    // Usa o custo manual ou o do template
     const finalCost = Number(newItem.cost);
-
     const newEntry: OSItem = { materialId: materialTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
     onStockChange(materialTemplate.id, Number(newItem.qty), selectedOS.number);
     const updatedOS = { ...selectedOS, materials: [...selectedOS.materials, newEntry] };
@@ -144,36 +145,74 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formOS.projectId) return;
+    // Validação: Precisa ter um Project ID OU um Building ID
+    if (!formOS.projectId && !formOS.buildingId) return;
+
     setOss(prev => [...prev, {
       id: Math.random().toString(36).substr(2, 9), number: `OS-${Date.now().toString().slice(-4)}`,
-      projectId: formOS.projectId!, description: formOS.description || '', type: formOS.type || OSType.PREVENTIVE,
+      projectId: formOS.projectId, // Pode ser undefined
+      buildingId: formOS.buildingId, // Pode ser undefined
+      executorId: formOS.executorId, // Vincula o prestador
+      description: formOS.description || '', type: formOS.type || OSType.PREVENTIVE,
       priority: formOS.priority as any, slaHours: Number(formOS.slaHours), openDate: new Date().toISOString(),
       limitDate: new Date(Date.now() + (Number(formOS.slaHours)) * 3600000).toISOString(), status: OSStatus.OPEN, materials: [], services: []
     }]);
-    setShowModal(false); setFormOS({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
+    setShowModal(false); 
+    setFormOS({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
+    setCreationContext('PROJECT');
+  };
+
+  const handleCreateExecutor = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newExecutorData.name || !newExecutorData.email) return;
+
+      const newUser: User = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: newExecutorData.name,
+          email: newExecutorData.email,
+          password: '123', // Senha padrão
+          role: 'EXECUTOR',
+          department: newExecutorData.department || 'Manutenção',
+          active: true,
+          avatar: newExecutorData.name.substr(0, 2).toUpperCase()
+      };
+
+      setUsers(prev => [...prev, newUser]);
+      setFormOS(prev => ({ ...prev, executorId: newUser.id })); // Auto-seleciona o novo executor
+      setShowExecutorModal(false);
+      setNewExecutorData({ name: '', email: '', department: '' });
   };
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Função auxiliar para Tooltip de Status
   const getStatusTooltip = (status: OSStatus) => {
       switch (status) {
-          case OSStatus.OPEN: return 'Aguardando início ou atribuição de técnico.';
-          case OSStatus.IN_PROGRESS: return 'Atividade em execução. O tempo está sendo contabilizado.';
-          case OSStatus.PAUSED: return 'Atividade paralisada. O tempo não está sendo contabilizado.';
-          case OSStatus.COMPLETED: return 'Atividade concluída e encerrada.';
-          case OSStatus.CANCELED: return 'Atividade cancelada. Não gera mais custos.';
+          case OSStatus.OPEN: return 'Aguardando início.';
+          case OSStatus.IN_PROGRESS: return 'Atividade em execução.';
+          case OSStatus.PAUSED: return 'Atividade paralisada.';
+          case OSStatus.COMPLETED: return 'Atividade concluída.';
+          case OSStatus.CANCELED: return 'Atividade cancelada.';
           default: return '';
       }
   };
 
-  // --- PDF GENERATION LOGIC ---
+  // Helper para obter nome do contexto (Projeto ou Edifício)
+  const getContextInfo = (os: OS) => {
+      if (os.projectId) {
+          const p = projects.find(proj => proj.id === os.projectId);
+          return { label: p?.code || 'N/A', sub: p?.city || '', type: 'PROJECT' };
+      } else if (os.buildingId) {
+          const b = buildings.find(bld => bld.id === os.buildingId);
+          return { label: b?.name || 'N/A', sub: b?.city || '', type: 'BUILDING' };
+      }
+      return { label: '---', sub: '', type: 'UNKNOWN' };
+  };
+
   const generateOSDetailPDF = (os: OS) => {
-      // ... [Mantido igual]
     const doc = new jsPDF();
     const costs = calculateOSCosts(os, materials, services);
-    const project = projects.find(p => p.id === os.projectId);
+    const context = getContextInfo(os);
+    const executor = users.find(u => u.id === os.executorId);
 
     doc.setFillColor(71, 122, 127);
     doc.rect(0, 0, 210, 20, 'F');
@@ -187,9 +226,11 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
     doc.setFont("helvetica", "bold");
     
     let yPos = 30;
-    doc.text(`Projeto Vinculado: ${project?.code || 'N/A'} - ${project?.description || ''}`, 14, yPos);
+    doc.text(`Vínculo: ${context.type === 'PROJECT' ? 'Projeto' : 'Edifício'} - ${context.label}`, 14, yPos);
     yPos += 6;
     doc.text(`Status: ${os.status} | Prioridade: ${os.priority} | Tipo: ${os.type}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Executor: ${executor ? executor.name : 'Não Atribuído'}`, 14, yPos);
     yPos += 6;
     doc.text(`Datas: Aberta em ${new Date(os.openDate).toLocaleDateString()} | Limite: ${new Date(os.limitDate).toLocaleDateString()}`, 14, yPos);
     
@@ -220,144 +261,41 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
         ["CUSTO TOTAL DA OS", `R$ ${formatCurrency(costs.totalCost)}`]
     ];
 
-    autoTable(doc, {
-        startY: yPos,
-        head: [],
-        body: summaryData,
-        theme: 'plain',
-        styles: { fontSize: 10, cellPadding: 2 },
-        columnStyles: { 0: { fontStyle: 'bold', width: 80 }, 1: { halign: 'right' } }
-    });
+    autoTable(doc, { startY: yPos, head: [], body: summaryData, theme: 'plain', styles: { fontSize: 10, cellPadding: 2 }, columnStyles: { 0: { fontStyle: 'bold', width: 80 }, 1: { halign: 'right' } } });
     
     yPos = (doc as any).lastAutoTable.finalY + 10;
-
     doc.setTextColor(0,0,0);
     doc.text("MATERIAIS CONSUMIDOS", 14, yPos);
     yPos += 5;
 
     const matRows = os.materials.map(m => {
         const matDesc = materials.find(x => x.id === m.materialId)?.description || 'Item excluído';
-        return [
-            matDesc,
-            m.quantity.toString(),
-            `R$ ${formatCurrency(m.unitCost)}`,
-            `R$ ${formatCurrency(m.quantity * m.unitCost)}`
-        ];
+        return [matDesc, m.quantity.toString(), `R$ ${formatCurrency(m.unitCost)}`, `R$ ${formatCurrency(m.quantity * m.unitCost)}`];
     });
 
     if (matRows.length > 0) {
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Item', 'Qtd', 'Vl. Unit', 'Total']],
-            body: matRows,
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [71, 122, 127] },
-            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
-        });
+        autoTable(doc, { startY: yPos, head: [['Item', 'Qtd', 'Vl. Unit', 'Total']], body: matRows, styles: { fontSize: 8 }, headStyles: { fillColor: [71, 122, 127] }, columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } } });
         yPos = (doc as any).lastAutoTable.finalY + 10;
     } else {
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(8);
-        doc.text("Nenhum material consumido.", 14, yPos + 5);
-        yPos += 15;
+        doc.setFont("helvetica", "italic"); doc.setFontSize(8); doc.text("Nenhum material consumido.", 14, yPos + 5); yPos += 15;
     }
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("SERVIÇOS EXECUTADOS", 14, yPos);
-    yPos += 5;
-
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("SERVIÇOS EXECUTADOS", 14, yPos); yPos += 5;
     const srvRows = os.services.map(s => {
         const srvName = services.find(x => x.id === s.serviceTypeId)?.name || 'Serviço excluído';
-        return [
-            srvName,
-            `${s.quantity} h`,
-            `R$ ${formatCurrency(s.unitCost)}`,
-            `R$ ${formatCurrency(s.quantity * s.unitCost)}`
-        ];
+        return [srvName, `${s.quantity} h`, `R$ ${formatCurrency(s.unitCost)}`, `R$ ${formatCurrency(s.quantity * s.unitCost)}`];
     });
 
     if (srvRows.length > 0) {
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Serviço', 'Tempo', 'Vl. Unit', 'Total']],
-            body: srvRows,
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [71, 122, 127] },
-            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
-        });
+        autoTable(doc, { startY: yPos, head: [['Serviço', 'Tempo', 'Vl. Unit', 'Total']], body: srvRows, styles: { fontSize: 8 }, headStyles: { fillColor: [71, 122, 127] }, columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } } });
     } else {
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(8);
-        doc.text("Nenhum serviço apontado.", 14, yPos + 5);
+        doc.setFont("helvetica", "italic"); doc.setFontSize(8); doc.text("Nenhum serviço apontado.", 14, yPos + 5);
     }
-
     doc.save(`${os.number}_Detalhado.pdf`);
-  };
-
-  const exportToCSV = () => {
-     // ... [Mantido igual]
-    const headers = ['Número OS', 'Projeto', 'Descrição', 'Tipo', 'Prioridade', 'Status', 'SLA (h)', 'Abertura', 'Custo Total (R$)'];
-    const rows = filteredOSs.map(o => {
-        const project = projects.find(p => p.id === o.projectId);
-        const costs = calculateOSCosts(o, materials, services);
-        return [
-            o.number,
-            project ? project.code : 'N/A',
-            `"${o.description}"`, 
-            o.type,
-            o.priority,
-            o.status,
-            o.slaHours,
-            new Date(o.openDate).toLocaleDateString('pt-BR'),
-            costs.totalCost.toFixed(2).replace('.', ',')
-        ];
-    });
-
-    const csvContent = "\uFEFF" + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `os_export_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
-
-  const exportToPDF = () => {
-    // ... [Mantido igual]
-    const doc = new jsPDF();
-    doc.text("Relatório de Ordens de Serviço - Crop Service", 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Gerado em: ${new Date().toLocaleDateString()} | Filtros: Status=${statusFilter}, Prio=${priorityFilter}`, 14, 22);
-
-    const tableColumn = ["Número", "Projeto", "Tipo", "Prioridade", "Status", "Custo Total"];
-    const tableRows = filteredOSs.map(o => {
-        const project = projects.find(p => p.id === o.projectId);
-        const costs = calculateOSCosts(o, materials, services);
-        return [
-            o.number,
-            project ? project.code : 'N/A',
-            o.type,
-            o.priority,
-            o.status,
-            `R$ ${formatCurrency(costs.totalCost)}`
-        ];
-    });
-
-    autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
-        startY: 30,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [71, 122, 127] }
-    });
-
-    doc.save(`os_export_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   return (
     <div className="space-y-8">
-      {/* ... [Header e Filtros Mantidos] ... */}
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-200 pb-6">
         <div>
           <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Ordens de Serviço</h2>
@@ -392,8 +330,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
 
             {/* Ações */}
             <div className="flex gap-2 w-full md:w-auto">
-                <button onClick={exportToCSV} className="bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 px-4 rounded-xl font-bold transition-all shadow-sm h-12" title="Exportar CSV"><i className="fas fa-file-csv text-emerald-600 text-xl"></i></button>
-                <button onClick={exportToPDF} className="bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 px-4 rounded-xl font-bold transition-all shadow-sm h-12" title="Exportar PDF"><i className="fas fa-file-pdf text-red-600 text-xl"></i></button>
                 <button onClick={() => setShowModal(true)} className="flex-1 md:flex-none bg-clean-primary text-white px-6 rounded-xl font-bold text-base uppercase tracking-wide hover:bg-clean-primary/90 transition-all shadow-lg shadow-clean-primary/20 h-12 whitespace-nowrap"><i className="fas fa-plus mr-2"></i> Abrir OS</button>
             </div>
         </div>
@@ -401,10 +337,10 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {currentOSs.map(os => {
-            // ... [Card OS mantido]
-            const project = projects.find(p => p.id === os.projectId);
+            const context = getContextInfo(os);
             const costs = calculateOSCosts(os, materials, services);
             const isOverdue = os.status !== OSStatus.COMPLETED && new Date(os.limitDate) < new Date();
+            const executor = users.find(u => u.id === os.executorId);
             
             return (
               <div key={os.id} className={`bg-white rounded-xl border p-6 shadow-sm hover:shadow-lg transition-all flex flex-col ${isOverdue ? 'border-l-8 border-l-red-500 border-t-slate-200 border-r-slate-200 border-b-slate-200' : 'border-slate-200'}`}>
@@ -413,7 +349,16 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
                     <span className={`text-xs font-bold uppercase px-3 py-1.5 rounded-lg border ${os.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : os.priority === 'HIGH' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{os.priority}</span>
                  </div>
                  <h4 className="text-xl font-bold text-slate-900 mb-3 leading-tight flex-1 line-clamp-2">{os.description}</h4>
-                 <p className="text-base text-slate-600 mb-6 truncate font-medium"><i className="fas fa-folder text-slate-400 mr-2"></i> {project?.code}</p>
+                 <div className="mb-4">
+                     <p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2 mb-1">
+                         <i className={`fas ${context.type === 'PROJECT' ? 'fa-folder' : 'fa-building'} text-slate-400 w-4`}></i> 
+                         {context.label}
+                     </p>
+                     <p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2">
+                        <i className="fas fa-user-hard-hat text-slate-400 w-4"></i>
+                        {executor ? <span className="text-emerald-600 font-bold">{executor.name}</span> : <span className="text-slate-400 italic">Sem executor</span>}
+                     </p>
+                 </div>
                  
                  <div className="grid grid-cols-2 gap-4 text-base mb-6">
                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -442,7 +387,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
         })}
       </div>
       
-      {filteredOSs.length === 0 && <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed text-slate-400 text-lg">Nenhuma Ordem de Serviço encontrada com os filtros atuais.</div>}
+      {filteredOSs.length === 0 && <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed text-slate-400 text-lg">Nenhuma Ordem de Serviço encontrada.</div>}
 
       {/* Paginação */}
       {totalPages > 1 && (
@@ -456,17 +401,19 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
       {selectedOS && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col animate-in zoom-in duration-200">
+             {/* Header do Modal Gerenciar OS */}
              <div className="p-8 border-b border-slate-200 bg-slate-50 rounded-t-2xl flex justify-between items-center">
                 <div>
                    <h3 className="text-3xl font-bold text-slate-900">Gerenciamento: <span className="text-clean-primary">{selectedOS.number}</span></h3>
                    <div className="flex items-center gap-3 mt-2">
                      <span title={getStatusTooltip(selectedOS.status)} className={`text-sm font-bold uppercase px-3 py-1 rounded cursor-help ${selectedOS.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>{selectedOS.status}</span>
                      {selectedOS.startTime && <span className="text-sm text-slate-500 font-mono">Início: {new Date(selectedOS.startTime).toLocaleString()}</span>}
-                     {selectedOS.endTime && <span className="text-sm text-slate-500 font-mono">Fim: {new Date(selectedOS.endTime).toLocaleString()}</span>}
                    </div>
-                   <p className="text-base font-bold text-slate-800 mt-3 bg-slate-100 inline-block px-3 py-1.5 rounded border border-slate-200">
-                        Custo Total: <span className="text-emerald-700">R$ {formatCurrency(calculateOSCosts(selectedOS, materials, services).totalCost)}</span>
-                   </p>
+                   {users.find(u => u.id === selectedOS.executorId) && (
+                       <p className="text-sm font-bold text-emerald-600 mt-2 flex items-center gap-2">
+                           <i className="fas fa-user-hard-hat"></i> Executor: {users.find(u => u.id === selectedOS.executorId)?.name}
+                       </p>
+                   )}
                 </div>
                 <div className="flex items-center gap-3">
                     <button onClick={() => generateOSDetailPDF(selectedOS)} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-5 py-3 rounded-lg font-bold text-base transition-all border border-slate-200 flex items-center gap-2">
@@ -476,13 +423,13 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
                 </div>
              </div>
              
+             {/* Conteúdo Modal */}
              <div className="flex-1 flex overflow-hidden">
                 <div className="w-[380px] lg:w-[450px] bg-slate-50 border-r border-slate-200 p-8 flex flex-col shadow-inner overflow-y-auto">
                     {/* Workflow Actions */}
                     <div className="mb-8 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
                         <h5 className="text-sm font-bold text-slate-500 uppercase mb-4">Ações de Status</h5>
                         <div className="grid grid-cols-2 gap-3">
-                           {/* ... [Botões de status mantidos] ... */}
                            {selectedOS.status === OSStatus.OPEN && (
                                <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.IN_PROGRESS)} className="col-span-2 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-base shadow-sm transition-all"><i className="fas fa-play mr-2"></i> Iniciar Atividade</button>
                            )}
@@ -535,6 +482,29 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
                 </div>
 
                 <div className="flex-1 p-8 overflow-y-auto bg-white">
+                    {/* SEÇÃO DE EVIDÊNCIA DE EXECUÇÃO */}
+                    {selectedOS.status === OSStatus.COMPLETED && selectedOS.completionImage && (
+                        <div className="mb-8 p-6 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                            <h4 className="text-sm font-black text-emerald-800 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                <i className="fas fa-camera text-emerald-600"></i> Evidência de Execução
+                            </h4>
+                            <div className="relative group">
+                                <img 
+                                    src={selectedOS.completionImage} 
+                                    alt="Evidência do Serviço" 
+                                    className="w-full max-h-[400px] object-contain rounded-lg border border-emerald-200 bg-white shadow-sm" 
+                                />
+                                <a 
+                                    href={selectedOS.completionImage} 
+                                    download={`evidencia_${selectedOS.number}.png`}
+                                    className="absolute bottom-4 right-4 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                >
+                                    <i className="fas fa-download mr-2"></i> Baixar Imagem
+                                </a>
+                            </div>
+                        </div>
+                    )}
+
                     <h4 className="text-base font-black text-slate-900 uppercase border-b border-slate-200 pb-4 mb-6 flex items-center gap-2">
                         <i className="fas fa-clipboard-list text-clean-primary"></i> Detalhamento de Custos
                     </h4>
@@ -595,21 +565,57 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
       )}
 
       {showModal && (
-        // ... [Modal Nova OS mantido igual]
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-8 animate-in zoom-in duration-200">
-                  <h3 className="text-3xl font-bold text-slate-900 mb-8 border-b border-slate-200 pb-6">Nova Ordem de Serviço</h3>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-8 animate-in zoom-in duration-200 overflow-y-auto max-h-[90vh]">
+                  <h3 className="text-3xl font-bold text-slate-900 mb-6 border-b border-slate-200 pb-4">Nova Ordem de Serviço</h3>
                   <form onSubmit={handleCreate} className="space-y-6">
+                      
+                      {/* Context Selection Switch */}
                       <div>
-                          <label className="text-base font-bold text-slate-800 mb-2 block">Projeto Vinculado</label>
-                          <select required className="w-full h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.projectId} onChange={e=>setFormOS({...formOS, projectId:e.target.value})}>
-                              <option value="">Selecione um Projeto...</option>
-                              {projects.map(p=><option key={p.id} value={p.id}>{p.code} - {p.description}</option>)}
-                          </select>
+                          <label className="text-sm font-bold text-slate-800 mb-2 block uppercase tracking-wide">Vincular OS a:</label>
+                          <div className="flex bg-slate-100 p-1 rounded-lg">
+                              <button type="button" onClick={() => { setCreationContext('PROJECT'); setFormOS({ ...formOS, buildingId: undefined }); }} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${creationContext === 'PROJECT' ? 'bg-white text-clean-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Projeto (Capex)</button>
+                              <button type="button" onClick={() => { setCreationContext('BUILDING'); setFormOS({ ...formOS, projectId: undefined }); }} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${creationContext === 'BUILDING' ? 'bg-white text-clean-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Edifício / Facility</button>
+                          </div>
                       </div>
+
+                      {creationContext === 'PROJECT' ? (
+                          <div>
+                              <label className="text-base font-bold text-slate-800 mb-2 block">Selecione o Projeto</label>
+                              <select required className="w-full h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.projectId || ''} onChange={e=>setFormOS({...formOS, projectId:e.target.value, buildingId: undefined})}>
+                                  <option value="">Selecione...</option>
+                                  {projects.map(p=><option key={p.id} value={p.id}>{p.code} - {p.description}</option>)}
+                              </select>
+                          </div>
+                      ) : (
+                          <div>
+                              <label className="text-base font-bold text-slate-800 mb-2 block">Selecione o Edifício</label>
+                              <select required className="w-full h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.buildingId || ''} onChange={e=>setFormOS({...formOS, buildingId:e.target.value, projectId: undefined})}>
+                                  <option value="">Selecione...</option>
+                                  {buildings.map(b=><option key={b.id} value={b.id}>{b.name} - {b.city}</option>)}
+                              </select>
+                          </div>
+                      )}
+
+                      <div>
+                          <label className="text-base font-bold text-slate-800 mb-2 block">Selecione o Executor (Prestador)</label>
+                          <div className="flex gap-2">
+                              <select className="flex-1 h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.executorId || ''} onChange={e=>setFormOS({...formOS, executorId:e.target.value})}>
+                                  <option value="">Sem Executor Específico</option>
+                                  {executors.map(u => (
+                                      <option key={u.id} value={u.id}>{u.name} - {u.department}</option>
+                                  ))}
+                              </select>
+                              <button type="button" onClick={() => setShowExecutorModal(true)} className="h-14 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-300 transition-colors flex items-center justify-center gap-2 whitespace-nowrap">
+                                  <i className="fas fa-user-plus"></i> Novo
+                              </button>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">O executor verá esta OS em sua Agenda e Painel.</p>
+                      </div>
+
                       <div>
                           <label className="text-base font-bold text-slate-800 mb-2 block">Descrição da Atividade</label>
-                          <textarea required className="w-full p-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 h-40" placeholder="Descreva o que precisa ser feito..." value={formOS.description} onChange={e=>setFormOS({...formOS, description:e.target.value})} />
+                          <textarea required className="w-full p-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 h-32" placeholder="Descreva o que precisa ser feito..." value={formOS.description} onChange={e=>setFormOS({...formOS, description:e.target.value})} />
                       </div>
                       <div className="grid grid-cols-2 gap-6">
                           <div>
@@ -628,6 +634,35 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, materials, services, o
                       <div className="flex justify-end gap-4 pt-6 border-t border-slate-200">
                           <button type="button" onClick={()=>setShowModal(false)} className="px-8 py-3 text-lg font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
                           <button type="submit" className="px-10 py-3 bg-clean-primary text-white text-lg font-bold rounded-lg hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/30 transition-all transform hover:-translate-y-0.5">Criar OS</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL DE CRIAÇÃO RÁPIDA DE EXECUTOR */}
+      {showExecutorModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in zoom-in duration-200">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+                      <h3 className="text-xl font-bold text-slate-900">Novo Executor</h3>
+                      <button onClick={() => setShowExecutorModal(false)} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500"><i className="fas fa-times"></i></button>
+                  </div>
+                  <form onSubmit={handleCreateExecutor} className="space-y-4">
+                      <div>
+                          <label className="text-sm font-bold text-slate-700 block mb-1">Nome Completo</label>
+                          <input required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" value={newExecutorData.name} onChange={e => setNewExecutorData({ ...newExecutorData, name: e.target.value })} placeholder="João Silva" />
+                      </div>
+                      <div>
+                          <label className="text-sm font-bold text-slate-700 block mb-1">Email</label>
+                          <input type="email" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" value={newExecutorData.email} onChange={e => setNewExecutorData({ ...newExecutorData, email: e.target.value })} placeholder="joao@email.com" />
+                      </div>
+                      <div>
+                          <label className="text-sm font-bold text-slate-700 block mb-1">Departamento / Empresa</label>
+                          <input className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" value={newExecutorData.department} onChange={e => setNewExecutorData({ ...newExecutorData, department: e.target.value })} placeholder="Manutenção Elétrica" />
+                      </div>
+                      <div className="pt-2">
+                          <button type="submit" className="w-full h-12 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition-colors shadow-lg">Cadastrar Executor</button>
                       </div>
                   </form>
               </div>

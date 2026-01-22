@@ -1,5 +1,5 @@
 
-import { Material, ServiceType, Project, ProjectStatus, Category, OSType, ServiceCostType, User } from './types';
+import { Material, ServiceType, Project, ProjectStatus, Category, OSType, ServiceCostType, User, Building } from './types';
 
 export const INITIAL_MATERIALS: Material[] = [
   { id: 'm1', code: 'CIM-001', description: 'Cimento CP-II 50kg', group: 'Construção', unit: 'Saco', unitCost: 32.5, minStock: 20, currentStock: 45, location: 'Ala A-01', status: 'ACTIVE' },
@@ -47,6 +47,27 @@ export const INITIAL_PROJECTS: Project[] = [
   }
 ];
 
+export const INITIAL_BUILDINGS: Building[] = [
+  {
+    id: 'b1',
+    name: 'Sede Administrativa',
+    address: 'Av. Paulista, 1000',
+    city: 'São Paulo - SP',
+    manager: 'Carlos Eduardo',
+    type: 'CORPORATE',
+    notes: 'Edifício principal com 15 andares.'
+  },
+  {
+    id: 'b2',
+    name: 'CD Cajamar',
+    address: 'Rod. Anhanguera, km 30',
+    city: 'Cajamar - SP',
+    manager: 'Roberto Dias',
+    type: 'LOGISTICS',
+    notes: 'Centro de distribuição principal.'
+  }
+];
+
 export const INITIAL_USERS: User[] = [
   {
     id: 'admin',
@@ -57,5 +78,15 @@ export const INITIAL_USERS: User[] = [
     department: 'Diretoria Técnica',
     active: true,
     avatar: 'AD'
+  },
+  {
+    id: 'prestador',
+    name: 'Prestador Teste',
+    email: 'prestador@crop.com',
+    password: '123',
+    role: 'EXECUTOR',
+    department: 'Manutenção de Campo',
+    active: true,
+    avatar: 'PT'
   }
 ];

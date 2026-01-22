@@ -7,8 +7,8 @@ const Documentation: React.FC = () => {
       <div className="bg-white border border-slate-200 rounded-lg p-8 shadow-sm">
         <header className="mb-8 border-b border-slate-100 pb-6">
             <div className="flex items-center gap-2 mb-3">
-                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded">v1.4.0</span>
-                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase rounded">Database Full Sync</span>
+                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded">v1.5.0</span>
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase rounded">Facilities</span>
             </div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Documentação Técnica & Setup</h1>
             <p className="text-slate-500 mt-2 text-lg">Manual de configuração do banco de dados e usuários.</p>
@@ -81,6 +81,13 @@ create table if not exists purchases (
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
 
+-- 9. Tabela de Edifícios (Facilities)
+create table if not exists buildings (
+  id text primary key,
+  json_content jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
 -- --- SEGURANÇA (RLS) ---
 -- Habilita Row Level Security em todas as tabelas
 alter table projects enable row level security;
@@ -91,25 +98,45 @@ alter table stock_movements enable row level security;
 alter table suppliers enable row level security;
 alter table users enable row level security;
 alter table purchases enable row level security;
+alter table buildings enable row level security;
 
 -- Cria políticas de acesso PÚBLICO (Para uso imediato com a chave Anon Key)
--- Nota: Em produção real com Login, alterar 'true' para checagem de auth.uid()
+-- Nota: As linhas 'drop policy' evitam erros caso o script seja rodado mais de uma vez.
 
+drop policy if exists "Enable all access for projects" on projects;
 create policy "Enable all access for projects" on projects for all using (true) with check (true);
+
+drop policy if exists "Enable all access for materials" on materials;
 create policy "Enable all access for materials" on materials for all using (true) with check (true);
+
+drop policy if exists "Enable all access for oss" on oss;
 create policy "Enable all access for oss" on oss for all using (true) with check (true);
+
+drop policy if exists "Enable all access for services" on services;
 create policy "Enable all access for services" on services for all using (true) with check (true);
+
+drop policy if exists "Enable all access for stock_movements" on stock_movements;
 create policy "Enable all access for stock_movements" on stock_movements for all using (true) with check (true);
+
+drop policy if exists "Enable all access for suppliers" on suppliers;
 create policy "Enable all access for suppliers" on suppliers for all using (true) with check (true);
+
+drop policy if exists "Enable all access for users" on users;
 create policy "Enable all access for users" on users for all using (true) with check (true);
+
+drop policy if exists "Enable all access for purchases" on purchases;
 create policy "Enable all access for purchases" on purchases for all using (true) with check (true);
+
+drop policy if exists "Enable all access for buildings" on buildings;
+create policy "Enable all access for buildings" on buildings for all using (true) with check (true);
                 `}</pre>
             </div>
 
             <h3>2. Como funciona a Autenticação?</h3>
             <ul className="list-disc pl-5 space-y-2 text-sm text-slate-700">
                 <li><strong>Mock Authentication:</strong> Atualmente, os usuários são armazenados na tabela <code>users</code> como objetos JSON.</li>
-                <li><strong>Admin Padrão:</strong> Se nenhum usuário existir, o sistema cria o <code>admin@crop.com</code> com senha <code>123</code>.</li>
+                <li><strong>Admin Padrão:</strong> <code>admin@crop.com</code> (Senha: 123) - Acesso total.</li>
+                <li><strong>Prestador Teste:</strong> <code>prestador@crop.com</code> (Senha: 123) - Para testar o painel mobile simplificado.</li>
                 <li><strong>Segurança:</strong> Em produção, esta lógica deve ser substituída pelo <strong>Supabase Auth</strong> nativo para segurança de senhas e tokens JWT.</li>
             </ul>
         </div>

@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Project, OS, Material, ServiceType, StockMovement, 
-  UserRole, OSStatus, ProjectStatus, User, PurchaseRecord
+  UserRole, OSStatus, ProjectStatus, User, PurchaseRecord, Building
 } from './types';
-import { INITIAL_MATERIALS, INITIAL_SERVICES, INITIAL_PROJECTS, INITIAL_USERS } from './constants';
+import { INITIAL_MATERIALS, INITIAL_SERVICES, INITIAL_PROJECTS, INITIAL_USERS, INITIAL_BUILDINGS } from './constants';
 import Dashboard from './components/Dashboard';
 import ProjectList from './components/ProjectList';
 import OSList from './components/OSList';
@@ -15,6 +15,8 @@ import Documentation from './components/Documentation';
 import CalendarView from './components/CalendarView';
 import UserManagement from './components/UserManagement';
 import Login from './components/Login';
+import ExecutorPanel from './components/ExecutorPanel';
+import BuildingManager from './components/BuildingManager';
 import { supabase, mapFromSupabase, mapToSupabase } from './services/supabase';
 
 // Definição da estrutura do Menu com Permissões (allowedRoles)
@@ -24,13 +26,14 @@ const MENU_GROUPS = [
     items: [
       { id: 'dash', icon: 'fa-chart-pie', label: 'Dashboard', allowedRoles: ['ADMIN', 'MANAGER', 'USER'] },
       { id: 'projects', icon: 'fa-folder-tree', label: 'Projetos (Capex)', allowedRoles: ['ADMIN', 'MANAGER'] },
-      { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço', allowedRoles: ['ADMIN', 'MANAGER', 'EXECUTOR'] }
+      { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço', allowedRoles: ['ADMIN', 'MANAGER'] }
     ]
   },
   {
     title: "Operacional",
     items: [
-      { id: 'calendar', icon: 'fa-calendar-days', label: 'Agenda de Serviços', allowedRoles: ['ADMIN', 'MANAGER', 'EXECUTOR'] },
+      { id: 'calendar', icon: 'fa-calendar-days', label: 'Agenda de Serviços', allowedRoles: ['ADMIN', 'MANAGER'] },
+      { id: 'buildings', icon: 'fa-building', label: 'Edifícios', allowedRoles: ['ADMIN', 'MANAGER'] },
       { id: 'inventory', icon: 'fa-warehouse', label: 'Almoxarifado', allowedRoles: ['ADMIN', 'MANAGER'] },
       { id: 'services', icon: 'fa-users-gear', label: 'Serviços', allowedRoles: ['ADMIN', 'MANAGER'] },
       { id: 'suppliers', icon: 'fa-handshake', label: 'Fornecedores', allowedRoles: ['ADMIN', 'MANAGER'] }
@@ -62,6 +65,7 @@ const App: React.FC = () => {
   const [suppliers, setSuppliers] = useState<any[]>([]); 
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>(INITIAL_BUILDINGS);
   
   // Estado de Layout Mobile
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -79,7 +83,7 @@ const App: React.FC = () => {
       setSyncStatus('syncing');
       try {
         // Tenta buscar do Supabase
-        const [p, m, s, o, mov, sup, usr, pur] = await Promise.all([
+        const [p, m, s, o, mov, sup, usr, pur, bld] = await Promise.all([
           supabase.from('projects').select('*'),
           supabase.from('materials').select('*'),
           supabase.from('services').select('*'),
@@ -87,7 +91,8 @@ const App: React.FC = () => {
           supabase.from('stock_movements').select('*'),
           supabase.from('suppliers').select('*'),
           supabase.from('users').select('*'),
-          supabase.from('purchases').select('*')
+          supabase.from('purchases').select('*'),
+          supabase.from('buildings').select('*')
         ]);
 
         if (p.error || m.error) throw new Error("Erro de conexão com DB");
@@ -105,6 +110,7 @@ const App: React.FC = () => {
             setSuppliers(mapFromSupabase<any>(sup.data));
             setUsers(mapFromSupabase<User>(usr.data).length ? mapFromSupabase<User>(usr.data) : INITIAL_USERS);
             setPurchases(mapFromSupabase<PurchaseRecord>(pur.data));
+            setBuildings(mapFromSupabase<Building>(bld.data).length ? mapFromSupabase<Building>(bld.data) : INITIAL_BUILDINGS);
             setSyncStatus('online');
         } else {
             // Fallback para LocalStorage se o banco estiver vazio (primeiro uso)
@@ -119,6 +125,7 @@ const App: React.FC = () => {
                 if (data.suppliers) setSuppliers(data.suppliers);
                 if (data.users) setUsers(data.users);
                 if (data.purchases) setPurchases(data.purchases);
+                if (data.buildings) setBuildings(data.buildings);
             }
             setSyncStatus('online'); // Consideramos online mas vazio
         }
@@ -136,6 +143,7 @@ const App: React.FC = () => {
           if (data.suppliers) setSuppliers(data.suppliers);
           if (data.users) setUsers(data.users);
           if (data.purchases) setPurchases(data.purchases);
+          if (data.buildings) setBuildings(data.buildings);
         }
         setSyncStatus('offline');
       } finally {
@@ -154,7 +162,7 @@ const App: React.FC = () => {
     if (firstLoad) return;
 
     // 1. Salva Localmente
-    localStorage.setItem('crop_service_v3_data', JSON.stringify({ projects, materials, services, oss, movements, suppliers, users, purchases }));
+    localStorage.setItem('crop_service_v3_data', JSON.stringify({ projects, materials, services, oss, movements, suppliers, users, purchases, buildings }));
 
     // 2. Debounce para salvar no Supabase
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -174,6 +182,7 @@ const App: React.FC = () => {
              ...suppliers.map(item => supabase.from('suppliers').upsert(mapToSupabase(item))),
              ...users.map(item => supabase.from('users').upsert(mapToSupabase(item))),
              ...purchases.map(item => supabase.from('purchases').upsert(mapToSupabase(item))),
+             ...buildings.map(item => supabase.from('buildings').upsert(mapToSupabase(item))),
           ]);
           setSyncStatus('online');
        } catch (e) {
@@ -183,7 +192,7 @@ const App: React.FC = () => {
     }, 2000); 
 
     return () => { if(timeoutRef.current) clearTimeout(timeoutRef.current); };
-  }, [projects, materials, services, oss, movements, suppliers, users, purchases, firstLoad]);
+  }, [projects, materials, services, oss, movements, suppliers, users, purchases, buildings, firstLoad]);
 
   const handleStockChange = (mId: string, qty: number, osNumber: string) => {
     setMaterials(prev => prev.map(m => 
@@ -218,6 +227,19 @@ const App: React.FC = () => {
     return <Login users={users} onLogin={handleLogin} />;
   }
 
+  // Lógica Especial para EXECUTOR: Painel Simplificado
+  if (currentUser.role === 'EXECUTOR') {
+      return (
+        <ExecutorPanel 
+          user={currentUser} 
+          oss={oss} 
+          setOss={setOss} 
+          projects={projects} 
+          onLogout={handleLogout} 
+        />
+      );
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dash': 
@@ -230,13 +252,18 @@ const App: React.FC = () => {
             oss={oss} 
             setOss={setOss} 
             projects={projects} 
+            buildings={buildings}
             materials={materials} 
             services={services}
+            users={users}
+            setUsers={setUsers}
             onStockChange={handleStockChange}
           />
         );
       case 'calendar':
-        return <CalendarView oss={oss} projects={projects} materials={materials} services={services} />;
+        return <CalendarView oss={oss} projects={projects} materials={materials} services={services} users={users} />;
+      case 'buildings':
+        return <BuildingManager buildings={buildings} setBuildings={setBuildings} />;
       case 'inventory': 
         return (
           <Inventory 

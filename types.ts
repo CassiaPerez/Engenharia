@@ -36,6 +36,16 @@ export enum ServiceCostType {
   FIXED = 'Valor Fixo'
 }
 
+export interface Building {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  manager: string;
+  type: 'CORPORATE' | 'INDUSTRIAL' | 'LOGISTICS';
+  notes?: string;
+}
+
 export interface Material {
   id: string;
   code: string;
@@ -98,7 +108,8 @@ export interface Project {
 export interface OS {
   id: string;
   number: string;
-  projectId: string;
+  projectId?: string; // Agora opcional
+  buildingId?: string; // Novo campo para vincular a Edifício
   description: string;
   type: OSType;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -110,6 +121,7 @@ export interface OS {
   startTime?: string;
   endTime?: string;
   pauseReason?: string;
+  completionImage?: string; /* Base64 da Foto de Conclusão */
   materials: OSItem[];
   services: OSService[];
 }

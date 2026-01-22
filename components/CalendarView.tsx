@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { OS, Project, OSStatus, Material, ServiceType } from '../types';
+import { OS, Project, OSStatus, Material, ServiceType, User } from '../types';
 import { calculateOSCosts } from '../services/engine';
 
 interface Props {
@@ -8,9 +8,10 @@ interface Props {
   projects: Project[];
   materials: Material[];
   services: ServiceType[];
+  users: User[];
 }
 
-const CalendarView: React.FC<Props> = ({ oss, projects, materials, services }) => {
+const CalendarView: React.FC<Props> = ({ oss, projects, materials, services, users }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
 
@@ -129,19 +130,27 @@ const CalendarView: React.FC<Props> = ({ oss, projects, materials, services }) =
                          <div className="space-y-1.5 overflow-y-auto max-h-[110px] custom-scrollbar pr-1">
                              {events.map(os => {
                                  const proj = projects.find(p => p.id === os.projectId);
+                                 const executor = users.find(u => u.id === os.executorId);
                                  return (
                                      <button 
                                         key={os.id}
                                         onClick={() => setSelectedOS(os)}
-                                        className={`w-full text-left px-2 py-1.5 rounded border text-xs font-bold truncate shadow-sm hover:opacity-80 transition-all ${getStatusColor(os.status)}`}
+                                        className={`w-full text-left px-2 py-1.5 rounded border text-xs font-bold truncate shadow-sm hover:opacity-80 transition-all flex flex-col gap-0.5 ${getStatusColor(os.status)}`}
                                         title={`${os.number}: ${os.description}`}
                                      >
                                         <div className="flex items-center gap-1.5">
-                                            <div className={`w-1.5 h-1.5 rounded-full ${os.priority === 'CRITICAL' ? 'bg-red-500' : os.priority === 'HIGH' ? 'bg-orange-500' : 'bg-slate-400'}`}></div>
+                                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${os.priority === 'CRITICAL' ? 'bg-red-500' : os.priority === 'HIGH' ? 'bg-orange-500' : 'bg-slate-400'}`}></div>
                                             <span className="truncate">{os.description}</span>
                                         </div>
-                                        <div className="text-[10px] opacity-75 truncate mt-0.5 ml-3 font-medium">
-                                            {proj?.code}
+                                        <div className="flex justify-between items-center w-full">
+                                            <div className="text-[10px] opacity-75 truncate font-medium">
+                                                {proj?.code}
+                                            </div>
+                                            {executor && (
+                                                <div className="text-[9px] opacity-90 font-bold bg-black/10 px-1 rounded ml-1 truncate max-w-[60px]" title={executor.name}>
+                                                    {executor.name.split(' ')[0]}
+                                                </div>
+                                            )}
                                         </div>
                                      </button>
                                  );
@@ -192,6 +201,19 @@ const CalendarView: React.FC<Props> = ({ oss, projects, materials, services }) =
                             <p className="font-medium text-slate-800">
                                 {new Date(selectedOS.limitDate).toLocaleDateString()} às {new Date(selectedOS.limitDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             </p>
+                        </div>
+                        <div className="col-span-2">
+                            <p className="text-slate-500 font-bold uppercase text-[10px]">Executor Responsável</p>
+                            {users.find(u => u.id === selectedOS.executorId) ? (
+                                <div className="flex items-center gap-2 mt-1">
+                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700">
+                                        {users.find(u => u.id === selectedOS.executorId)?.avatar || 'U'}
+                                    </div>
+                                    <p className="font-bold text-slate-800">{users.find(u => u.id === selectedOS.executorId)?.name}</p>
+                                </div>
+                            ) : (
+                                <p className="text-slate-400 italic">Não atribuído</p>
+                            )}
                         </div>
                     </div>
 

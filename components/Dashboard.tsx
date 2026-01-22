@@ -49,6 +49,86 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
   const getActualMaterialQty = (projectId: string, materialId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.materials.find(m => m.materialId === materialId)?.quantity || 0), 0);
   const getActualServiceHours = (projectId: string, serviceId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.services.find(s => s.serviceTypeId === serviceId)?.quantity || 0), 0);
 
+  // --- PDF GENERATION: Relatório Consolidado ---
+  const generateConsolidatedReport = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const today = new Date().toLocaleDateString('pt-BR');
+
+    // Header Branding
+    doc.setFillColor(71, 122, 127); // Clean Primary
+    doc.rect(0, 0, 297, 24, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("RELATÓRIO DE CUSTOS POR PROJETO (CAPEX)", 14, 16);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+
+    let totalBudget = 0;
+    let totalReal = 0;
+
+    const tableBody = sortedProjects.map(p => {
+        const costs = calculateProjectCosts(p, oss, materials, services);
+        totalBudget += p.estimatedValue;
+        totalReal += costs.totalReal;
+        
+        const variance = p.estimatedValue - costs.totalReal;
+        const variancePct = p.estimatedValue > 0 ? (costs.totalReal / p.estimatedValue) * 100 : 0;
+
+        return [
+            p.code,
+            p.description,
+            p.responsible,
+            formatDate(p.startDate),
+            p.status,
+            `R$ ${formatCurrency(p.estimatedValue)}`,
+            `R$ ${formatCurrency(costs.totalReal)}`,
+            `R$ ${formatCurrency(variance)}`,
+            `${variancePct.toFixed(1)}%`
+        ];
+    });
+
+    // Add Summary Row
+    tableBody.push([
+        '', 
+        'TOTAIS CONSOLIDADOS', 
+        '', 
+        '', 
+        '', 
+        `R$ ${formatCurrency(totalBudget)}`, 
+        `R$ ${formatCurrency(totalReal)}`, 
+        `R$ ${formatCurrency(totalBudget - totalReal)}`, 
+        `${totalBudget > 0 ? ((totalReal/totalBudget)*100).toFixed(1) : 0}%`
+    ]);
+
+    autoTable(doc, {
+        head: [['Código', 'Projeto', 'Responsável', 'Início', 'Status', 'Budget (Plan)', 'Custo Real', 'Saldo (Var)', '% Uso']],
+        body: tableBody,
+        startY: 35,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [71, 122, 127], textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+            0: { fontStyle: 'bold' },
+            5: { halign: 'right' }, // Budget
+            6: { halign: 'right', fontStyle: 'bold' }, // Real
+            7: { halign: 'right' }, // Var
+            8: { halign: 'right' }  // %
+        },
+        didParseCell: function(data) {
+            // Highlight Summary Row
+            if (data.row.index === tableBody.length - 1) {
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fillColor = [240, 240, 240];
+            }
+        }
+    });
+
+    doc.save(`Relatorio_Custos_Projetos_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   const generateProjectDetailPDF = (project: Project) => {
     const doc = new jsPDF();
     const costs = calculateProjectCosts(project, oss, materials, services);
@@ -184,9 +264,17 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
           <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Painel de Governança</h2>
           <p className="text-slate-600 text-lg mt-1 font-medium">Visão consolidada de custos e performance industrial.</p>
         </div>
-        <span className="text-sm font-bold text-emerald-700 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-200 flex items-center gap-2">
-           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sistema Operante
-        </span>
+        <div className="flex items-center gap-3">
+            <button 
+                onClick={generateConsolidatedReport}
+                className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-slate-900/20 transition-all flex items-center gap-2"
+            >
+                <i className="fas fa-file-invoice-dollar"></i> Relatório de Gastos
+            </button>
+            <span className="text-sm font-bold text-emerald-700 bg-emerald-50 px-4 py-2.5 rounded-lg border border-emerald-200 flex items-center gap-2">
+               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sistema Operante
+            </span>
+        </div>
       </div>
 
       {/* KPI Cards */}
