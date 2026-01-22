@@ -269,7 +269,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
         body: summaryData,
         theme: 'plain',
         styles: { fontSize: 10, cellPadding: 2 },
-        columnStyles: { 0: { fontStyle: 'bold', width: 80 }, 1: { halign: 'right' } }
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 }, 1: { halign: 'right' } }
     });
     
     yPos = (doc as any).lastAutoTable.finalY + 10;

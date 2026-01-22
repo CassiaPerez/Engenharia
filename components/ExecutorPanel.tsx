@@ -1,18 +1,22 @@
 
 import React, { useState, useRef, useMemo } from 'react';
-import { OS, User, OSStatus, Project } from '../types';
+import { OS, User, OSStatus, Project, Building, ServiceType, Material } from '../types';
 
 interface Props {
   user: User;
   oss: OS[];
   setOss: React.Dispatch<React.SetStateAction<OS[]>>;
   projects: Project[];
+  buildings: Building[];
+  materials?: Material[]; // Agora opcional/recebido para detalhes
+  services?: ServiceType[]; // Agora opcional/recebido para detalhes
   onLogout: () => void;
 }
 
-const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, onLogout }) => {
+const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings, materials = [], services = [], onLogout }) => {
   const [activeTab, setActiveTab] = useState<'TODO' | 'DONE' | 'CALENDAR'>('TODO');
   const [finishingOS, setFinishingOS] = useState<OS | null>(null);
+  const [viewDetailOS, setViewDetailOS] = useState<OS | null>(null); // Novo estado para Modal de Detalhes
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -27,6 +31,54 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, onLogout 
   
   const todoList = myOSs.filter(o => o.status !== OSStatus.COMPLETED && o.status !== OSStatus.CANCELED);
   const doneList = myOSs.filter(o => o.status === OSStatus.COMPLETED);
+
+  // Helper para contexto
+  const getContext = (os: OS) => {
+    if (os.projectId) {
+        const p = projects.find(x => x.id === os.projectId);
+        return { name: p?.description, type: 'PROJETO', code: p?.code, location: p?.location, city: p?.city };
+    } else if (os.buildingId) {
+        const b = buildings.find(x => x.id === os.buildingId);
+        return { name: b?.name, type: 'EDIFÍCIO', code: 'FACILITIES', location: b?.address, city: b?.city };
+    }
+    return { name: 'Local Não Definido', type: '---', code: '---', location: '', city: '' };
+  };
+
+  // Google Calendar Integration
+  const handleGoogleCalendarSync = (os: OS) => {
+    const context = getContext(os);
+    
+    // Formata datas para Google (YYYYMMDDTHHMMSSZ)
+    const formatDateForGoogle = (dateStr: string) => {
+        return new Date(dateStr).toISOString().replace(/-|:|\.\d\d\d/g, "");
+    };
+
+    const start = os.startTime ? formatDateForGoogle(os.startTime) : formatDateForGoogle(os.openDate);
+    // Duração estimada padrão de 2h se não houver SLA
+    const limit = new Date(os.limitDate); 
+    const end = formatDateForGoogle(limit.toISOString());
+
+    const title = encodeURIComponent(`OS ${os.number}: ${os.description.substring(0, 40)}...`);
+    
+    // Checklist de Serviços para a descrição do evento
+    const serviceList = os.services.map(s => {
+        const srv = services.find(x => x.id === s.serviceTypeId);
+        return `- ${srv?.name || 'Serviço'} (${s.quantity}h)`;
+    }).join('\n');
+
+    const details = encodeURIComponent(
+        `ATIVIDADE: ${os.description}\n\n` +
+        `LOCAL: ${context.name} (${context.location}, ${context.city})\n\n` +
+        `ESCOPO DETALHADO:\n${serviceList || 'Ver no App'}\n\n` +
+        `PRIORIDADE: ${os.priority}\n` +
+        `Link do Sistema: CropService`
+    );
+    
+    const location = encodeURIComponent(`${context.name}, ${context.city}`);
+    const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${start}/${end}&add=${user.email}`;
+
+    window.open(googleUrl, '_blank');
+  };
 
   // --- Lógica do Calendário ---
   const daysInMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0).getDate();
@@ -86,7 +138,6 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, onLogout 
 
   const handleStart = (e: React.MouseEvent, osId: string) => {
       e.stopPropagation();
-      // Removido confirm() para ação direta e sem bloqueios
       setOss(prev => prev.map(o => o.id === osId ? { ...o, status: OSStatus.IN_PROGRESS, startTime: new Date().toISOString() } : o));
   };
 
@@ -127,7 +178,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, onLogout 
   };
 
   const renderOSCard = (os: OS) => {
-      const project = projects.find(p => p.id === os.projectId);
+      const context = getContext(os);
       return (
         <div key={os.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 relative overflow-hidden mb-4 group hover:shadow-md transition-shadow">
             <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${os.status === OSStatus.IN_PROGRESS ? 'bg-blue-500 animate-pulse' : os.status === OSStatus.COMPLETED ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
@@ -139,7 +190,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, onLogout 
                 </div>
                 
                 <h3 className="text-lg font-bold text-slate-900 leading-tight mb-1">{os.description}</h3>
-                <p className="text-xs font-bold text-emerald-600 mb-4 uppercase tracking-wide truncate">{project?.code} - {project?.city}</p>
+                <p className="text-xs font-bold text-emerald-600 mb-4 uppercase tracking-wide truncate">{context.code} - {context.city}</p>
                 
                 <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mb-4 bg-slate-50 p-3 rounded-lg">
                     <div className="flex items-center gap-1.5">
@@ -152,24 +203,24 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, onLogout 
                     </div>
                 </div>
 
-                {os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED && (
-                    <div className="grid grid-cols-2 gap-3">
+                <div className="flex gap-2">
+                   {os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED && (
+                       <>
                         {os.status === OSStatus.OPEN ? (
-                            <button onClick={(e) => handleStart(e, os.id)} className="col-span-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2">
-                                <i className="fas fa-play"></i> Iniciar Atividade
+                            <button onClick={(e) => handleStart(e, os.id)} className="flex-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                                <i className="fas fa-play"></i> Iniciar
                             </button>
                         ) : (
-                            <>
-                              <button disabled className="bg-slate-100 text-blue-600 font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 border border-slate-200 cursor-default opacity-70">
-                                  <i className="fas fa-sync fa-spin"></i> Em Execução
-                              </button>
-                              <button onClick={(e) => openFinishModal(e, os)} className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2">
+                             <button onClick={(e) => openFinishModal(e, os)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
                                   <i className="fas fa-camera"></i> Finalizar
-                              </button>
-                            </>
+                             </button>
                         )}
-                    </div>
-                )}
+                       </>
+                   )}
+                   <button onClick={() => setViewDetailOS(os)} className="flex-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                       <i className="fas fa-eye"></i> Detalhes
+                   </button>
+                </div>
                 
                 {os.status === OSStatus.COMPLETED && os.completionImage && (
                     <div className="mt-2 relative">
@@ -188,8 +239,8 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, onLogout 
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
       
       {/* --- SIDEBAR (Desktop/Tablet) --- */}
-      <aside className="hidden md:flex w-72 bg-slate-900 text-slate-300 flex-col border-r border-slate-800 shadow-2xl relative z-20">
-          <div className="h-24 flex items-center px-6 border-b border-slate-800 bg-slate-950 shrink-0 gap-3">
+      <aside className="hidden md:flex w-72 bg-[#0f172a] text-slate-300 flex-col border-r border-slate-700 shadow-2xl relative z-20">
+          <div className="h-24 flex items-center px-6 border-b border-slate-800 bg-[#0f172a] shrink-0 gap-3">
               <div className="w-10 h-10 flex items-center justify-center text-emerald-500 text-2xl">
                   <i className="fas fa-fingerprint"></i>
               </div>
@@ -226,14 +277,14 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, onLogout 
               </button>
           </nav>
 
-          <div className="p-4 border-t border-slate-800 bg-slate-950/50">
-              <div className="flex items-center gap-3 p-3 mb-2 rounded-xl bg-slate-800/50 border border-slate-800">
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center font-bold text-white shadow-md border-2 border-slate-700">
+          <div className="p-4 border-t border-slate-800 bg-[#020617]">
+              <div className="flex items-center gap-3 p-3 mb-2 rounded-xl bg-slate-800/50 border border-slate-700">
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center font-bold text-white shadow-md border-2 border-slate-600">
                       {user.avatar || user.name.substr(0,2)}
                   </div>
                   <div className="overflow-hidden">
                       <p className="text-sm font-bold text-white truncate">{user.name}</p>
-                      <p className="text-xs text-slate-500 truncate">Prestador</p>
+                      <p className="text-xs text-slate-400 truncate">Prestador</p>
                   </div>
               </div>
               <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors uppercase tracking-wider">
@@ -372,6 +423,92 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, onLogout 
               <span className="text-[10px] font-bold uppercase">Histórico</span>
           </button>
       </nav>
+
+      {/* --- DETAIL MODAL (Novo) --- */}
+      {viewDetailOS && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex flex-col justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg mx-auto overflow-hidden animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="p-5 border-b border-slate-200 bg-slate-50 flex justify-between items-start">
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="bg-slate-800 text-white font-mono text-xs font-bold px-2 py-0.5 rounded">{viewDetailOS.number}</span>
+                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${viewDetailOS.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{viewDetailOS.priority}</span>
+                        </div>
+                        <h3 className="font-bold text-lg text-slate-900 leading-tight">{viewDetailOS.description}</h3>
+                    </div>
+                    <button onClick={() => setViewDetailOS(null)} className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center transition-colors"><i className="fas fa-times"></i></button>
+                </div>
+                
+                <div className="p-5 overflow-y-auto custom-scrollbar space-y-6">
+                    {/* Contexto Local */}
+                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                        <h4 className="text-xs font-black text-blue-800 uppercase tracking-wide mb-2 flex items-center gap-1.5"><i className="fas fa-map-marker-alt"></i> Local de Execução</h4>
+                        <div className="text-sm text-slate-700 space-y-1">
+                            <p><span className="font-bold">Vínculo:</span> {getContext(viewDetailOS).name}</p>
+                            <p><span className="font-bold">Endereço:</span> {getContext(viewDetailOS).location}</p>
+                            <p><span className="font-bold">Cidade:</span> {getContext(viewDetailOS).city}</p>
+                        </div>
+                        <button 
+                            onClick={() => handleGoogleCalendarSync(viewDetailOS)}
+                            className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-sm shadow-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <i className="fab fa-google"></i> Adicionar à Minha Agenda
+                        </button>
+                    </div>
+
+                    {/* Checklist Serviços */}
+                    <div>
+                        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
+                            <i className="fas fa-tasks text-emerald-500"></i> Checklist de Atividades
+                        </h4>
+                        <ul className="space-y-2">
+                            {viewDetailOS.services.length > 0 ? viewDetailOS.services.map((s, idx) => {
+                                const srv = services?.find(x => x.id === s.serviceTypeId);
+                                return (
+                                    <li key={idx} className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                        <div className="w-5 h-5 rounded border-2 border-slate-300 mt-0.5"></div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-800 leading-tight">{srv?.name || 'Serviço'}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">{srv?.description || 'Executar conforme padrão.'}</p>
+                                            <span className="inline-block mt-1 text-[10px] bg-slate-200 px-1.5 rounded font-bold text-slate-600">Estimado: {s.quantity}h</span>
+                                        </div>
+                                    </li>
+                                );
+                            }) : <p className="text-sm text-slate-400 italic">Nenhum serviço específico listado. Seguir descrição geral.</p>}
+                        </ul>
+                    </div>
+
+                    {/* Lista de Materiais */}
+                    <div>
+                        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
+                            <i className="fas fa-box-open text-orange-500"></i> Materiais Necessários
+                        </h4>
+                        <ul className="space-y-2">
+                             {viewDetailOS.materials.length > 0 ? viewDetailOS.materials.map((m, idx) => {
+                                 const mat = materials?.find(x => x.id === m.materialId);
+                                 return (
+                                     <li key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
+                                         <span className="font-medium text-slate-700">{mat?.description || 'Material'}</span>
+                                         <span className="font-bold text-slate-900 bg-white px-2 py-1 rounded border border-slate-200">{m.quantity} {mat?.unit}</span>
+                                     </li>
+                                 );
+                             }) : <p className="text-sm text-slate-400 italic">Nenhum material alocado previamente.</p>}
+                        </ul>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3">
+                    <button onClick={() => setViewDetailOS(null)} className="flex-1 py-3 text-slate-600 font-bold text-sm bg-white border border-slate-300 rounded-xl hover:bg-slate-100">Fechar</button>
+                    {viewDetailOS.status === OSStatus.OPEN && (
+                        <button onClick={(e) => { handleStart(e, viewDetailOS.id); setViewDetailOS(null); }} className="flex-1 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 shadow-md">Iniciar Agora</button>
+                    )}
+                    {viewDetailOS.status === OSStatus.IN_PROGRESS && (
+                         <button onClick={(e) => { setViewDetailOS(null); openFinishModal(e, viewDetailOS); }} className="flex-1 py-3 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow-md">Finalizar</button>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
 
       {/* --- FINISH MODAL --- */}
       {finishingOS && (

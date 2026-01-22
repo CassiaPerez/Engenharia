@@ -234,8 +234,11 @@ const App: React.FC = () => {
           user={currentUser} 
           oss={oss} 
           setOss={setOss} 
-          projects={projects} 
+          projects={projects}
+          buildings={buildings} 
           onLogout={handleLogout} 
+          services={services}
+          materials={materials}
         />
       );
   }
@@ -306,14 +309,14 @@ const App: React.FC = () => {
       {/* Sidebar Navigation */}
       <aside 
         className={`
-          fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 ease-in-out shadow-2xl
+          fixed inset-y-0 left-0 z-50 w-72 bg-[#0f172a] text-slate-300 flex flex-col border-r border-slate-700 transition-transform duration-300 ease-in-out shadow-2xl
           md:relative md:translate-x-0 md:shadow-none
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
           md:w-20 lg:w-72
         `}
       >
         {/* Brand Header */}
-        <div className="h-20 flex items-center px-6 border-b border-slate-800 bg-slate-950 shrink-0 justify-between md:justify-center lg:justify-start relative overflow-hidden group">
+        <div className="h-20 flex items-center px-6 border-b border-slate-800 bg-[#0f172a] shrink-0 justify-between md:justify-center lg:justify-start relative overflow-hidden group">
           <div className="flex items-center gap-3 relative z-10">
              {/* Logo Icon Style - imitating the fingerprint logo */}
              <div className="w-10 h-10 flex items-center justify-center text-emerald-500 text-2xl group-hover:scale-110 transition-transform">
@@ -360,7 +363,7 @@ const App: React.FC = () => {
         </nav>
 
         {/* User Footer with Logout */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/50 shrink-0">
+        <div className="p-4 border-t border-slate-800 bg-[#020617] shrink-0">
           <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group mb-2">
             <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold text-white border border-slate-700 group-hover:border-emerald-500 transition-all shrink-0">
               {currentUser.avatar}

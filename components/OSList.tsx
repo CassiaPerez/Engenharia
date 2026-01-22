@@ -183,6 +183,39 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       setNewExecutorData({ name: '', email: '', department: '' });
   };
 
+  // --- GOOGLE CALENDAR INTEGRATION ---
+  const handleGoogleCalendarSync = (os: OS) => {
+    // 1. Busca dados do contexto (Executor e Local)
+    const executor = users.find(u => u.id === os.executorId);
+    const context = getContextInfo(os);
+    
+    // 2. Formata datas para o padrão Google (YYYYMMDDTHHMMSSZ)
+    const formatDateForGoogle = (dateStr: string) => {
+        return new Date(dateStr).toISOString().replace(/-|:|\.\d\d\d/g, "");
+    };
+
+    // Define início e fim. Se não tiver start definido, usa agora. Duração padrão 2h se não tiver data final.
+    const start = os.startTime ? formatDateForGoogle(os.startTime) : formatDateForGoogle(os.openDate);
+    const end = os.limitDate ? formatDateForGoogle(os.limitDate) : formatDateForGoogle(new Date(new Date(os.openDate).getTime() + 2 * 60 * 60 * 1000).toISOString());
+
+    // 3. Monta o Link
+    const title = encodeURIComponent(`OS ${os.number} - ${os.description.substring(0, 40)}...`);
+    const details = encodeURIComponent(
+        `Serviço: ${os.description}\n` +
+        `Prioridade: ${os.priority}\n` +
+        `Tipo: ${os.type}\n` +
+        `Local: ${context.label} - ${context.sub}\n` +
+        `Sistema: CropService`
+    );
+    const location = encodeURIComponent(`${context.label}, ${context.sub}`);
+    const emails = executor?.email ? encodeURIComponent(executor.email) : '';
+
+    const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${start}/${end}&add=${emails}`;
+
+    // 4. Abre em nova aba
+    window.open(googleUrl, '_blank');
+  };
+
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const getStatusTooltip = (status: OSStatus) => {
@@ -261,7 +294,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
         ["CUSTO TOTAL DA OS", `R$ ${formatCurrency(costs.totalCost)}`]
     ];
 
-    autoTable(doc, { startY: yPos, head: [], body: summaryData, theme: 'plain', styles: { fontSize: 10, cellPadding: 2 }, columnStyles: { 0: { fontStyle: 'bold', width: 80 }, 1: { halign: 'right' } } });
+    autoTable(doc, { startY: yPos, head: [], body: summaryData, theme: 'plain', styles: { fontSize: 10, cellPadding: 2 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 }, 1: { halign: 'right' } } });
     
     yPos = (doc as any).lastAutoTable.finalY + 10;
     doc.setTextColor(0,0,0);
@@ -416,6 +449,9 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
                    )}
                 </div>
                 <div className="flex items-center gap-3">
+                    <button onClick={() => handleGoogleCalendarSync(selectedOS)} className="bg-white text-slate-600 hover:text-blue-600 hover:bg-blue-50 px-4 py-3 rounded-lg font-bold text-base transition-all border border-slate-300 hover:border-blue-300 shadow-sm flex items-center gap-2" title="Enviar convite para Google Agenda">
+                        <i className="fab fa-google"></i> Agendar
+                    </button>
                     <button onClick={() => generateOSDetailPDF(selectedOS)} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-5 py-3 rounded-lg font-bold text-base transition-all border border-slate-200 flex items-center gap-2">
                         <i className="fas fa-print"></i> Imprimir OS
                     </button>
