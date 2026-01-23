@@ -364,7 +364,38 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
                     <button onClick={() => setShowDetail(null)} className="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"><i className="fas fa-times text-xl"></i></button>
                 </div>
              </div>
-             <div className="flex-1 overflow-y-auto p-8 space-y-8">
+             
+             <div className="flex-1 overflow-y-auto p-8">
+                {/* FINANCIAL SUMMARY CARDS */}
+                {(() => {
+                    const costs = calculateProjectCosts(showDetail, oss, materials, services);
+                    return (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Orçamento (Budget)</p>
+                                <p className="text-2xl font-black text-slate-800">R$ {formatCurrency(showDetail.estimatedValue)}</p>
+                            </div>
+                            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Custo Realizado</p>
+                                <p className="text-2xl font-black text-blue-900">R$ {formatCurrency(costs.totalReal)}</p>
+                                <div className="flex gap-3 text-[10px] uppercase font-bold mt-2 pt-2 border-t border-slate-100">
+                                    <span className="text-slate-500">Mat: <span className="text-slate-700">R$ {formatCurrency(costs.totalMaterials)}</span></span>
+                                    <span className="text-slate-500">Srv: <span className="text-slate-700">R$ {formatCurrency(costs.totalServices)}</span></span>
+                                </div>
+                            </div>
+                            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                                <div className={`absolute top-0 left-0 w-1 h-full ${costs.variance >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Variação / Saldo</p>
+                                <p className={`text-2xl font-black ${costs.variance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                    {costs.variance >= 0 ? '+' : ''} R$ {formatCurrency(costs.variance)}
+                                </p>
+                                <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">{costs.variancePercent.toFixed(1)}% do orçamento utilizado</p>
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {/* Tabelas de comparativo */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="border border-slate-200 rounded-xl p-6 shadow-sm">

@@ -46,6 +46,11 @@ export interface Building {
   notes?: string;
 }
 
+export interface StockLocation {
+  name: string;
+  quantity: number;
+}
+
 export interface Material {
   id: string;
   code: string;
@@ -54,8 +59,9 @@ export interface Material {
   unit: string;
   unitCost: number;
   minStock: number;
-  currentStock: number;
-  location: string;
+  currentStock: number; // Soma total de todos os locais
+  location: string; // Local principal/padrão (display)
+  stockLocations?: StockLocation[]; // Detalhamento por local
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -142,13 +148,15 @@ export interface OSService {
 
 export interface StockMovement {
   id: string;
-  type: 'IN' | 'OUT' | 'ADJUST' | 'RETURN';
+  type: 'IN' | 'OUT' | 'ADJUST' | 'RETURN' | 'TRANSFER';
   materialId: string;
   quantity: number;
   date: string;
   userId: string;
   osId?: string;
   description: string;
+  fromLocation?: string; // Para transferências e saídas
+  toLocation?: string;   // Para transferências e entradas
 }
 
 export interface SupplierDoc {

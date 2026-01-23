@@ -168,6 +168,14 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       setPhotoPreview(null);
   };
 
+  const handlePriorityChange = (osId: string, newPriority: string) => {
+      const p = newPriority as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      setOss(prev => prev.map(o => o.id === osId ? { ...o, priority: p } : o));
+      if (viewDetailOS && viewDetailOS.id === osId) {
+          setViewDetailOS({ ...viewDetailOS, priority: p });
+      }
+  };
+
   const getPriorityColor = (p: string) => {
       switch(p) {
           case 'CRITICAL': return 'bg-red-500 text-white border-red-600';
@@ -181,7 +189,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       const context = getContext(os);
       return (
         <div key={os.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 relative overflow-hidden mb-4 group hover:shadow-md transition-shadow">
-            <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${os.status === OSStatus.IN_PROGRESS ? 'bg-blue-500 animate-pulse' : os.status === OSStatus.COMPLETED ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+            <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${os.status === OSStatus.IN_PROGRESS ? 'bg-blue-500 animate-pulse' : os.status === OSStatus.COMPLETED ? 'bg-clean-primary' : 'bg-slate-300'}`}></div>
             
             <div className="pl-3">
                 <div className="flex justify-between items-start mb-2">
@@ -190,7 +198,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                 </div>
                 
                 <h3 className="text-lg font-bold text-slate-900 leading-tight mb-1">{os.description}</h3>
-                <p className="text-xs font-bold text-emerald-600 mb-4 uppercase tracking-wide truncate">{context.code} - {context.city}</p>
+                <p className="text-xs font-bold text-clean-primary mb-4 uppercase tracking-wide truncate">{context.code} - {context.city}</p>
                 
                 <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mb-4 bg-slate-50 p-3 rounded-lg">
                     <div className="flex items-center gap-1.5">
@@ -211,7 +219,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                                 <i className="fas fa-play"></i> Iniciar
                             </button>
                         ) : (
-                             <button onClick={(e) => openFinishModal(e, os)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                             <button onClick={(e) => openFinishModal(e, os)} className="flex-1 bg-clean-primary hover:bg-green-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
                                   <i className="fas fa-camera"></i> Finalizar
                              </button>
                         )}
@@ -226,7 +234,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                     <div className="mt-2 relative">
                         <img src={os.completionImage} alt="Evidência" className="w-full h-32 object-cover rounded-lg border border-slate-200 opacity-80" />
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm"><i className="fas fa-check-circle text-emerald-400 mr-1"></i> Evidência Enviada</span>
+                            <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm"><i className="fas fa-check-circle text-clean-primary mr-1"></i> Evidência Enviada</span>
                         </div>
                     </div>
                 )}
@@ -239,30 +247,30 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
       
       {/* --- SIDEBAR (Desktop/Tablet) --- */}
-      <aside className="hidden md:flex w-72 bg-[#0f172a] text-slate-300 flex-col border-r border-slate-700 shadow-2xl relative z-20">
-          <div className="h-24 flex items-center px-6 border-b border-slate-800 bg-[#0f172a] shrink-0 gap-3">
-              <div className="w-10 h-10 flex items-center justify-center text-emerald-500 text-2xl">
+      <aside className="hidden md:flex w-72 bg-[#001529] text-white flex-col border-r border-white/10 shadow-2xl relative z-20">
+          <div className="h-24 flex items-center px-6 border-b border-white/10 bg-[#001529] shrink-0 gap-3">
+              <div className="w-10 h-10 flex items-center justify-center text-clean-primary text-2xl">
                   <i className="fas fa-fingerprint"></i>
               </div>
               <div>
                   <h1 className="text-lg font-black text-white tracking-tighter leading-none">CropService</h1>
-                  <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest block">Executor</span>
+                  <span className="text-[10px] text-clean-primary font-bold uppercase tracking-widest block">Executor</span>
               </div>
           </div>
 
           <nav className="flex-1 py-8 px-4 space-y-2">
               <button 
                   onClick={() => setActiveTab('TODO')}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${activeTab === 'TODO' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${activeTab === 'TODO' ? 'bg-clean-primary text-white border border-white shadow-md' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
               >
                   <i className="fas fa-clipboard-list w-6 text-center text-lg"></i>
                   <span>Minhas Tarefas</span>
-                  {todoList.length > 0 && <span className="ml-auto bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full">{todoList.length}</span>}
+                  {todoList.length > 0 && <span className="ml-auto bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full">{todoList.length}</span>}
               </button>
 
               <button 
                   onClick={() => setActiveTab('CALENDAR')}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${activeTab === 'CALENDAR' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${activeTab === 'CALENDAR' ? 'bg-clean-primary text-white border border-white shadow-md' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
               >
                   <i className="fas fa-calendar-days w-6 text-center text-lg"></i>
                   <span>Agenda</span>
@@ -270,21 +278,21 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
 
               <button 
                   onClick={() => setActiveTab('DONE')}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${activeTab === 'DONE' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${activeTab === 'DONE' ? 'bg-clean-primary text-white border border-white shadow-md' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
               >
                   <i className="fas fa-clock-rotate-left w-6 text-center text-lg"></i>
                   <span>Histórico</span>
               </button>
           </nav>
 
-          <div className="p-4 border-t border-slate-800 bg-[#020617]">
-              <div className="flex items-center gap-3 p-3 mb-2 rounded-xl bg-slate-800/50 border border-slate-700">
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center font-bold text-white shadow-md border-2 border-slate-600">
+          <div className="p-4 border-t border-white/10 bg-[#000b14]">
+              <div className="flex items-center gap-3 p-3 mb-2 rounded-xl bg-[#001529] border border-white/20">
+                  <div className="w-10 h-10 rounded-full bg-[#000b14] flex items-center justify-center font-bold text-white shadow-md border-2 border-blue-600">
                       {user.avatar || user.name.substr(0,2)}
                   </div>
                   <div className="overflow-hidden">
                       <p className="text-sm font-bold text-white truncate">{user.name}</p>
-                      <p className="text-xs text-slate-400 truncate">Prestador</p>
+                      <p className="text-xs text-white/70 truncate">Prestador</p>
                   </div>
               </div>
               <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors uppercase tracking-wider">
@@ -297,17 +305,17 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-100">
           
           {/* Header Mobile (Only visible on small screens) */}
-          <header className="md:hidden bg-slate-900 text-white p-6 shadow-md rounded-b-3xl shrink-0 z-10 flex justify-between items-center">
+          <header className="md:hidden bg-[#001529] text-white p-6 shadow-md rounded-b-3xl shrink-0 z-10 flex justify-between items-center">
               <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-white border-2 border-slate-800 shadow-md">
+                  <div className="w-10 h-10 rounded-full bg-clean-primary flex items-center justify-center font-bold text-white border-2 border-blue-900 shadow-md">
                       {user.avatar || user.name.substr(0,2)}
                   </div>
                   <div>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Olá, Prestador</p>
+                      <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Olá, Prestador</p>
                       <h1 className="text-lg font-bold leading-none">{user.name.split(' ')[0]}</h1>
                   </div>
               </div>
-              <button onClick={onLogout} className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+              <button onClick={onLogout} className="w-10 h-10 bg-blue-800 rounded-full flex items-center justify-center text-blue-300 hover:text-white transition-colors">
                   <i className="fas fa-sign-out-alt"></i>
               </button>
           </header>
@@ -356,7 +364,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                                               onClick={() => setSelectedDay(date)}
                                               className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all ${isSelected ? 'bg-slate-800 text-white shadow-lg scale-105 z-10' : 'hover:bg-slate-50 text-slate-700 bg-slate-50/50'}`}
                                           >
-                                              <span className={`text-sm font-bold ${isToday && !isSelected ? 'text-emerald-600' : ''}`}>{day}</span>
+                                              <span className={`text-sm font-bold ${isToday && !isSelected ? 'text-clean-primary' : ''}`}>{day}</span>
                                               <div className="flex gap-0.5 mt-1.5 h-2">
                                                   {hasCompleted && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-emerald-500'}`}></div>}
                                                   {hasScheduled && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-blue-400' : 'bg-blue-500'}`}></div>}
@@ -410,15 +418,15 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
 
       {/* --- BOTTOM NAVIGATION (Mobile Only) --- */}
       <nav className="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 flex justify-around p-2 z-30 pb-safe">
-          <button onClick={() => setActiveTab('TODO')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'TODO' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('TODO')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'TODO' ? 'text-clean-primary bg-green-50' : 'text-slate-400'}`}>
               <i className="fas fa-clipboard-list text-xl"></i>
               <span className="text-[10px] font-bold uppercase">Tarefas</span>
           </button>
-          <button onClick={() => setActiveTab('CALENDAR')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'CALENDAR' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('CALENDAR')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'CALENDAR' ? 'text-clean-primary bg-green-50' : 'text-slate-400'}`}>
               <i className="fas fa-calendar-days text-xl"></i>
               <span className="text-[10px] font-bold uppercase">Agenda</span>
           </button>
-          <button onClick={() => setActiveTab('DONE')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'DONE' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('DONE')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'DONE' ? 'text-clean-primary bg-green-50' : 'text-slate-400'}`}>
               <i className="fas fa-clock-rotate-left text-xl"></i>
               <span className="text-[10px] font-bold uppercase">Histórico</span>
           </button>
@@ -456,10 +464,35 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                         </button>
                     </div>
 
+                    {/* Seleção de Prioridade (Nova Funcionalidade) */}
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                            <i className="fas fa-flag"></i> Informar Nível de Prioridade
+                        </label>
+                        <div className="flex gap-2">
+                            {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((p) => {
+                                const isSelected = viewDetailOS.priority === p;
+                                return (
+                                    <button
+                                        key={p}
+                                        onClick={() => handlePriorityChange(viewDetailOS.id, p)}
+                                        className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase transition-all border ${
+                                            isSelected 
+                                            ? getPriorityColor(p) + ' shadow-md scale-105' 
+                                            : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        {p === 'LOW' ? 'Baixa' : p === 'MEDIUM' ? 'Média' : p === 'HIGH' ? 'Alta' : 'Crítica'}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
                     {/* Checklist Serviços */}
                     <div>
                         <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                            <i className="fas fa-tasks text-emerald-500"></i> Checklist de Atividades
+                            <i className="fas fa-tasks text-clean-primary"></i> Checklist de Atividades
                         </h4>
                         <ul className="space-y-2">
                             {viewDetailOS.services.length > 0 ? viewDetailOS.services.map((s, idx) => {
@@ -503,7 +536,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                         <button onClick={(e) => { handleStart(e, viewDetailOS.id); setViewDetailOS(null); }} className="flex-1 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 shadow-md">Iniciar Agora</button>
                     )}
                     {viewDetailOS.status === OSStatus.IN_PROGRESS && (
-                         <button onClick={(e) => { setViewDetailOS(null); openFinishModal(e, viewDetailOS); }} className="flex-1 py-3 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow-md">Finalizar</button>
+                         <button onClick={(e) => { setViewDetailOS(null); openFinishModal(e, viewDetailOS); }} className="flex-1 py-3 bg-clean-primary text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow-md">Finalizar</button>
                     )}
                 </div>
             </div>
@@ -531,7 +564,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                           <label className="block text-sm font-bold text-slate-900 mb-3">Evidência Fotográfica (Obrigatório)</label>
                           
                           {!photoPreview ? (
-                              <button onClick={() => fileInputRef.current?.click()} className="w-full h-48 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center gap-3 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:border-emerald-500 hover:text-emerald-600 transition-all group">
+                              <button onClick={() => fileInputRef.current?.click()} className="w-full h-48 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center gap-3 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:border-clean-primary hover:text-clean-primary transition-all group">
                                   <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-2xl mb-1 group-hover:scale-110 transition-transform">
                                       <i className="fas fa-camera"></i>
                                   </div>
@@ -556,7 +589,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                       <button 
                           onClick={confirmFinish} 
                           disabled={!photoPreview}
-                          className="w-full py-4 bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-xl shadow-emerald-600/30 transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-emerald-700"
+                          className="w-full py-4 bg-clean-primary disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-xl shadow-clean-primary/30 transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-emerald-700"
                       >
                           <i className="fas fa-check-double"></i> Confirmar Conclusão
                       </button>

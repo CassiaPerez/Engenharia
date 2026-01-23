@@ -2,9 +2,45 @@
 import { Material, ServiceType, Project, ProjectStatus, Category, OSType, ServiceCostType, User, Building } from './types';
 
 export const INITIAL_MATERIALS: Material[] = [
-  { id: 'm1', code: 'CIM-001', description: 'Cimento CP-II 50kg', group: 'Construção', unit: 'Saco', unitCost: 32.5, minStock: 20, currentStock: 45, location: 'Ala A-01', status: 'ACTIVE' },
-  { id: 'm2', code: 'ACO-010', description: 'Barra de Aço 10mm', group: 'Metalurgia', unit: 'Barra', unitCost: 45.9, minStock: 50, currentStock: 120, location: 'Ala B-05', status: 'ACTIVE' },
-  { id: 'm3', code: 'TUB-075', description: 'Tubo PVC 75mm 6m', group: 'Hidráulica', unit: 'Un', unitCost: 89.0, minStock: 10, currentStock: 8, location: 'Ala C-02', status: 'ACTIVE' },
+  { 
+    id: 'm1', 
+    code: 'CIM-001', 
+    description: 'Cimento CP-II 50kg', 
+    group: 'Construção', 
+    unit: 'Saco', 
+    unitCost: 32.5, 
+    minStock: 20, 
+    currentStock: 45, 
+    location: 'Ala A-01', 
+    stockLocations: [{ name: 'Ala A-01', quantity: 45 }],
+    status: 'ACTIVE' 
+  },
+  { 
+    id: 'm2', 
+    code: 'ACO-010', 
+    description: 'Barra de Aço 10mm', 
+    group: 'Metalurgia', 
+    unit: 'Barra', 
+    unitCost: 45.9, 
+    minStock: 50, 
+    currentStock: 120, 
+    location: 'Ala B-05', 
+    stockLocations: [{ name: 'Ala B-05', quantity: 100 }, { name: 'Container Obra 1', quantity: 20 }],
+    status: 'ACTIVE' 
+  },
+  { 
+    id: 'm3', 
+    code: 'TUB-075', 
+    description: 'Tubo PVC 75mm 6m', 
+    group: 'Hidráulica', 
+    unit: 'Un', 
+    unitCost: 89.0, 
+    minStock: 10, 
+    currentStock: 8, 
+    location: 'Ala C-02', 
+    stockLocations: [{ name: 'Ala C-02', quantity: 8 }],
+    status: 'ACTIVE' 
+  },
 ];
 
 export const INITIAL_SERVICES: ServiceType[] = [

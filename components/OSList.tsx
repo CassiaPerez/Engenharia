@@ -432,166 +432,174 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       )}
 
       {selectedOS && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col animate-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col animate-in zoom-in-95 fade-in duration-300 overflow-hidden border border-slate-200">
              {/* Header do Modal Gerenciar OS */}
-             <div className="p-8 border-b border-slate-200 bg-slate-50 rounded-t-2xl flex justify-between items-center">
+             <div className="px-8 py-6 border-b border-slate-100 bg-white rounded-t-2xl flex justify-between items-center sticky top-0 z-20">
                 <div>
-                   <h3 className="text-3xl font-bold text-slate-900">Gerenciamento: <span className="text-clean-primary">{selectedOS.number}</span></h3>
-                   <div className="flex items-center gap-3 mt-2">
-                     <span title={getStatusTooltip(selectedOS.status)} className={`text-sm font-bold uppercase px-3 py-1 rounded cursor-help ${selectedOS.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>{selectedOS.status}</span>
-                     {selectedOS.startTime && <span className="text-sm text-slate-500 font-mono">Início: {new Date(selectedOS.startTime).toLocaleString()}</span>}
+                   <h3 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+                       Gerenciamento OS
+                       <span className="text-clean-primary bg-emerald-50 px-3 py-1 rounded-lg text-lg border border-emerald-100">{selectedOS.number}</span>
+                   </h3>
+                   <div className="flex items-center gap-4 mt-2 text-sm font-medium text-slate-500">
+                     <span title={getStatusTooltip(selectedOS.status)} className={`font-bold uppercase px-2.5 py-0.5 rounded border text-xs tracking-wide cursor-help ${selectedOS.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{selectedOS.status}</span>
+                     {selectedOS.startTime && <span className="font-mono flex items-center gap-1"><i className="fas fa-clock text-slate-400"></i> Início: {new Date(selectedOS.startTime).toLocaleString()}</span>}
+                     {users.find(u => u.id === selectedOS.executorId) && (
+                       <span className="text-emerald-600 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md">
+                           <i className="fas fa-user-hard-hat"></i> {users.find(u => u.id === selectedOS.executorId)?.name}
+                       </span>
+                     )}
                    </div>
-                   {users.find(u => u.id === selectedOS.executorId) && (
-                       <p className="text-sm font-bold text-emerald-600 mt-2 flex items-center gap-2">
-                           <i className="fas fa-user-hard-hat"></i> Executor: {users.find(u => u.id === selectedOS.executorId)?.name}
-                       </p>
-                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                    <button onClick={() => handleGoogleCalendarSync(selectedOS)} className="bg-white text-slate-600 hover:text-blue-600 hover:bg-blue-50 px-4 py-3 rounded-lg font-bold text-base transition-all border border-slate-300 hover:border-blue-300 shadow-sm flex items-center gap-2" title="Enviar convite para Google Agenda">
+                    <button onClick={() => handleGoogleCalendarSync(selectedOS)} className="bg-white text-slate-600 hover:text-blue-600 hover:bg-blue-50 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border border-slate-200 hover:border-blue-300 shadow-sm flex items-center gap-2" title="Enviar convite para Google Agenda">
                         <i className="fab fa-google"></i> Agendar
                     </button>
-                    <button onClick={() => generateOSDetailPDF(selectedOS)} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-5 py-3 rounded-lg font-bold text-base transition-all border border-slate-200 flex items-center gap-2">
+                    <button onClick={() => generateOSDetailPDF(selectedOS)} className="bg-slate-50 text-slate-700 hover:bg-slate-100 px-5 py-2.5 rounded-xl font-bold text-sm transition-all border border-slate-200 flex items-center gap-2">
                         <i className="fas fa-print"></i> Imprimir OS
                     </button>
-                    <button onClick={() => setSelectedOS(null)} className="w-12 h-12 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"><i className="fas fa-times text-2xl"></i></button>
+                    <button onClick={() => setSelectedOS(null)} className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-xl"></i></button>
                 </div>
              </div>
              
              {/* Conteúdo Modal */}
-             <div className="flex-1 flex overflow-hidden">
-                <div className="w-[380px] lg:w-[450px] bg-slate-50 border-r border-slate-200 p-8 flex flex-col shadow-inner overflow-y-auto">
+             <div className="flex-1 flex overflow-hidden bg-slate-50">
+                <div className="w-[380px] lg:w-[450px] bg-white border-r border-slate-200 p-8 flex flex-col shadow-sm overflow-y-auto z-10">
                     {/* Workflow Actions */}
-                    <div className="mb-8 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
-                        <h5 className="text-sm font-bold text-slate-500 uppercase mb-4">Ações de Status</h5>
+                    <div className="mb-8 p-6 bg-slate-50 rounded-2xl border border-slate-200">
+                        <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Ações de Status</h5>
                         <div className="grid grid-cols-2 gap-3">
                            {selectedOS.status === OSStatus.OPEN && (
-                               <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.IN_PROGRESS)} className="col-span-2 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-base shadow-sm transition-all"><i className="fas fa-play mr-2"></i> Iniciar Atividade</button>
+                               <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.IN_PROGRESS)} className="col-span-2 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-base shadow-lg shadow-blue-600/20 transition-all transform active:scale-95"><i className="fas fa-play mr-2"></i> Iniciar Atividade</button>
                            )}
                            {selectedOS.status === OSStatus.IN_PROGRESS && (
                                <>
-                                <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.PAUSED)} className="py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-base shadow-sm transition-all"><i className="fas fa-pause mr-2"></i> Pausar</button>
-                                <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.COMPLETED)} className="py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-base shadow-sm transition-all"><i className="fas fa-check mr-2"></i> Concluir</button>
+                                <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.PAUSED)} className="py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-base shadow-lg shadow-amber-500/20 transition-all transform active:scale-95"><i className="fas fa-pause mr-2"></i> Pausar</button>
+                                <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.COMPLETED)} className="py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-base shadow-lg shadow-emerald-600/20 transition-all transform active:scale-95"><i className="fas fa-check mr-2"></i> Concluir</button>
                                 </>
                            )}
                            {selectedOS.status === OSStatus.PAUSED && (
-                               <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.IN_PROGRESS)} className="col-span-2 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-base shadow-sm transition-all"><i className="fas fa-play mr-2"></i> Retomar</button>
+                               <button onClick={() => handleStatusChange(selectedOS.id, OSStatus.IN_PROGRESS)} className="col-span-2 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-base shadow-lg shadow-blue-600/20 transition-all transform active:scale-95"><i className="fas fa-play mr-2"></i> Retomar</button>
                            )}
                            {selectedOS.status === OSStatus.COMPLETED && (
-                               <div className="col-span-2 text-center py-4 text-emerald-700 font-bold bg-emerald-50 rounded-lg border border-emerald-200 text-base"><i className="fas fa-check-circle mr-2"></i> OS Finalizada</div>
+                               <div className="col-span-2 text-center py-4 text-emerald-700 font-bold bg-emerald-50 rounded-xl border border-emerald-100 text-base"><i className="fas fa-check-circle mr-2"></i> OS Finalizada</div>
                            )}
                            {selectedOS.status !== OSStatus.COMPLETED && selectedOS.status !== OSStatus.CANCELED && (
-                               <button onClick={() => { if(confirm('Cancelar esta OS?')) handleStatusChange(selectedOS.id, OSStatus.CANCELED)}} className="col-span-2 mt-2 py-3 text-red-600 hover:bg-red-50 rounded-lg font-bold text-sm transition-all border border-transparent hover:border-red-200">Cancelar OS</button>
+                               <button onClick={() => { if(confirm('Cancelar esta OS?')) handleStatusChange(selectedOS.id, OSStatus.CANCELED)}} className="col-span-2 mt-2 py-3 text-red-600 hover:bg-red-50 rounded-xl font-bold text-sm transition-all border border-transparent hover:border-red-100">Cancelar OS</button>
                            )}
                         </div>
                     </div>
 
                     <div className={`transition-opacity ${!isEditable(selectedOS) ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <div className="flex bg-white rounded-xl border border-slate-300 p-1.5 mb-6 shadow-sm">
-                            <button onClick={()=>setActiveSubTab('services')} className={`flex-1 py-3 text-base font-bold rounded-lg transition-all ${activeSubTab==='services'?'bg-clean-primary text-white shadow':'text-slate-600 hover:text-slate-800'}`}>Serviços</button>
-                            <button onClick={()=>setActiveSubTab('materials')} className={`flex-1 py-3 text-base font-bold rounded-lg transition-all ${activeSubTab==='materials'?'bg-clean-primary text-white shadow':'text-slate-600 hover:text-slate-800'}`}>Materiais</button>
+                        <div className="flex bg-slate-100 rounded-xl p-1 mb-6 border border-slate-200">
+                            <button onClick={()=>setActiveSubTab('services')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${activeSubTab==='services'?'bg-white text-slate-800 shadow-sm ring-1 ring-black/5':'text-slate-500 hover:text-slate-700'}`}>Serviços</button>
+                            <button onClick={()=>setActiveSubTab('materials')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${activeSubTab==='materials'?'bg-white text-slate-800 shadow-sm ring-1 ring-black/5':'text-slate-500 hover:text-slate-700'}`}>Materiais</button>
                         </div>
                         <div className="space-y-6 flex-1">
                             <div>
-                                <label className="text-sm font-bold text-slate-700 uppercase mb-2 block">Item</label>
-                                <select className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.id} onChange={handleSelectChange}>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 block">Item</label>
+                                <select className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" value={newItem.id} onChange={handleSelectChange}>
                                     <option value="">Selecione...</option>
                                     {activeSubTab==='services' ? services.map(s=><option key={s.id} value={s.id}>{s.name}</option>) : materials.map(m=><option key={m.id} value={m.id}>{m.description} (Saldo: {m.currentStock})</option>)}
                                 </select>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-sm font-bold text-slate-700 uppercase mb-2 block">{activeSubTab==='services'?'Horas':'Quantidade'}</label>
-                                    <input type="number" className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.qty} onChange={e=>setNewItem({...newItem, qty:Number(e.target.value)})} />
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 block">{activeSubTab==='services'?'Horas':'Quantidade'}</label>
+                                    <input type="number" className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" value={newItem.qty} onChange={e=>setNewItem({...newItem, qty:Number(e.target.value)})} />
                                 </div>
                                 <div>
-                                    <label className="text-sm font-bold text-slate-700 uppercase mb-2 block">R$ Unitário</label>
-                                    <input type="number" step="0.01" className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={newItem.cost} onChange={e=>setNewItem({...newItem, cost:Number(e.target.value)})} />
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 block">R$ Unitário</label>
+                                    <input type="number" step="0.01" className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" value={newItem.cost} onChange={e=>setNewItem({...newItem, cost:Number(e.target.value)})} />
                                 </div>
                             </div>
-                            <button onClick={activeSubTab==='services'?handleAddService:handleAddMaterial} className="w-full h-14 bg-slate-800 text-white rounded-lg text-base font-bold hover:bg-slate-900 mt-2 shadow-lg transition-all transform hover:-translate-y-0.5">
-                                <i className="fas fa-plus mr-2"></i> Adicionar
+                            <button onClick={activeSubTab==='services'?handleAddService:handleAddMaterial} className="w-full h-12 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 mt-2 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                                <i className="fas fa-plus"></i> Adicionar Item
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 p-8 overflow-y-auto bg-white">
+                <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
                     {/* SEÇÃO DE EVIDÊNCIA DE EXECUÇÃO */}
                     {selectedOS.status === OSStatus.COMPLETED && selectedOS.completionImage && (
-                        <div className="mb-8 p-6 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                            <h4 className="text-sm font-black text-emerald-800 uppercase tracking-wide mb-4 flex items-center gap-2">
-                                <i className="fas fa-camera text-emerald-600"></i> Evidência de Execução
+                        <div className="mb-8 p-6 bg-white rounded-2xl border border-emerald-100 shadow-sm ring-4 ring-emerald-50">
+                            <h4 className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <i className="fas fa-camera"></i> Evidência de Execução
                             </h4>
-                            <div className="relative group">
+                            <div className="relative group overflow-hidden rounded-xl">
                                 <img 
                                     src={selectedOS.completionImage} 
                                     alt="Evidência do Serviço" 
-                                    className="w-full max-h-[400px] object-contain rounded-lg border border-emerald-200 bg-white shadow-sm" 
+                                    className="w-full max-h-[400px] object-contain bg-slate-100" 
                                 />
-                                <a 
-                                    href={selectedOS.completionImage} 
-                                    download={`evidencia_${selectedOS.number}.png`}
-                                    className="absolute bottom-4 right-4 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                                >
-                                    <i className="fas fa-download mr-2"></i> Baixar Imagem
-                                </a>
+                                <div className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                    <a 
+                                        href={selectedOS.completionImage} 
+                                        download={`evidencia_${selectedOS.number}.png`}
+                                        className="bg-white text-slate-900 px-6 py-3 rounded-xl text-sm font-bold shadow-xl flex items-center gap-2 hover:scale-105 transition-transform"
+                                    >
+                                        <i className="fas fa-download"></i> Baixar Imagem Original
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    <h4 className="text-base font-black text-slate-900 uppercase border-b border-slate-200 pb-4 mb-6 flex items-center gap-2">
-                        <i className="fas fa-clipboard-list text-clean-primary"></i> Detalhamento de Custos
-                    </h4>
-                    <div className="space-y-8">
-                        <div>
-                            <h5 className="text-sm font-bold text-slate-600 mb-4 uppercase tracking-wide">Materiais Utilizados</h5>
-                            <table className="w-full text-base">
-                                <thead className="text-slate-500 border-b border-slate-200 font-bold uppercase text-xs">
-                                  <tr className="text-left">
-                                    <th className="pb-4 pl-2">Item</th>
-                                    <th className="text-right pb-4">Qtd</th>
-                                    <th className="text-right pb-4">Vl. Unit</th>
-                                    <th className="text-right pb-4 pr-2">Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                  {selectedOS.materials.map((m,i)=>(
-                                    <tr key={i}>
-                                      <td className="py-4 pl-2 font-bold text-slate-800">{materials.find(mat=>mat.id===m.materialId)?.description}</td>
-                                      <td className="text-right font-medium text-slate-600">{m.quantity}</td>
-                                      <td className="text-right font-bold text-slate-600">R$ {formatCurrency(m.unitCost)}</td>
-                                      <td className="text-right pr-2 font-bold text-slate-900">R$ {formatCurrency(m.quantity*m.unitCost)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                            </table>
-                            {selectedOS.materials.length === 0 && <p className="text-slate-400 italic text-base mt-4 bg-slate-50 p-4 rounded-lg border border-slate-100 text-center">Nenhum material consumido.</p>}
-                        </div>
-                        <div>
-                            <h5 className="text-sm font-bold text-slate-600 mb-4 uppercase tracking-wide">Serviços Executados</h5>
-                            <table className="w-full text-base">
-                                <thead className="text-slate-500 border-b border-slate-200 font-bold uppercase text-xs">
-                                  <tr className="text-left">
-                                    <th className="pb-4 pl-2">Serviço</th>
-                                    <th className="text-right pb-4">Horas</th>
-                                    <th className="text-right pb-4">Vl. Unit</th>
-                                    <th className="text-right pb-4 pr-2">Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                  {selectedOS.services.map((s,i)=>(
-                                    <tr key={i}>
-                                      <td className="py-4 pl-2 font-bold text-slate-800">{services.find(srv=>srv.id===s.serviceTypeId)?.name}</td>
-                                      <td className="text-right font-bold text-slate-900">{s.quantity} h</td>
-                                      <td className="text-right font-bold text-slate-600">R$ {formatCurrency(s.unitCost)}</td>
-                                      <td className="text-right pr-2 font-bold text-slate-900">R$ {formatCurrency(s.quantity * s.unitCost)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                            </table>
-                            {selectedOS.services.length === 0 && <p className="text-slate-400 italic text-base mt-4 bg-slate-50 p-4 rounded-lg border border-slate-100 text-center">Nenhum serviço apontado.</p>}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+                        <h4 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-4 mb-6 flex items-center gap-2">
+                            <span className="bg-clean-primary w-2 h-6 rounded-full"></span>
+                            Detalhamento de Custos & Insumos
+                        </h4>
+                        <div className="space-y-10">
+                            <div>
+                                <h5 className="text-xs font-black text-slate-400 mb-4 uppercase tracking-widest">Materiais Utilizados</h5>
+                                <table className="w-full text-sm">
+                                    <thead className="text-slate-500 border-b border-slate-100 font-bold uppercase text-[10px] tracking-wider">
+                                      <tr className="text-left">
+                                        <th className="pb-3 pl-2">Item</th>
+                                        <th className="text-right pb-3">Qtd</th>
+                                        <th className="text-right pb-3">Vl. Unit</th>
+                                        <th className="text-right pb-3 pr-2">Total</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                      {selectedOS.materials.map((m,i)=>(
+                                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                          <td className="py-4 pl-2 font-bold text-slate-700">{materials.find(mat=>mat.id===m.materialId)?.description}</td>
+                                          <td className="text-right font-medium text-slate-500">{m.quantity}</td>
+                                          <td className="text-right font-bold text-slate-500">R$ {formatCurrency(m.unitCost)}</td>
+                                          <td className="text-right pr-2 font-black text-slate-800">R$ {formatCurrency(m.quantity*m.unitCost)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                </table>
+                                {selectedOS.materials.length === 0 && <p className="text-slate-400 italic text-sm mt-4 text-center py-4 bg-slate-50 rounded-xl border border-slate-100 border-dashed">Nenhum material consumido.</p>}
+                            </div>
+                            <div>
+                                <h5 className="text-xs font-black text-slate-400 mb-4 uppercase tracking-widest">Serviços Executados</h5>
+                                <table className="w-full text-sm">
+                                    <thead className="text-slate-500 border-b border-slate-100 font-bold uppercase text-[10px] tracking-wider">
+                                      <tr className="text-left">
+                                        <th className="pb-3 pl-2">Serviço</th>
+                                        <th className="text-right pb-3">Horas</th>
+                                        <th className="text-right pb-3">Vl. Unit</th>
+                                        <th className="text-right pb-3 pr-2">Total</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                      {selectedOS.services.map((s,i)=>(
+                                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                          <td className="py-4 pl-2 font-bold text-slate-700">{services.find(srv=>srv.id===s.serviceTypeId)?.name}</td>
+                                          <td className="text-right font-bold text-slate-800">{s.quantity} h</td>
+                                          <td className="text-right font-bold text-slate-500">R$ {formatCurrency(s.unitCost)}</td>
+                                          <td className="text-right pr-2 font-black text-slate-800">R$ {formatCurrency(s.quantity * s.unitCost)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                </table>
+                                {selectedOS.services.length === 0 && <p className="text-slate-400 italic text-sm mt-4 text-center py-4 bg-slate-50 rounded-xl border border-slate-100 border-dashed">Nenhum serviço apontado.</p>}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -601,104 +609,119 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       )}
 
       {showModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-8 animate-in zoom-in duration-200 overflow-y-auto max-h-[90vh]">
-                  <h3 className="text-3xl font-bold text-slate-900 mb-6 border-b border-slate-200 pb-4">Nova Ordem de Serviço</h3>
-                  <form onSubmit={handleCreate} className="space-y-6">
-                      
-                      {/* Context Selection Switch */}
+          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 fade-in duration-300 overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+                  <div className="px-8 py-6 border-b border-slate-100 bg-white sticky top-0 z-10 flex justify-between items-center">
                       <div>
-                          <label className="text-sm font-bold text-slate-800 mb-2 block uppercase tracking-wide">Vincular OS a:</label>
-                          <div className="flex bg-slate-100 p-1 rounded-lg">
-                              <button type="button" onClick={() => { setCreationContext('PROJECT'); setFormOS({ ...formOS, buildingId: undefined }); }} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${creationContext === 'PROJECT' ? 'bg-white text-clean-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Projeto (Capex)</button>
-                              <button type="button" onClick={() => { setCreationContext('BUILDING'); setFormOS({ ...formOS, projectId: undefined }); }} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${creationContext === 'BUILDING' ? 'bg-white text-clean-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Edifício / Facility</button>
-                          </div>
+                          <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Nova Ordem de Serviço</h3>
+                          <p className="text-sm text-slate-500 mt-1">Preencha os dados iniciais para abertura.</p>
                       </div>
+                      <button onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 transition-colors"><i className="fas fa-times text-lg"></i></button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-slate-50/50">
+                      <form onSubmit={handleCreate} className="space-y-8">
+                          
+                          {/* Context Selection Switch */}
+                          <div>
+                              <label className="text-xs font-black text-slate-400 mb-3 block uppercase tracking-widest">Vincular OS a:</label>
+                              <div className="flex bg-slate-200 p-1.5 rounded-xl">
+                                  <button type="button" onClick={() => { setCreationContext('PROJECT'); setFormOS({ ...formOS, buildingId: undefined }); }} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${creationContext === 'PROJECT' ? 'bg-white text-slate-900 shadow-md ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}>Projeto (Capex)</button>
+                                  <button type="button" onClick={() => { setCreationContext('BUILDING'); setFormOS({ ...formOS, projectId: undefined }); }} className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${creationContext === 'BUILDING' ? 'bg-white text-slate-900 shadow-md ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}>Edifício / Facility</button>
+                              </div>
+                          </div>
 
-                      {creationContext === 'PROJECT' ? (
-                          <div>
-                              <label className="text-base font-bold text-slate-800 mb-2 block">Selecione o Projeto</label>
-                              <select required className="w-full h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.projectId || ''} onChange={e=>setFormOS({...formOS, projectId:e.target.value, buildingId: undefined})}>
-                                  <option value="">Selecione...</option>
-                                  {projects.map(p=><option key={p.id} value={p.id}>{p.code} - {p.description}</option>)}
-                              </select>
-                          </div>
-                      ) : (
-                          <div>
-                              <label className="text-base font-bold text-slate-800 mb-2 block">Selecione o Edifício</label>
-                              <select required className="w-full h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.buildingId || ''} onChange={e=>setFormOS({...formOS, buildingId:e.target.value, projectId: undefined})}>
-                                  <option value="">Selecione...</option>
-                                  {buildings.map(b=><option key={b.id} value={b.id}>{b.name} - {b.city}</option>)}
-                              </select>
-                          </div>
-                      )}
+                          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                              {creationContext === 'PROJECT' ? (
+                                  <div>
+                                      <label className="text-sm font-bold text-slate-700 mb-2 block">Selecione o Projeto</label>
+                                      <select required className="w-full h-14 px-4 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 focus:bg-white transition-all" value={formOS.projectId || ''} onChange={e=>setFormOS({...formOS, projectId:e.target.value, buildingId: undefined})}>
+                                          <option value="">Selecione...</option>
+                                          {projects.map(p=><option key={p.id} value={p.id}>{p.code} - {p.description}</option>)}
+                                      </select>
+                                  </div>
+                              ) : (
+                                  <div>
+                                      <label className="text-sm font-bold text-slate-700 mb-2 block">Selecione o Edifício</label>
+                                      <select required className="w-full h-14 px-4 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 focus:bg-white transition-all" value={formOS.buildingId || ''} onChange={e=>setFormOS({...formOS, buildingId:e.target.value, projectId: undefined})}>
+                                          <option value="">Selecione...</option>
+                                          {buildings.map(b=><option key={b.id} value={b.id}>{b.name} - {b.city}</option>)}
+                                      </select>
+                                  </div>
+                              )}
 
-                      <div>
-                          <label className="text-base font-bold text-slate-800 mb-2 block">Selecione o Executor (Prestador)</label>
-                          <div className="flex gap-2">
-                              <select className="flex-1 h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.executorId || ''} onChange={e=>setFormOS({...formOS, executorId:e.target.value})}>
-                                  <option value="">Sem Executor Específico</option>
-                                  {executors.map(u => (
-                                      <option key={u.id} value={u.id}>{u.name} - {u.department}</option>
-                                  ))}
-                              </select>
-                              <button type="button" onClick={() => setShowExecutorModal(true)} className="h-14 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-300 transition-colors flex items-center justify-center gap-2 whitespace-nowrap">
-                                  <i className="fas fa-user-plus"></i> Novo
-                              </button>
+                              <div>
+                                  <label className="text-sm font-bold text-slate-700 mb-2 block">Selecione o Executor (Prestador)</label>
+                                  <div className="flex gap-2">
+                                      <select className="flex-1 h-14 px-4 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 focus:bg-white transition-all" value={formOS.executorId || ''} onChange={e=>setFormOS({...formOS, executorId:e.target.value})}>
+                                          <option value="">Sem Executor Específico</option>
+                                          {executors.map(u => (
+                                              <option key={u.id} value={u.id}>{u.name} - {u.department}</option>
+                                          ))}
+                                      </select>
+                                      <button type="button" onClick={() => setShowExecutorModal(true)} className="h-14 px-5 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl border border-slate-300 hover:border-clean-primary hover:text-clean-primary transition-all flex items-center justify-center gap-2 whitespace-nowrap shadow-sm">
+                                          <i className="fas fa-user-plus"></i> Novo
+                                      </button>
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 mt-1.5 font-medium ml-1">O executor verá esta OS em sua Agenda e Painel.</p>
+                              </div>
                           </div>
-                          <p className="text-xs text-slate-500 mt-1">O executor verá esta OS em sua Agenda e Painel.</p>
-                      </div>
 
-                      <div>
-                          <label className="text-base font-bold text-slate-800 mb-2 block">Descrição da Atividade</label>
-                          <textarea required className="w-full p-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 h-32" placeholder="Descreva o que precisa ser feito..." value={formOS.description} onChange={e=>setFormOS({...formOS, description:e.target.value})} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-6">
                           <div>
-                              <label className="text-base font-bold text-slate-800 mb-2 block">Tipo</label>
-                              <select className="w-full h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.type} onChange={e=>setFormOS({...formOS, type:e.target.value as any})}>{Object.values(OSType).map(t=><option key={t} value={t}>{t}</option>)}</select>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Descrição da Atividade</label>
+                              <textarea required className="w-full p-4 bg-white border border-slate-300 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all h-32 resize-none" placeholder="Descreva o que precisa ser feito com detalhes..." value={formOS.description} onChange={e=>setFormOS({...formOS, description:e.target.value})} />
                           </div>
-                          <div>
-                              <label className="text-base font-bold text-slate-800 mb-2 block">Prioridade</label>
-                              <select className="w-full h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.priority} onChange={e=>setFormOS({...formOS, priority:e.target.value as any})}><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select>
+                          
+                          <div className="grid grid-cols-3 gap-6">
+                              <div>
+                                  <label className="text-sm font-bold text-slate-700 mb-2 block">Tipo</label>
+                                  <select className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10" value={formOS.type} onChange={e=>setFormOS({...formOS, type:e.target.value as any})}>{Object.values(OSType).map(t=><option key={t} value={t}>{t}</option>)}</select>
+                              </div>
+                              <div>
+                                  <label className="text-sm font-bold text-slate-700 mb-2 block">Prioridade</label>
+                                  <select className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10" value={formOS.priority} onChange={e=>setFormOS({...formOS, priority:e.target.value as any})}><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select>
+                              </div>
+                              <div>
+                                  <label className="text-sm font-bold text-slate-700 mb-2 block">SLA (Horas)</label>
+                                  <input type="number" className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10" value={formOS.slaHours} onChange={e=>setFormOS({...formOS, slaHours:Number(e.target.value)})} />
+                              </div>
                           </div>
-                      </div>
-                      <div>
-                          <label className="text-base font-bold text-slate-800 mb-2 block">SLA (Horas)</label>
-                          <input type="number" className="w-full h-14 px-4 bg-white border border-slate-300 rounded-xl text-lg text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={formOS.slaHours} onChange={e=>setFormOS({...formOS, slaHours:Number(e.target.value)})} />
-                      </div>
-                      <div className="flex justify-end gap-4 pt-6 border-t border-slate-200">
-                          <button type="button" onClick={()=>setShowModal(false)} className="px-8 py-3 text-lg font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                          <button type="submit" className="px-10 py-3 bg-clean-primary text-white text-lg font-bold rounded-lg hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/30 transition-all transform hover:-translate-y-0.5">Criar OS</button>
-                      </div>
-                  </form>
+                      </form>
+                  </div>
+
+                  <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-4 rounded-b-2xl z-10">
+                      <button type="button" onClick={()=>setShowModal(false)} className="px-8 py-3.5 text-base font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">Cancelar</button>
+                      <button type="submit" onClick={handleCreate} className="px-10 py-3.5 bg-clean-primary text-white text-base font-bold rounded-xl hover:bg-clean-primary/90 shadow-xl shadow-clean-primary/30 transition-all transform hover:-translate-y-1 active:scale-95 flex items-center gap-2">
+                          <i className="fas fa-check-circle"></i> Confirmar Abertura
+                      </button>
+                  </div>
               </div>
           </div>
       )}
 
       {/* MODAL DE CRIAÇÃO RÁPIDA DE EXECUTOR */}
       {showExecutorModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in zoom-in duration-200">
-                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
-                      <h3 className="text-xl font-bold text-slate-900">Novo Executor</h3>
-                      <button onClick={() => setShowExecutorModal(false)} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500"><i className="fas fa-times"></i></button>
+          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[110]">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 fade-in duration-200 border border-slate-200">
+                  <div className="flex justify-between items-center px-6 py-5 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
+                      <h3 className="text-lg font-bold text-slate-900">Novo Executor</h3>
+                      <button onClick={() => setShowExecutorModal(false)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"><i className="fas fa-times"></i></button>
                   </div>
-                  <form onSubmit={handleCreateExecutor} className="space-y-4">
+                  <form onSubmit={handleCreateExecutor} className="p-6 space-y-5">
                       <div>
-                          <label className="text-sm font-bold text-slate-700 block mb-1">Nome Completo</label>
-                          <input required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" value={newExecutorData.name} onChange={e => setNewExecutorData({ ...newExecutorData, name: e.target.value })} placeholder="João Silva" />
+                          <label className="text-sm font-bold text-slate-700 block mb-2">Nome Completo</label>
+                          <input required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl shadow-sm focus:ring-4 focus:ring-clean-primary/10 focus:border-clean-primary transition-all" value={newExecutorData.name} onChange={e => setNewExecutorData({ ...newExecutorData, name: e.target.value })} placeholder="Ex: João Silva" />
                       </div>
                       <div>
-                          <label className="text-sm font-bold text-slate-700 block mb-1">Email</label>
-                          <input type="email" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" value={newExecutorData.email} onChange={e => setNewExecutorData({ ...newExecutorData, email: e.target.value })} placeholder="joao@email.com" />
+                          <label className="text-sm font-bold text-slate-700 block mb-2">Email</label>
+                          <input type="email" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl shadow-sm focus:ring-4 focus:ring-clean-primary/10 focus:border-clean-primary transition-all" value={newExecutorData.email} onChange={e => setNewExecutorData({ ...newExecutorData, email: e.target.value })} placeholder="joao@email.com" />
                       </div>
                       <div>
-                          <label className="text-sm font-bold text-slate-700 block mb-1">Departamento / Empresa</label>
-                          <input className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" value={newExecutorData.department} onChange={e => setNewExecutorData({ ...newExecutorData, department: e.target.value })} placeholder="Manutenção Elétrica" />
+                          <label className="text-sm font-bold text-slate-700 block mb-2">Departamento / Empresa</label>
+                          <input className="w-full h-12 px-4 bg-white border border-slate-300 rounded-xl shadow-sm focus:ring-4 focus:ring-clean-primary/10 focus:border-clean-primary transition-all" value={newExecutorData.department} onChange={e => setNewExecutorData({ ...newExecutorData, department: e.target.value })} placeholder="Ex: Manutenção Elétrica" />
                       </div>
                       <div className="pt-2">
-                          <button type="submit" className="w-full h-12 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 transition-colors shadow-lg">Cadastrar Executor</button>
+                          <button type="submit" className="w-full h-14 bg-slate-900 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all shadow-lg hover:shadow-xl transform active:scale-95">Cadastrar Executor</button>
                       </div>
                   </form>
               </div>

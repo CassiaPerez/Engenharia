@@ -207,7 +207,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
 
   // --- PDF GENERATION LOGIC ---
   const generateProjectDetailPDF = (project: Project) => {
-    // ... [Mantido igual ao original]
     const doc = new jsPDF();
     const costs = calculateProjectCosts(project, oss, materials, services);
 
@@ -330,7 +329,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
 
   // --- LIST EXPORT FUNCTIONS ---
   const exportToCSV = () => {
-    // ... [Mantido igual]
     const headers = ['Código', 'Descrição', 'Status', 'Cidade', 'Responsável', 'Budget (R$)', 'Realizado (R$)', 'Início', 'Fim Estimado'];
     const rows = filteredProjects.map(p => {
         const costs = calculateProjectCosts(p, oss, materials, services);
@@ -357,7 +355,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   };
 
   const exportToPDF = () => {
-     // ... [Mantido igual]
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.text("Relatório de Projetos - Crop Service", 14, 15);
     doc.setFontSize(10);
@@ -426,10 +423,9 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
           const costs = calculateProjectCosts(p, oss, materials, services);
           const projectOSs = oss.filter(o => o.projectId === p.id);
           const totalOSs = projectOSs.length;
-          const activeOSs = projectOSs.filter(o => o.status !== OSStatus.CANCELED);
-          const delayedOSCount = activeOSs.filter(o => o.status !== OSStatus.COMPLETED && new Date(o.limitDate) < new Date()).length;
-          const budgetPercent = p.estimatedValue > 0 ? (costs.totalReal / p.estimatedValue) * 100 : 0;
           const completedOSs = projectOSs.filter(o => o.status === OSStatus.COMPLETED).length;
+          const delayedOSCount = projectOSs.filter(o => o.status !== OSStatus.COMPLETED && o.status !== OSStatus.CANCELED && new Date(o.limitDate) < new Date()).length;
+          const budgetPercent = p.estimatedValue > 0 ? (costs.totalReal / p.estimatedValue) * 100 : 0;
           const executionPercent = totalOSs > 0 ? (completedOSs / totalOSs) * 100 : 0;
           const today = new Date();
           const diffDays = Math.ceil((new Date(p.estimatedEndDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -504,63 +500,97 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       </div>
 
       {showCostDetail && (
-        // ... [Detail Modal mantido igual]
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col animate-in zoom-in duration-200">
-             <div className="p-8 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col animate-in zoom-in-95 fade-in duration-300 overflow-hidden border border-slate-200">
+             <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                 <div>
-                   <h3 className="text-xl font-bold text-slate-900">Detalhamento Físico-Financeiro</h3>
-                   <p className="text-base text-slate-600 mt-1 font-medium">{showCostDetail.code} - {showCostDetail.description}</p>
+                   <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Detalhamento Financeiro</h3>
+                   <p className="text-base text-slate-500 mt-1 font-medium flex items-center gap-2">
+                      <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-mono font-bold text-slate-600">{showCostDetail.code}</span>
+                      {showCostDetail.description}
+                   </p>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={() => generateProjectDetailPDF(showCostDetail)} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2 rounded-lg font-bold text-sm transition-all border border-slate-200 flex items-center gap-2">
-                        <i className="fas fa-print"></i> Imprimir PDF
+                <div className="flex gap-3">
+                    <button onClick={() => generateProjectDetailPDF(showCostDetail)} className="bg-white text-slate-700 hover:text-clean-primary hover:bg-slate-50 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border border-slate-300 shadow-sm flex items-center gap-2">
+                        <i className="fas fa-print"></i> PDF
                     </button>
-                    <button onClick={() => setShowCostDetail(null)} className="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"><i className="fas fa-times text-xl"></i></button>
+                    <button onClick={() => setShowCostDetail(null)} className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-lg"></i></button>
                 </div>
              </div>
-             <div className="flex-1 overflow-y-auto p-8 space-y-8">
+             
+             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white">
+                {/* FINANCIAL SUMMARY CARDS */}
+                {(() => {
+                    const costs = calculateProjectCosts(showCostDetail, oss, materials, services);
+                    return (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Orçamento (Budget)</p>
+                                <p className="text-3xl font-black text-slate-800 tracking-tight">R$ {formatCurrency(showCostDetail.estimatedValue)}</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-lg shadow-blue-500/5 relative overflow-hidden ring-1 ring-blue-50">
+                                <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+                                <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">Custo Realizado</p>
+                                <p className="text-3xl font-black text-blue-900 tracking-tight">R$ {formatCurrency(costs.totalReal)}</p>
+                                <div className="flex gap-4 text-[10px] uppercase font-bold mt-3 pt-3 border-t border-blue-50">
+                                    <span className="text-slate-400">Mat: <span className="text-slate-600">R$ {formatCurrency(costs.totalMaterials)}</span></span>
+                                    <span className="text-slate-400">Srv: <span className="text-slate-600">R$ {formatCurrency(costs.totalServices)}</span></span>
+                                </div>
+                            </div>
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                                <div className={`absolute top-0 left-0 w-1.5 h-full ${costs.variance >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Variação / Saldo</p>
+                                <p className={`text-3xl font-black tracking-tight ${costs.variance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                    {costs.variance >= 0 ? '+' : ''} R$ {formatCurrency(costs.variance)}
+                                </p>
+                                <p className="text-[10px] font-bold text-slate-400 mt-3 uppercase">{costs.variancePercent.toFixed(1)}% do orçamento utilizado</p>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {/* Tabelas de comparativo */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="border border-slate-200 rounded-xl p-6 shadow-sm">
-                        <h4 className="text-sm font-bold text-slate-900 uppercase mb-5 border-b border-slate-200 pb-3 flex items-center gap-2"><i className="fas fa-cubes text-slate-500"></i> Materiais (Plan x Real)</h4>
-                        <table className="w-full text-base">
+                    <div className="border border-slate-200 rounded-2xl p-6 shadow-sm bg-white">
+                        <h4 className="text-sm font-black text-slate-800 uppercase mb-5 pb-3 flex items-center gap-2 border-b border-slate-100"><i className="fas fa-cubes text-clean-primary"></i> Materiais (Plan x Real)</h4>
+                        <table className="w-full text-sm">
                             <thead>
-                                <tr className="text-slate-500 font-bold uppercase text-xs"><th className="text-left pb-3">Item</th><th className="text-right pb-3">Plan</th><th className="text-right pb-3">Real</th><th className="text-center pb-3">Var</th></tr>
+                                <tr className="text-slate-400 font-bold uppercase text-[10px] tracking-wider"><th className="text-left pb-3">Item</th><th className="text-right pb-3">Plan</th><th className="text-right pb-3">Real</th><th className="text-center pb-3">Var</th></tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-slate-50">
                                 {showCostDetail.plannedMaterials.map(pm => {
                                     const actual = getActualMaterialQty(showCostDetail.id, pm.materialId);
                                     const mat = materials.find(m => m.id === pm.materialId);
                                     const diff = actual - pm.quantity;
                                     return (
-                                        <tr key={pm.materialId}>
-                                            <td className="py-3 text-slate-800 font-bold">{mat?.description}</td>
-                                            <td className="text-right text-slate-600 font-medium">{pm.quantity}</td>
-                                            <td className="text-right text-slate-900 font-bold">{actual}</td>
-                                            <td className="text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${diff > 0 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>{diff > 0 ? `+${diff}` : diff}</span></td>
+                                        <tr key={pm.materialId} className="group hover:bg-slate-50 transition-colors">
+                                            <td className="py-3 text-slate-700 font-bold group-hover:text-slate-900">{mat?.description}</td>
+                                            <td className="text-right text-slate-500 font-medium">{pm.quantity}</td>
+                                            <td className="text-right text-slate-800 font-bold">{actual}</td>
+                                            <td className="text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${diff > 0 ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>{diff > 0 ? `+${diff}` : diff}</span></td>
                                         </tr>
                                     )
                                 })}
                             </tbody>
                         </table>
                     </div>
-                    <div className="border border-slate-200 rounded-xl p-6 shadow-sm">
-                        <h4 className="text-sm font-bold text-slate-900 uppercase mb-5 border-b border-slate-200 pb-3 flex items-center gap-2"><i className="fas fa-clock text-slate-500"></i> Serviços (Horas)</h4>
-                        <table className="w-full text-base">
+                    <div className="border border-slate-200 rounded-2xl p-6 shadow-sm bg-white">
+                        <h4 className="text-sm font-black text-slate-800 uppercase mb-5 pb-3 flex items-center gap-2 border-b border-slate-100"><i className="fas fa-clock text-clean-primary"></i> Serviços (Horas)</h4>
+                        <table className="w-full text-sm">
                             <thead>
-                                <tr className="text-slate-500 font-bold uppercase text-xs"><th className="text-left pb-3">Tipo</th><th className="text-right pb-3">Plan</th><th className="text-right pb-3">Real</th><th className="text-center pb-3">Var</th></tr>
+                                <tr className="text-slate-400 font-bold uppercase text-[10px] tracking-wider"><th className="text-left pb-3">Tipo</th><th className="text-right pb-3">Plan</th><th className="text-right pb-3">Real</th><th className="text-center pb-3">Var</th></tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-slate-50">
                                 {showCostDetail.plannedServices.map(ps => {
                                     const actual = getActualServiceHours(showCostDetail.id, ps.serviceTypeId);
                                     const srv = services.find(s => s.id === ps.serviceTypeId);
                                     const diff = actual - ps.hours;
                                     return (
-                                        <tr key={ps.serviceTypeId}>
-                                            <td className="py-3 text-slate-800 font-bold">{srv?.name}</td>
-                                            <td className="text-right text-slate-600 font-medium">{ps.hours}</td>
-                                            <td className="text-right text-slate-900 font-bold">{actual}</td>
-                                            <td className="text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${diff > 0 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>{diff > 0 ? `+${diff}` : diff}</span></td>
+                                        <tr key={ps.serviceTypeId} className="group hover:bg-slate-50 transition-colors">
+                                            <td className="py-3 text-slate-700 font-bold group-hover:text-slate-900">{srv?.name}</td>
+                                            <td className="text-right text-slate-500 font-medium">{ps.hours}</td>
+                                            <td className="text-right text-slate-800 font-bold">{actual}</td>
+                                            <td className="text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${diff > 0 ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>{diff > 0 ? `+${diff}` : diff}</span></td>
                                         </tr>
                                     )
                                 })}
@@ -568,115 +598,134 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                         </table>
                     </div>
                 </div>
+             </div>
+             
+             <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end rounded-b-2xl">
+                 <button onClick={() => setShowCostDetail(null)} className="px-8 py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-all shadow-lg hover:shadow-xl transform active:scale-95">Fechar Detalhes</button>
              </div>
           </div>
         </div>
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col">
-            <div className="p-8 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                <h3 className="text-2xl font-bold text-slate-900">{editingProject ? 'Editar Projeto' : 'Novo Projeto de Capex'}</h3>
-                <button onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"><i className="fas fa-times text-lg"></i></button>
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col animate-in zoom-in-95 fade-in duration-300 border border-slate-200 overflow-hidden">
+            <div className="px-10 py-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                <div>
+                    <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{editingProject ? 'Editar Projeto' : 'Novo Projeto de Capex'}</h3>
+                    <p className="text-sm text-slate-500 mt-1">Preencha as informações técnicas e financeiras.</p>
+                </div>
+                <button onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"><i className="fas fa-times text-lg"></i></button>
             </div>
-            <form onSubmit={handleSave} className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-10 grid grid-cols-1 md:grid-cols-2 gap-10">
-                    <div className="space-y-6">
-                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest border-b border-slate-200 pb-3 flex items-center gap-2"><i className="fas fa-info-circle text-clean-primary"></i> Dados Cadastrais</h4>
+            
+            <form onSubmit={handleSave} className="flex-1 flex flex-col overflow-hidden bg-slate-50/30">
+                <div className="flex-1 overflow-y-auto p-10 grid grid-cols-1 md:grid-cols-2 gap-12 custom-scrollbar">
+                    <div className="space-y-8">
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2 mb-6">Dados Cadastrais</h4>
                         <div>
-                            <label className="text-sm font-bold text-slate-800 mb-2 block">Título do Projeto</label>
-                            <input required className="w-full h-14 px-4 bg-white border border-slate-300 rounded-lg text-lg text-slate-900 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 transition-all placeholder:text-slate-400 font-medium" placeholder="Ex: Ampliação da Linha C" value={formProject.description || ''} onChange={e => setFormProject({...formProject, description: e.target.value})} />
+                            <label className="text-sm font-bold text-slate-700 mb-2 block">Título do Projeto</label>
+                            <input required className="w-full h-14 px-4 bg-white border border-slate-200 rounded-xl text-lg text-slate-900 shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all placeholder:text-slate-300 font-medium" placeholder="Ex: Ampliação da Linha C" value={formProject.description || ''} onChange={e => setFormProject({...formProject, description: e.target.value})} />
                         </div>
                         <div>
-                            <label className="text-sm font-bold text-slate-800 mb-2 block">Escopo Detalhado</label>
-                            <textarea className="w-full p-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 h-32 custom-scrollbar font-medium" placeholder="Descreva os detalhes técnicos..." value={formProject.detailedDescription || ''} onChange={e => setFormProject({...formProject, detailedDescription: e.target.value})} />
+                            <label className="text-sm font-bold text-slate-700 mb-2 block">Escopo Detalhado</label>
+                            <textarea className="w-full p-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 h-32 custom-scrollbar font-medium transition-all" placeholder="Descreva os detalhes técnicos..." value={formProject.detailedDescription || ''} onChange={e => setFormProject({...formProject, detailedDescription: e.target.value})} />
                         </div>
                         <div className="grid grid-cols-2 gap-6">
                             <div>
-                                <label className="text-sm font-bold text-slate-800 mb-2 block">Local (Prédio/Setor)</label>
-                                <input className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 font-medium" value={formProject.location || ''} onChange={e => setFormProject({...formProject, location: e.target.value})} placeholder="Ex: Galpão B" />
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Local (Prédio/Setor)</label>
+                                <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={formProject.location || ''} onChange={e => setFormProject({...formProject, location: e.target.value})} placeholder="Ex: Galpão B" />
                             </div>
                             <div>
-                                <label className="text-sm font-bold text-slate-800 mb-2 block">Cidade</label>
-                                <input className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 font-medium" value={formProject.city || ''} onChange={e => setFormProject({...formProject, city: e.target.value})} placeholder="Ex: São Paulo" />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-6">
-                            <div>
-                                <label className="text-sm font-bold text-slate-800 mb-2 block">Budget Aprovado (R$)</label>
-                                <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 font-medium" value={formProject.estimatedValue} onChange={e => setFormProject({...formProject, estimatedValue: Number(e.target.value)})} placeholder="0,00" />
-                            </div>
-                            <div>
-                                <label className="text-sm font-bold text-slate-800 mb-2 block">Prazo (Dias)</label>
-                                <input type="number" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 font-medium" value={formProject.slaDays} onChange={e => setFormProject({...formProject, slaDays: Number(e.target.value)})} />
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Cidade</label>
+                                <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={formProject.city || ''} onChange={e => setFormProject({...formProject, city: e.target.value})} placeholder="Ex: São Paulo" />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-6">
                             <div>
-                                <label className="text-sm font-bold text-slate-800 mb-2 block">Centro de Custo</label>
-                                <input className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 font-medium" value={formProject.costCenter || ''} onChange={e => setFormProject({...formProject, costCenter: e.target.value})} />
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Budget Aprovado (R$)</label>
+                                <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all font-bold" value={formProject.estimatedValue} onChange={e => setFormProject({...formProject, estimatedValue: Number(e.target.value)})} placeholder="0,00" />
                             </div>
                             <div>
-                                <label className="text-sm font-bold text-slate-800 mb-2 block">Responsável</label>
-                                <input className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 font-medium" value={formProject.responsible || ''} onChange={e => setFormProject({...formProject, responsible: e.target.value})} />
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Prazo (Dias)</label>
+                                <input type="number" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={formProject.slaDays} onChange={e => setFormProject({...formProject, slaDays: Number(e.target.value)})} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-6">
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Centro de Custo</label>
+                                <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={formProject.costCenter || ''} onChange={e => setFormProject({...formProject, costCenter: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Responsável</label>
+                                <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={formProject.responsible || ''} onChange={e => setFormProject({...formProject, responsible: e.target.value})} />
                             </div>
                         </div>
                     </div>
                     
-                    <div className="space-y-6">
-                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest border-b border-slate-200 pb-3 flex items-center gap-2"><i className="fas fa-list-check text-clean-primary"></i> Planejamento de Recursos</h4>
+                    <div className="space-y-8">
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2 mb-6">Planejamento de Recursos</h4>
                         
-                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-inner">
-                             <div className="flex justify-between text-base mb-3 font-bold text-slate-800"><span>Materiais</span> <span className="text-clean-primary">Total: R$ {formatCurrency(plannedCosts.matCost)}</span></div>
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                             <div className="flex justify-between text-base mb-4 font-bold text-slate-800">
+                                <span>Materiais</span> 
+                                <span className="text-clean-primary bg-emerald-50 px-2 py-0.5 rounded text-sm">Total: R$ {formatCurrency(plannedCosts.matCost)}</span>
+                             </div>
                              <div className="flex gap-2 mb-4">
-                                <select className="flex-1 h-12 px-3 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm" value={tempMatId} onChange={handleMaterialSelect}>
+                                <select className="flex-1 h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-800 font-medium shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" value={tempMatId} onChange={handleMaterialSelect}>
                                     <option value="">Selecione Material...</option>
                                     {materials.map(m => <option key={m.id} value={m.id}>{m.description}</option>)}
                                 </select>
-                                <input type="number" className="w-20 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="Qtd" value={tempMatQty} onChange={e => setTempMatQty(e.target.value)} />
-                                <input type="number" step="0.01" className="w-24 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="R$ Unit" value={tempMatCost} onChange={e => setTempMatCost(e.target.value)} />
-                                <button type="button" onClick={addPlannedMaterial} className="h-12 px-4 bg-slate-800 hover:bg-slate-900 rounded-lg text-white shadow-sm transition-colors"><i className="fas fa-plus"></i></button>
+                                <input type="number" className="w-20 h-12 px-2 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-800 font-medium shadow-sm text-center focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" placeholder="Qtd" value={tempMatQty} onChange={e => setTempMatQty(e.target.value)} />
+                                <input type="number" step="0.01" className="w-24 h-12 px-2 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-800 font-medium shadow-sm text-center focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" placeholder="R$ Unit" value={tempMatCost} onChange={e => setTempMatCost(e.target.value)} />
+                                <button type="button" onClick={addPlannedMaterial} className="h-12 w-12 flex items-center justify-center bg-slate-800 hover:bg-slate-900 rounded-xl text-white shadow-lg shadow-slate-800/20 transition-all"><i className="fas fa-plus"></i></button>
                              </div>
-                             <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                             <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                 {formProject.plannedMaterials?.map((pm, i) => (
-                                    <div key={i} className="flex justify-between items-center text-sm bg-white p-3 border border-slate-200 rounded-lg shadow-sm">
-                                        <span className="truncate flex-1 font-bold text-slate-800">{materials.find(m => m.id === pm.materialId)?.description}</span>
+                                    <div key={i} className="flex justify-between items-center text-sm bg-slate-50 p-3 border border-slate-100 rounded-xl group hover:border-slate-300 transition-colors">
+                                        <span className="truncate flex-1 font-bold text-slate-700">{materials.find(m => m.id === pm.materialId)?.description}</span>
                                         <span className="mx-2 text-slate-500 text-xs">R$ {pm.unitCost}</span>
-                                        <span className="font-bold mx-3 bg-slate-100 px-2 py-1 rounded text-slate-700 border border-slate-200">{pm.quantity} un</span>
-                                        <button type="button" onClick={() => removePlannedMaterial(pm.materialId)} className="text-red-500 hover:text-red-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"><i className="fas fa-trash"></i></button>
+                                        <span className="font-bold mx-3 bg-white px-2 py-1 rounded text-slate-800 border border-slate-200 shadow-sm">{pm.quantity} un</span>
+                                        <button type="button" onClick={() => removePlannedMaterial(pm.materialId)} className="text-slate-400 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"><i className="fas fa-trash"></i></button>
                                     </div>
                                 ))}
+                                {(!formProject.plannedMaterials || formProject.plannedMaterials.length === 0) && <p className="text-center text-slate-400 text-sm italic py-4">Nenhum material adicionado.</p>}
                              </div>
                         </div>
 
-                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-inner">
-                             <div className="flex justify-between text-base mb-3 font-bold text-slate-800"><span>Serviços (HH)</span> <span className="text-clean-primary">Total: R$ {formatCurrency(plannedCosts.srvCost)}</span></div>
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                             <div className="flex justify-between text-base mb-4 font-bold text-slate-800">
+                                <span>Serviços (HH)</span> 
+                                <span className="text-clean-primary bg-emerald-50 px-2 py-0.5 rounded text-sm">Total: R$ {formatCurrency(plannedCosts.srvCost)}</span>
+                             </div>
                              <div className="flex gap-2 mb-4">
-                                <select className="flex-1 h-12 px-3 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm" value={tempSrvId} onChange={handleServiceSelect}>
+                                <select className="flex-1 h-12 px-3 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-800 font-medium shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" value={tempSrvId} onChange={handleServiceSelect}>
                                     <option value="">Selecione Serviço...</option>
                                     {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
-                                <input type="number" className="w-20 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="Hrs" value={tempSrvHrs} onChange={e => setTempSrvHrs(e.target.value)} />
-                                <input type="number" step="0.01" className="w-24 h-12 px-2 bg-white border border-slate-300 rounded-lg text-base text-slate-800 font-medium shadow-sm text-center" placeholder="R$ Unit" value={tempSrvCost} onChange={e => setTempSrvCost(e.target.value)} />
-                                <button type="button" onClick={addPlannedService} className="h-12 px-4 bg-slate-800 hover:bg-slate-900 rounded-lg text-white shadow-sm transition-colors"><i className="fas fa-plus"></i></button>
+                                <input type="number" className="w-20 h-12 px-2 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-800 font-medium shadow-sm text-center focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" placeholder="Hrs" value={tempSrvHrs} onChange={e => setTempSrvHrs(e.target.value)} />
+                                <input type="number" step="0.01" className="w-24 h-12 px-2 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-800 font-medium shadow-sm text-center focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" placeholder="R$ Unit" value={tempSrvCost} onChange={e => setTempSrvCost(e.target.value)} />
+                                <button type="button" onClick={addPlannedService} className="h-12 w-12 flex items-center justify-center bg-slate-800 hover:bg-slate-900 rounded-xl text-white shadow-lg shadow-slate-800/20 transition-all"><i className="fas fa-plus"></i></button>
                              </div>
-                             <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                             <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                 {formProject.plannedServices?.map((ps, i) => (
-                                    <div key={i} className="flex justify-between items-center text-sm bg-white p-3 border border-slate-200 rounded-lg shadow-sm">
-                                        <span className="truncate flex-1 font-bold text-slate-800">{services.find(s => s.id === ps.serviceTypeId)?.name}</span>
+                                    <div key={i} className="flex justify-between items-center text-sm bg-slate-50 p-3 border border-slate-100 rounded-xl group hover:border-slate-300 transition-colors">
+                                        <span className="truncate flex-1 font-bold text-slate-700">{services.find(s => s.id === ps.serviceTypeId)?.name}</span>
                                         <span className="mx-2 text-slate-500 text-xs">R$ {ps.unitCost}</span>
-                                        <span className="font-bold mx-3 bg-slate-100 px-2 py-1 rounded text-slate-700 border border-slate-200">{ps.hours} h</span>
-                                        <button type="button" onClick={() => removePlannedService(ps.serviceTypeId)} className="text-red-500 hover:text-red-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"><i className="fas fa-trash"></i></button>
+                                        <span className="font-bold mx-3 bg-white px-2 py-1 rounded text-slate-800 border border-slate-200 shadow-sm">{ps.hours} h</span>
+                                        <button type="button" onClick={() => removePlannedService(ps.serviceTypeId)} className="text-slate-400 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors"><i className="fas fa-trash"></i></button>
                                     </div>
                                 ))}
+                                {(!formProject.plannedServices || formProject.plannedServices.length === 0) && <p className="text-center text-slate-400 text-sm italic py-4">Nenhum serviço adicionado.</p>}
                              </div>
                         </div>
                     </div>
                 </div>
-                <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-4 rounded-b-2xl">
-                    <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-base font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancelar</button>
-                    <button type="submit" className="px-8 py-3 text-base font-bold text-white bg-clean-primary hover:bg-clean-primary/90 rounded-lg shadow-lg shadow-clean-primary/30 transition-all transform hover:-translate-y-0.5">Confirmar Projeto</button>
+                
+                <div className="px-10 py-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-4 rounded-b-2xl sticky bottom-0 z-10">
+                    <button type="button" onClick={() => setShowModal(false)} className="px-8 py-4 text-base font-bold text-slate-600 hover:text-slate-800 hover:bg-white border border-transparent hover:border-slate-200 rounded-xl transition-all">Cancelar</button>
+                    <button type="submit" className="px-10 py-4 text-base font-bold text-white bg-clean-primary hover:bg-clean-primary/90 rounded-xl shadow-xl shadow-clean-primary/30 transition-all transform hover:-translate-y-1 active:scale-95 flex items-center gap-3">
+                        <i className="fas fa-check"></i> Confirmar Projeto
+                    </button>
                 </div>
             </form>
           </div>

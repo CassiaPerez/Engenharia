@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Project, OS, Material, ServiceType, StockMovement, 
-  UserRole, OSStatus, ProjectStatus, User, PurchaseRecord, Building
+  UserRole, OSStatus, ProjectStatus, User, PurchaseRecord, Building, StockLocation
 } from './types';
 import { INITIAL_MATERIALS, INITIAL_SERVICES, INITIAL_PROJECTS, INITIAL_USERS, INITIAL_BUILDINGS } from './constants';
 import Dashboard from './components/Dashboard';
@@ -194,10 +194,43 @@ const App: React.FC = () => {
     return () => { if(timeoutRef.current) clearTimeout(timeoutRef.current); };
   }, [projects, materials, services, oss, movements, suppliers, users, purchases, buildings, firstLoad]);
 
+  // Função para gerenciar baixa de estoque via OS
+  // Agora suporta múltiplos locais (FIFO de locais: consome do primeiro com saldo)
   const handleStockChange = (mId: string, qty: number, osNumber: string) => {
-    setMaterials(prev => prev.map(m => 
-      m.id === mId ? { ...m, currentStock: m.currentStock - qty } : m
-    ));
+    setMaterials(prev => prev.map(m => {
+      if (m.id === mId) {
+        let remainingToDeduct = qty;
+        let newLocations: StockLocation[] = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'Geral', quantity: m.currentStock }];
+
+        // Lógica de consumo inteligente de locais
+        newLocations = newLocations.map(loc => {
+            if (remainingToDeduct <= 0) return loc;
+            
+            if (loc.quantity >= remainingToDeduct) {
+                loc.quantity -= remainingToDeduct;
+                remainingToDeduct = 0;
+            } else {
+                remainingToDeduct -= loc.quantity;
+                loc.quantity = 0;
+            }
+            return loc;
+        }).filter(l => l.quantity > 0 || newLocations.length === 1); // Mantém pelo menos um local mesmo se zero
+
+        // Se ainda sobrou algo pra deduzir (estoque negativo global), tira do primeiro local
+        if (remainingToDeduct > 0 && newLocations.length > 0) {
+            newLocations[0].quantity -= remainingToDeduct;
+        }
+
+        const newTotal = newLocations.reduce((acc, l) => acc + l.quantity, 0);
+
+        return { 
+            ...m, 
+            currentStock: newTotal,
+            stockLocations: newLocations
+        };
+      }
+      return m;
+    }));
     
     setMovements(prev => [...prev, {
       id: Math.random().toString(36).substr(2, 9),
@@ -207,7 +240,8 @@ const App: React.FC = () => {
       date: new Date().toISOString(),
       userId: currentUser?.id || 'SYSTEM',
       osId: osNumber,
-      description: `Baixa via ${osNumber}`
+      description: `Baixa via ${osNumber} (Automático)`,
+      fromLocation: 'Automático'
     }]);
   };
 
@@ -274,6 +308,7 @@ const App: React.FC = () => {
             movements={movements} 
             setMaterials={setMaterials} 
             onAddMovement={(m) => setMovements(p => [...p, m])} 
+            currentUser={currentUser}
           />
         );
       case 'services':
@@ -306,28 +341,28 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Sidebar Navigation */}
+      {/* Sidebar Navigation - CUSTOM COLOR #001529 */}
       <aside 
         className={`
-          fixed inset-y-0 left-0 z-50 w-72 bg-[#0f172a] text-slate-300 flex flex-col border-r border-slate-700 transition-transform duration-300 ease-in-out shadow-2xl
+          fixed inset-y-0 left-0 z-50 w-72 bg-[#001529] text-white flex flex-col border-r border-white/10 transition-transform duration-300 ease-in-out shadow-2xl
           md:relative md:translate-x-0 md:shadow-none
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
           md:w-20 lg:w-72
         `}
       >
         {/* Brand Header */}
-        <div className="h-20 flex items-center px-6 border-b border-slate-800 bg-[#0f172a] shrink-0 justify-between md:justify-center lg:justify-start relative overflow-hidden group">
+        <div className="h-20 flex items-center px-6 border-b border-white/10 bg-[#001529] shrink-0 justify-between md:justify-center lg:justify-start relative overflow-hidden group">
           <div className="flex items-center gap-3 relative z-10">
              {/* Logo Icon Style - imitating the fingerprint logo */}
-             <div className="w-10 h-10 flex items-center justify-center text-emerald-500 text-2xl group-hover:scale-110 transition-transform">
+             <div className="w-10 h-10 flex items-center justify-center text-clean-primary text-2xl group-hover:scale-110 transition-transform">
                <i className="fas fa-fingerprint"></i>
              </div>
              <div className="block md:hidden lg:block">
                <h1 className="text-xl font-black text-white tracking-tighter leading-none">CropService</h1>
-               <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest block -mt-1">Engineering</span>
+               <span className="text-[10px] text-clean-primary font-bold uppercase tracking-widest block -mt-1">Engineering</span>
              </div>
           </div>
-          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400 hover:text-white transition-colors">
+          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-white hover:text-clean-primary transition-colors">
              <i className="fas fa-times text-xl"></i>
           </button>
         </div>
@@ -362,18 +397,18 @@ const App: React.FC = () => {
           })}
         </nav>
 
-        {/* User Footer with Logout */}
-        <div className="p-4 border-t border-slate-800 bg-[#020617] shrink-0">
+        {/* User Footer with Logout - Darker Shade */}
+        <div className="p-4 border-t border-white/10 bg-[#000b14] shrink-0">
           <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group mb-2">
-            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold text-white border border-slate-700 group-hover:border-emerald-500 transition-all shrink-0">
+            <div className="w-10 h-10 rounded-full bg-[#001529] flex items-center justify-center text-sm font-bold text-white border border-white/20 group-hover:border-clean-primary transition-all shrink-0">
               {currentUser.avatar}
             </div>
             <div className="block md:hidden lg:block overflow-hidden">
               <p className="text-sm font-bold text-white truncate">{currentUser.name}</p>
-              <p className="text-xs text-slate-400 truncate capitalize">{currentUser.role.toLowerCase()}</p>
+              <p className="text-xs text-white/70 truncate capitalize">{currentUser.role.toLowerCase()}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors uppercase tracking-wider">
+          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors uppercase tracking-wider">
              <i className="fas fa-sign-out-alt"></i> Sair
           </button>
         </div>
@@ -392,7 +427,7 @@ const App: React.FC = () => {
              </button>
 
              <div className="flex items-center gap-2 truncate">
-               <span className="font-bold text-slate-400 hidden sm:block">CropService <span className="text-emerald-500">/</span></span>
+               <span className="font-bold text-slate-400 hidden sm:block">CropService <span className="text-clean-primary">/</span></span>
                <span className="font-bold text-slate-900 text-lg sm:text-xl truncate">
                  {MENU_GROUPS.reduce((acc, g) => [...acc, ...g.items], [] as any[]).find(i => i.id === activeTab)?.label || 'Bem-vindo'}
                </span>
@@ -402,13 +437,13 @@ const App: React.FC = () => {
           <div className="flex items-center gap-3 sm:gap-6">
              {/* Status Sync */}
              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
-                <span className={`w-2 h-2 rounded-full ${syncStatus === 'online' ? 'bg-emerald-500' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
+                <span className={`w-2 h-2 rounded-full ${syncStatus === 'online' ? 'bg-clean-primary' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                     {syncStatus === 'online' ? 'Online' : syncStatus === 'syncing' ? 'Sync...' : syncStatus === 'error' ? 'Erro' : 'Offline'}
                 </span>
              </div>
              
-             <button className="w-10 h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-emerald-600 transition-all relative shadow-sm hover:shadow active:scale-95">
+             <button className="w-10 h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-clean-primary transition-all relative shadow-sm hover:shadow active:scale-95">
                 <i className="fas fa-bell"></i>
                 <span className="absolute top-2.5 right-3 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
              </button>
@@ -438,12 +473,12 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ active, onClick, icon, label 
     onClick={onClick}
     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group relative ${
       active 
-        ? 'bg-emerald-600 text-white font-bold shadow-lg shadow-emerald-900/20' 
+        ? 'bg-clean-primary text-white font-bold border border-white shadow-md' 
         : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
     }`}
     title={label}
   >
-    <div className={`w-6 flex justify-center shrink-0 ${active ? 'text-white' : 'text-slate-500 group-hover:text-white'}`}>
+    <div className={`w-6 flex justify-center shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>
       <i className={`fas ${icon} text-lg`}></i>
     </div>
     <span className="block md:hidden lg:block text-sm tracking-tight truncate">{label}</span>
