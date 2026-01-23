@@ -394,7 +394,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
            <h3 className="font-bold text-xl text-slate-800 mb-6 flex items-center gap-2"><i className="fas fa-history text-clean-primary"></i> Histórico de Movimentação (Kardex)</h3>
            <div className="overflow-x-auto">
                <table className="w-full text-base text-left">
-                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider"><tr className="border-b border-slate-200"><th className="p-5">Data</th><th className="p-5">Tipo</th><th className="p-5">Material</th><th className="p-5 text-right">Qtd</th><th className="p-5">Locais (Origem -> Destino)</th><th className="p-5">Responsável</th><th className="p-5">Justificativa</th></tr></thead>
+                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider"><tr className="border-b border-slate-200"><th className="p-5">Data</th><th className="p-5">Tipo</th><th className="p-5">Material</th><th className="p-5 text-right">Qtd</th><th className="p-5">Locais (Origem &rarr; Destino)</th><th className="p-5">Responsável</th><th className="p-5">Justificativa</th></tr></thead>
                    <tbody className="divide-y divide-slate-100">
                        {movements.sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()).map(mov => (
                            <tr key={mov.id} className="hover:bg-slate-50">
