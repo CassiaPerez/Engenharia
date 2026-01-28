@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Material, StockMovement, StockLocation, User } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -13,7 +13,11 @@ interface Props {
 
 const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser }) => {
   const [view, setView] = useState<'stock' | 'history'>('stock');
-  const [searchTerm, setSearchTerm] = useState('');
+  
+  // States para Busca com Debounce
+  const [searchInput, setSearchInput] = useState(''); // Valor do Input (Imediato)
+  const [searchTerm, setSearchTerm] = useState('');   // Valor do Filtro (Debounced)
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Estado para criação de novo material
@@ -24,7 +28,8 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     currentStock: 0,
     unitCost: 0,
     group: 'Geral',
-    unit: 'Un'
+    unit: 'Un',
+    code: ''
   });
 
   // Estado para Modal de Gestão de Locais
@@ -37,6 +42,15 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       reason: '' 
   });
 
+  // Efeito de Debounce: Atualiza o searchTerm apenas após 500ms sem digitar
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setSearchTerm(searchInput);
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchInput]);
+
   // Mapeia TODOS os locais existentes no sistema para sugerir no autocomplete (Criação/Reuso)
   const globalLocations = useMemo(() => {
     const locs = new Set<string>();
@@ -44,14 +58,54 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         if (m.location) locs.add(m.location);
         m.stockLocations?.forEach(l => locs.add(l.name));
     });
+    // Adiciona o padrão CD se não existir
+    locs.add('CD - Central');
     return Array.from(locs).sort();
   }, [materials]);
+
+  // Gerador de SKU Único (Garante não duplicidade)
+  const generateUniqueSKU = () => {
+      const prefix = 'MAT';
+      const year = new Date().getFullYear().toString().substr(-2);
+      let unique = false;
+      let code = '';
+      let attempts = 0;
+
+      // Tenta gerar um código único (limite de tentativas para evitar loop infinito teórico)
+      while (!unique && attempts < 1000) {
+          const random = Math.floor(1000 + Math.random() * 9000); // 4 digitos
+          code = `${prefix}-${year}-${random}`;
+          
+          // Verifica se já existe na lista de materiais
+          const exists = materials.some(m => m.code === code);
+          if (!exists) {
+              unique = true;
+          }
+          attempts++;
+      }
+      
+      return code;
+  };
+
+  const openNewItemModal = () => {
+      setNewMaterial({
+        status: 'ACTIVE',
+        minStock: 10,
+        currentStock: 0,
+        unitCost: 0,
+        group: 'Geral',
+        unit: 'Un',
+        location: 'CD - Central', // Padrão solicitado: CD
+        code: generateUniqueSKU() // Gera automaticamente ao abrir e garante unicidade
+      });
+      setShowModal(true);
+  };
 
   // Função para abrir o modal de locais
   const openLocationManager = (m: Material) => {
       // Garante que o material tenha a estrutura de locations inicializada
       if (!m.stockLocations || m.stockLocations.length === 0) {
-          const defaultLocs = [{ name: m.location || 'Geral', quantity: m.currentStock }];
+          const defaultLocs = [{ name: m.location || 'CD - Central', quantity: m.currentStock }];
           // Atualiza temporariamente para exibição correta
           const updatedM = { ...m, stockLocations: defaultLocs };
           setSelectedMaterialForLoc(updatedM);
@@ -77,7 +131,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
       setMaterials(prev => prev.map(m => {
           if (m.id === selectedMaterialForLoc.id) {
-              let newLocations = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'Geral', quantity: m.currentStock }];
+              let newLocations = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'CD - Central', quantity: m.currentStock }];
 
               if (locAction === 'ADD') {
                   // Criação de Local (Com ou sem saldo)
@@ -194,9 +248,16 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     e.preventDefault();
     if (!newMaterial.code || !newMaterial.description) return;
 
+    // Dupla verificação de duplicidade antes de salvar
+    if (materials.some(m => m.code === newMaterial.code)) {
+        alert('Erro: Este código SKU já existe. O sistema irá gerar um novo.');
+        setNewMaterial({ ...newMaterial, code: generateUniqueSKU() });
+        return;
+    }
+
     const id = Math.random().toString(36).substr(2, 9);
     const initialQty = Number(newMaterial.currentStock) || 0;
-    const initialLoc = newMaterial.location || 'Geral';
+    const initialLoc = newMaterial.location || 'CD - Central';
 
     const material: Material = {
         id,
@@ -246,17 +307,32 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
       /* Esperado: Codigo, Descricao, Grupo, Unidade, Custo, Estoque, Minimo */
       const importedMaterials: Material[] = [];
+      let generatedCount = 0;
       
       data.forEach((row: any) => {
-        const code = row['Codigo'] || row['SKU'] || row['Code'];
+        let code = row['Codigo'] || row['SKU'] || row['Code'];
         const desc = row['Descricao'] || row['Description'];
         
-        if (code && desc) {
-            // Verifica se já existe
+        if (desc) {
+            // Se não tiver código na planilha, gera um
+            if (!code) {
+                code = generateUniqueSKU(); // Atenção: Em loop rápido pode gerar colisão se não atualizar a lista 'materials' em tempo real.
+                // Mas generateUniqueSKU olha para 'materials' que é state.
+                // Para import em lote, precisamos garantir unicidade dentro do próprio lote também.
+                while (importedMaterials.some(im => im.code === code) || materials.some(m => m.code === code)) {
+                     // Regenera simples para evitar colisão no loop
+                     const random = Math.floor(1000 + Math.random() * 9000);
+                     const year = new Date().getFullYear().toString().substr(-2);
+                     code = `MAT-${year}-${random}`;
+                }
+                generatedCount++;
+            }
+
+            // Verifica se já existe (Skip duplicates from file if code match)
             if (materials.some(m => m.code === code)) return;
             
             const qty = Number(row['Estoque']) || 0;
-            const loc = row['Local'] || 'Geral';
+            const loc = row['Local'] || 'CD - Central';
 
             const newMat: Material = {
                 id: Math.random().toString(36).substr(2, 9),
@@ -291,7 +367,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
       if (importedMaterials.length > 0) {
           setMaterials(prev => [...prev, ...importedMaterials]);
-          alert(`${importedMaterials.length} itens importados com sucesso!`);
+          alert(`${importedMaterials.length} itens importados com sucesso! (${generatedCount} códigos gerados automaticamente)`);
       } else {
           alert('Nenhum item novo encontrado ou formato inválido. Use colunas: Codigo, Descricao, Grupo, Unidade, Custo, Estoque');
       }
@@ -301,7 +377,48 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     reader.readAsBinaryString(file);
   };
 
-  const filteredMaterials = materials.filter(m => m.description.toLowerCase().includes(searchTerm.toLowerCase()) || m.code.toLowerCase().includes(searchTerm.toLowerCase()));
+  const downloadTemplate = () => {
+      // Cabeçalho e dados de exemplo
+      const templateData = [
+          {
+              Codigo: 'EX-001',
+              Descricao: 'Exemplo Material A',
+              Grupo: 'Manutenção',
+              Unidade: 'Un',
+              Custo: 10.50,
+              Estoque: 100,
+              Minimo: 10,
+              Local: 'CD - Central'
+          },
+          {
+              Codigo: '', // Deixar vazio para gerar automatico
+              Descricao: 'Exemplo Material B (Gerar Codigo)',
+              Grupo: 'Elétrica',
+              Unidade: 'M',
+              Custo: 5.25,
+              Estoque: 200,
+              Minimo: 50,
+              Local: 'CD - Central'
+          }
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Modelo Importacao");
+      
+      const wscols = [{wch: 15}, {wch: 30}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 15}];
+      ws['!cols'] = wscols;
+
+      XLSX.writeFile(wb, "Modelo_Importacao_Estoque.xlsx");
+  };
+
+  // Filtragem usa o termo debounced (searchTerm)
+  const filteredMaterials = useMemo(() => {
+      return materials.filter(m => 
+        m.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        m.code.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+  }, [materials, searchTerm]);
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -319,11 +436,17 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
             </div>
             
             <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx, .xls, .csv" />
-            <button onClick={() => fileInputRef.current?.click()} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition-all h-[52px]">
-                <i className="fas fa-file-excel"></i> Importar
-            </button>
+            
+            <div className="flex bg-white rounded-xl border border-emerald-100 shadow-sm p-1">
+                <button onClick={downloadTemplate} className="px-4 py-2 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg text-sm font-bold transition-all flex items-center gap-2 border-r border-slate-100 mr-1" title="Baixar planilha modelo">
+                    <i className="fas fa-download"></i> Modelo
+                </button>
+                <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-all flex items-center gap-2">
+                    <i className="fas fa-file-excel"></i> Importar
+                </button>
+            </div>
 
-            <button onClick={() => setShowModal(true)} className="bg-clean-primary text-white px-6 py-3 rounded-xl font-bold text-sm uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2 transition-all h-[52px]">
+            <button onClick={openNewItemModal} className="bg-clean-primary text-white px-6 py-3 rounded-xl font-bold text-sm uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2 transition-all h-[52px]">
                 <i className="fas fa-plus"></i> Novo Item
             </button>
         </div>
@@ -331,9 +454,17 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
       {view === 'stock' ? (
         <>
-          <div className="relative max-w-lg">
-            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-            <input type="text" placeholder="Filtrar materiais por nome ou código..." className="w-full pl-12 pr-4 h-14 bg-white border border-slate-300 rounded-xl text-lg text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary placeholder:text-slate-400 font-medium" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <div className="relative max-w-lg group">
+            {/* Ícone muda se estiver aguardando debounce */}
+            <i className={`fas ${searchInput !== searchTerm ? 'fa-spinner fa-spin text-clean-primary' : 'fa-search text-slate-400'} absolute left-4 top-1/2 -translate-y-1/2 text-lg transition-colors`}></i>
+            
+            <input 
+                type="text" 
+                placeholder="Filtrar materiais por nome ou código..." 
+                className="w-full pl-12 pr-4 h-14 bg-white border border-slate-300 rounded-xl text-lg text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary placeholder:text-slate-400 font-medium transition-all" 
+                value={searchInput} 
+                onChange={e => setSearchInput(e.target.value)} 
+            />
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -438,8 +569,15 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                     <div className="p-8 space-y-6">
                         <div className="grid grid-cols-2 gap-6">
                             <div>
-                                <label className="text-sm font-bold text-slate-700 mb-2 block">Código (SKU)</label>
-                                <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all uppercase" placeholder="EX: MAT-001" value={newMaterial.code} onChange={e => setNewMaterial({...newMaterial, code: e.target.value})} />
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Código (SKU) <span className="text-xs font-normal text-emerald-600 ml-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100"><i className="fas fa-lock text-[10px]"></i> Sistema</span></label>
+                                <div className="relative">
+                                    <input 
+                                        readOnly
+                                        className="w-full h-12 px-4 bg-slate-100 border border-slate-200 rounded-xl text-base text-slate-500 font-bold shadow-sm focus:outline-none cursor-not-allowed uppercase" 
+                                        value={newMaterial.code} 
+                                        title="Gerado automaticamente pelo sistema"
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <label className="text-sm font-bold text-slate-700 mb-2 block">Grupo / Categoria</label>
@@ -461,7 +599,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                             </div>
                             <div>
                                 <label className="text-sm font-bold text-slate-700 mb-2 block">Local Padrão</label>
-                                <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Corredor A" value={newMaterial.location} onChange={e => setNewMaterial({...newMaterial, location: e.target.value})} />
+                                <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="CD - Central" value={newMaterial.location} onChange={e => setNewMaterial({...newMaterial, location: e.target.value})} />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">

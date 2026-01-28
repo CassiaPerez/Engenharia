@@ -35,8 +35,9 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
   const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING'>('PROJECT');
   
-  // Estado para novo item na OS
+  // Estado para novo item na OS e Busca de Item
   const [newItem, setNewItem] = useState<{ id: string, qty: number | '', cost: number | '' }>({ id: '', qty: '', cost: '' });
+  const [itemSearchTerm, setItemSearchTerm] = useState(''); // Estado para busca do item
 
   // Estado para criação rápida de Executor
   const [showExecutorModal, setShowExecutorModal] = useState(false);
@@ -45,7 +46,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   // Lista de Executores (Prestadores de Serviço)
   const executors = useMemo(() => users.filter(u => u.role === 'EXECUTOR'), [users]);
 
-  // Debounce do Search Input
+  // Debounce do Search Input da Lista Principal
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchTerm(searchInput);
@@ -54,7 +55,25 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Filtragem Avançada
+  // Reset item search quando troca a aba
+  useEffect(() => {
+      setItemSearchTerm('');
+      setNewItem({ id: '', qty: '', cost: '' });
+  }, [activeSubTab]);
+
+  // Itens Filtrados para o Dropdown de Adição
+  const filteredItems = useMemo(() => {
+      if (activeSubTab === 'services') {
+          return services.filter(s => s.name.toLowerCase().includes(itemSearchTerm.toLowerCase()));
+      } else {
+          return materials.filter(m => 
+              m.description.toLowerCase().includes(itemSearchTerm.toLowerCase()) || 
+              m.code.toLowerCase().includes(itemSearchTerm.toLowerCase())
+          );
+      }
+  }, [materials, services, activeSubTab, itemSearchTerm]);
+
+  // Filtragem Avançada da Lista de OS
   const filteredOSs = useMemo(() => {
     return oss.filter(os => {
       const matchesSearch = os.number.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -127,7 +146,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
     const newEntry: OSService = { serviceTypeId: serviceTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
     const updatedOS = { ...selectedOS, services: [...selectedOS.services, newEntry] };
     setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-    setSelectedOS(updatedOS); setNewItem({ id: '', qty: '', cost: '' });
+    setSelectedOS(updatedOS); setNewItem({ id: '', qty: '', cost: '' }); setItemSearchTerm('');
   };
 
   const handleAddMaterial = () => {
@@ -140,7 +159,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
     onStockChange(materialTemplate.id, Number(newItem.qty), selectedOS.number);
     const updatedOS = { ...selectedOS, materials: [...selectedOS.materials, newEntry] };
     setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-    setSelectedOS(updatedOS); setNewItem({ id: '', qty: '', cost: '' });
+    setSelectedOS(updatedOS); setNewItem({ id: '', qty: '', cost: '' }); setItemSearchTerm('');
   };
 
   const handleCreate = (e: React.FormEvent) => {
@@ -242,6 +261,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   };
 
   const generateOSDetailPDF = (os: OS) => {
+    // ... existing PDF generation logic ...
     const doc = new jsPDF();
     const costs = calculateOSCosts(os, materials, services);
     const context = getContextInfo(os);
@@ -491,16 +511,30 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
                     </div>
 
                     <div className={`transition-opacity ${!isEditable(selectedOS) ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <div className="flex bg-slate-100 rounded-xl p-1 mb-6 border border-slate-200">
+                        <div className="flex bg-slate-100 rounded-xl p-1 mb-4 border border-slate-200">
                             <button onClick={()=>setActiveSubTab('services')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${activeSubTab==='services'?'bg-white text-slate-800 shadow-sm ring-1 ring-black/5':'text-slate-500 hover:text-slate-700'}`}>Serviços</button>
                             <button onClick={()=>setActiveSubTab('materials')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${activeSubTab==='materials'?'bg-white text-slate-800 shadow-sm ring-1 ring-black/5':'text-slate-500 hover:text-slate-700'}`}>Materiais</button>
                         </div>
-                        <div className="space-y-6 flex-1">
+                        
+                        <div className="space-y-4 flex-1">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 block">Item</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">Buscar e Selecionar</label>
+                                <div className="relative mb-2">
+                                    <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                    <input 
+                                        type="text" 
+                                        className="w-full h-10 pl-8 pr-3 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 font-medium focus:border-clean-primary focus:ring-1 focus:ring-clean-primary transition-all placeholder:text-slate-400"
+                                        placeholder={`Filtrar ${activeSubTab === 'services' ? 'serviços' : 'materiais'}...`}
+                                        value={itemSearchTerm}
+                                        onChange={e => setItemSearchTerm(e.target.value)}
+                                    />
+                                </div>
                                 <select className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20 focus:bg-white transition-all" value={newItem.id} onChange={handleSelectChange}>
-                                    <option value="">Selecione...</option>
-                                    {activeSubTab==='services' ? services.map(s=><option key={s.id} value={s.id}>{s.name}</option>) : materials.map(m=><option key={m.id} value={m.id}>{m.description} (Saldo: {m.currentStock})</option>)}
+                                    <option value="">Selecione ({filteredItems.length} encontrados)...</option>
+                                    {activeSubTab==='services' ? 
+                                        filteredItems.map(s=><option key={s.id} value={s.id}>{(s as ServiceType).name}</option>) : 
+                                        filteredItems.map(m=><option key={m.id} value={m.id}>{(m as Material).description} (Saldo: {(m as Material).currentStock})</option>)
+                                    }
                                 </select>
                             </div>
                             <div className="grid grid-cols-2 gap-4">

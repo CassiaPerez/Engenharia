@@ -58,43 +58,54 @@ const ServiceManager: React.FC<Props> = ({ services, setServices }) => {
         ))}
       </div>
       {showModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in duration-200">
-                  <h3 className="font-bold text-2xl mb-6 text-slate-800">Novo Serviço</h3>
-                  <form onSubmit={handleSave} className="space-y-5">
-                      <div>
-                        <label className="text-sm font-bold text-slate-700 mb-2 block">Nome do Serviço</label>
-                        <input required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" onChange={e=>setFormData({...formData, name:e.target.value})} />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm font-bold text-slate-700 mb-2 block">Categoria</label>
-                            <select className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value as any})}>
-                                <option value="INTERNAL">Interno</option>
-                                <option value="EXTERNAL">Terceiro / Externo</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-sm font-bold text-slate-700 mb-2 block">Valor Unitário (R$/h)</label>
-                            <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" placeholder="0,00" value={formData.unitValue} onChange={e=>setFormData({...formData, unitValue: Number(e.target.value)})} />
-                          </div>
-                      </div>
+          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+                  
+                  {/* Header Fixo */}
+                  <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
+                      <h3 className="font-bold text-xl text-slate-800">Novo Serviço</h3>
+                      <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
+                  </div>
 
-                      <div>
-                        <label className="text-sm font-bold text-slate-700 mb-2 block">Time / Equipe Responsável</label>
-                        <input required className="w-full h-12 px-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary" placeholder="Ex: Manutenção Elétrica" onChange={e=>setFormData({...formData, team:e.target.value})} />
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm font-bold text-slate-700 mb-2 block">Descrição Detalhada</label>
-                        <textarea className="w-full p-4 bg-white border border-slate-300 rounded-lg text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary h-32" onChange={e=>setFormData({...formData, description:e.target.value})} />
-                      </div>
-                      <div className="flex justify-end gap-4 pt-4 border-t border-slate-100 mt-2">
-                          <button type="button" onClick={()=>setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-100 rounded-lg text-base font-bold transition-colors">Cancelar</button>
-                          <button type="submit" className="px-8 py-3 bg-clean-primary text-white rounded-lg text-base font-bold hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/30 transform hover:-translate-y-0.5 transition-all">Salvar</button>
-                      </div>
-                  </form>
+                  {/* Conteúdo Scrollable */}
+                  <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50">
+                      <form id="serviceForm" onSubmit={handleSave} className="space-y-6">
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nome do Serviço</label>
+                            <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" onChange={e=>setFormData({...formData, name:e.target.value})} placeholder="Ex: Manutenção Elétrica" />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-6">
+                              <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Categoria</label>
+                                <select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value as any})}>
+                                    <option value="INTERNAL">Interno</option>
+                                    <option value="EXTERNAL">Terceiro / Externo</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Valor Unitário (R$/h)</label>
+                                <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" placeholder="0,00" value={formData.unitValue} onChange={e=>setFormData({...formData, unitValue: Number(e.target.value)})} />
+                              </div>
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Time / Equipe Responsável</label>
+                            <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" placeholder="Ex: Manutenção Elétrica" onChange={e=>setFormData({...formData, team:e.target.value})} />
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição Detalhada</label>
+                            <textarea className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary h-32 transition-all" onChange={e=>setFormData({...formData, description:e.target.value})} placeholder="Detalhe as especificações..." />
+                          </div>
+                      </form>
+                  </div>
+
+                  {/* Footer Fixo */}
+                  <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10">
+                      <button type="button" onClick={()=>setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button>
+                      <button type="submit" form="serviceForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/30 transform hover:-translate-y-0.5 transition-all">Salvar</button>
+                  </div>
               </div>
           </div>
       )}
