@@ -19,7 +19,6 @@ import ExecutorPanel from './components/ExecutorPanel';
 import BuildingManager from './components/BuildingManager';
 import { supabase, mapFromSupabase, mapToSupabase } from './services/supabase';
 
-// Definição da estrutura do Menu com Permissões (allowedRoles)
 const MENU_GROUPS = [
   {
     title: "Estratégico",
@@ -51,12 +50,9 @@ const MENU_GROUPS = [
 type TabId = typeof MENU_GROUPS[number]['items'][number]['id'];
 
 const App: React.FC = () => {
-  // Estado de Autenticação
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-
   const [activeTab, setActiveTab] = useState<TabId>('dash');
   
-  // Dados do Sistema
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [materials, setMaterials] = useState<Material[]>(INITIAL_MATERIALS);
   const [services, setServices] = useState<ServiceType[]>(INITIAL_SERVICES);
@@ -67,22 +63,16 @@ const App: React.FC = () => {
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [buildings, setBuildings] = useState<Building[]>(INITIAL_BUILDINGS);
   
-  // Estado de Layout Mobile
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // Estado de Sincronização
   const [syncStatus, setSyncStatus] = useState<'online' | 'syncing' | 'offline' | 'error'>('online');
   const [firstLoad, setFirstLoad] = useState(true);
 
-  // Refs para debounce de salvamento
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Carregamento Inicial Híbrido (Supabase > LocalStorage > Initial)
   useEffect(() => {
     const loadData = async () => {
       setSyncStatus('syncing');
       try {
-        // Tenta buscar do Supabase
         const [p, m, s, o, mov, sup, usr, pur, bld] = await Promise.all([
           supabase.from('projects').select('*'),
           supabase.from('materials').select('*'),
@@ -100,7 +90,6 @@ const App: React.FC = () => {
         const dbProjects = mapFromSupabase<Project>(p.data);
         const dbMaterials = mapFromSupabase<Material>(m.data);
         
-        // Se o banco retornar dados, usamos eles. Se estiver vazio (tabela nova), tentamos localStorage
         if (dbProjects.length > 0 || dbMaterials.length > 0) {
             setProjects(dbProjects.length ? dbProjects : INITIAL_PROJECTS);
             setMaterials(dbMaterials.length ? dbMaterials : INITIAL_MATERIALS);
@@ -113,7 +102,6 @@ const App: React.FC = () => {
             setBuildings(mapFromSupabase<Building>(bld.data).length ? mapFromSupabase<Building>(bld.data) : INITIAL_BUILDINGS);
             setSyncStatus('online');
         } else {
-            // Fallback para LocalStorage se o banco estiver vazio (primeiro uso)
             const stored = localStorage.getItem('crop_service_v3_data');
             if (stored) {
                 const data = JSON.parse(stored);
@@ -127,11 +115,10 @@ const App: React.FC = () => {
                 if (data.purchases) setPurchases(data.purchases);
                 if (data.buildings) setBuildings(data.buildings);
             }
-            setSyncStatus('online'); // Consideramos online mas vazio
+            setSyncStatus('online');
         }
       } catch (err) {
-        console.warn("Supabase não conectado ou tabelas inexistentes. Usando LocalStorage.", err);
-        // Fallback completo para LocalStorage
+        console.warn("Offline ou Erro DB", err);
         const stored = localStorage.getItem('crop_service_v3_data');
         if (stored) {
           const data = JSON.parse(stored);
@@ -148,7 +135,6 @@ const App: React.FC = () => {
         setSyncStatus('offline');
       } finally {
         setFirstLoad(false);
-        // Verifica sessão persistida
         const savedUser = localStorage.getItem('crop_user_session');
         if (savedUser) setCurrentUser(JSON.parse(savedUser));
       }
@@ -157,14 +143,12 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
-  // Sincronização e Persistência
+  // Sincronização OTIMIZADA (Sequencial para evitar ERR_INSUFFICIENT_RESOURCES)
   useEffect(() => {
     if (firstLoad) return;
 
-    // 1. Salva Localmente
     localStorage.setItem('crop_service_v3_data', JSON.stringify({ projects, materials, services, oss, movements, suppliers, users, purchases, buildings }));
 
-    // 2. Debounce para salvar no Supabase
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     
     timeoutRef.current = setTimeout(async () => {
@@ -172,37 +156,34 @@ const App: React.FC = () => {
        
        setSyncStatus('syncing');
        try {
-          // Upsert em Batch
-          await Promise.all([
-             ...projects.map(item => supabase.from('projects').upsert(mapToSupabase(item))),
-             ...materials.map(item => supabase.from('materials').upsert(mapToSupabase(item))),
-             ...services.map(item => supabase.from('services').upsert(mapToSupabase(item))),
-             ...oss.map(item => supabase.from('oss').upsert(mapToSupabase(item))),
-             ...movements.map(item => supabase.from('stock_movements').upsert(mapToSupabase(item))),
-             ...suppliers.map(item => supabase.from('suppliers').upsert(mapToSupabase(item))),
-             ...users.map(item => supabase.from('users').upsert(mapToSupabase(item))),
-             ...purchases.map(item => supabase.from('purchases').upsert(mapToSupabase(item))),
-             ...buildings.map(item => supabase.from('buildings').upsert(mapToSupabase(item))),
-          ]);
+          // Executa upserts SEQUENCIALMENTE para não sobrecarregar a rede (Batch Sequential)
+          if (projects.length > 0) await supabase.from('projects').upsert(projects.map(item => mapToSupabase(item)));
+          if (materials.length > 0) await supabase.from('materials').upsert(materials.map(item => mapToSupabase(item)));
+          if (services.length > 0) await supabase.from('services').upsert(services.map(item => mapToSupabase(item)));
+          if (oss.length > 0) await supabase.from('oss').upsert(oss.map(item => mapToSupabase(item)));
+          if (movements.length > 0) await supabase.from('stock_movements').upsert(movements.map(item => mapToSupabase(item)));
+          if (suppliers.length > 0) await supabase.from('suppliers').upsert(suppliers.map(item => mapToSupabase(item)));
+          if (users.length > 0) await supabase.from('users').upsert(users.map(item => mapToSupabase(item)));
+          if (purchases.length > 0) await supabase.from('purchases').upsert(purchases.map(item => mapToSupabase(item)));
+          if (buildings.length > 0) await supabase.from('buildings').upsert(buildings.map(item => mapToSupabase(item)));
+
           setSyncStatus('online');
+
        } catch (e) {
-          console.error("Erro ao sincronizar", e);
+          console.error("Erro crítico ao sincronizar", e);
           setSyncStatus('error');
        }
-    }, 2000); 
+    }, 2500); // Aumentado delay para agrupar mais mudanças
 
     return () => { if(timeoutRef.current) clearTimeout(timeoutRef.current); };
   }, [projects, materials, services, oss, movements, suppliers, users, purchases, buildings, firstLoad]);
 
-  // Função para gerenciar baixa de estoque via OS
-  // Agora suporta múltiplos locais (FIFO de locais: consome do primeiro com saldo)
   const handleStockChange = (mId: string, qty: number, osNumber: string) => {
     setMaterials(prev => prev.map(m => {
       if (m.id === mId) {
         let remainingToDeduct = qty;
         let newLocations: StockLocation[] = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'Geral', quantity: m.currentStock }];
 
-        // Lógica de consumo inteligente de locais
         newLocations = newLocations.map(loc => {
             if (remainingToDeduct <= 0) return loc;
             
@@ -214,9 +195,8 @@ const App: React.FC = () => {
                 loc.quantity = 0;
             }
             return loc;
-        }).filter(l => l.quantity > 0 || newLocations.length === 1); // Mantém pelo menos um local mesmo se zero
+        }).filter(l => l.quantity > 0 || newLocations.length === 1); 
 
-        // Se ainda sobrou algo pra deduzir (estoque negativo global), tira do primeiro local
         if (remainingToDeduct > 0 && newLocations.length > 0) {
             newLocations[0].quantity -= remainingToDeduct;
         }
@@ -248,7 +228,7 @@ const App: React.FC = () => {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('crop_user_session', JSON.stringify(user));
-    setActiveTab('dash'); // Reset to dashboard on login
+    setActiveTab('dash'); 
   };
 
   const handleLogout = () => {
@@ -256,12 +236,10 @@ const App: React.FC = () => {
     localStorage.removeItem('crop_user_session');
   };
 
-  // Se não estiver logado, mostra Login
   if (!currentUser) {
     return <Login users={users} onLogin={handleLogin} />;
   }
 
-  // Lógica Especial para EXECUTOR: Painel Simplificado
   if (currentUser.role === 'EXECUTOR') {
       return (
         <ExecutorPanel 
@@ -282,7 +260,7 @@ const App: React.FC = () => {
       case 'dash': 
         return <Dashboard projects={projects} oss={oss} materials={materials} services={services} />;
       case 'projects': 
-        return <ProjectList projects={projects} setProjects={setProjects} oss={oss} materials={materials} services={services} />;
+        return <ProjectList projects={projects} setProjects={setProjects} oss={oss} materials={materials} services={services} currentUser={currentUser} />;
       case 'os': 
         return (
           <OSList 
@@ -295,12 +273,13 @@ const App: React.FC = () => {
             users={users}
             setUsers={setUsers}
             onStockChange={handleStockChange}
+            currentUser={currentUser}
           />
         );
       case 'calendar':
         return <CalendarView oss={oss} projects={projects} materials={materials} services={services} users={users} />;
       case 'buildings':
-        return <BuildingManager buildings={buildings} setBuildings={setBuildings} />;
+        return <BuildingManager buildings={buildings} setBuildings={setBuildings} currentUser={currentUser} />;
       case 'inventory': 
         return (
           <Inventory 
@@ -312,9 +291,9 @@ const App: React.FC = () => {
           />
         );
       case 'services':
-        return <ServiceManager services={services} setServices={setServices} />;
+        return <ServiceManager services={services} setServices={setServices} currentUser={currentUser} />;
       case 'suppliers':
-        return <SupplierManager suppliers={suppliers} setSuppliers={setSuppliers} purchases={purchases} materials={materials} />;
+        return <SupplierManager suppliers={suppliers} setSuppliers={setSuppliers} purchases={purchases} materials={materials} currentUser={currentUser} />;
       case 'users':
         return <UserManagement users={users} setUsers={setUsers} currentUser={currentUser} />;
       case 'docs':
@@ -324,7 +303,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Fecha o menu mobile ao trocar de aba
   const handleTabChange = (id: TabId) => {
     setActiveTab(id);
     setIsMobileMenuOpen(false);
@@ -332,8 +310,6 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
-      
-      {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
@@ -341,7 +317,6 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Sidebar Navigation - CUSTOM COLOR #001529 */}
       <aside 
         className={`
           fixed inset-y-0 left-0 z-50 w-72 bg-[#001529] text-white flex flex-col border-r border-white/10 transition-transform duration-300 ease-in-out shadow-2xl
@@ -350,10 +325,8 @@ const App: React.FC = () => {
           md:w-20 lg:w-72
         `}
       >
-        {/* Brand Header */}
         <div className="h-20 flex items-center px-6 border-b border-white/10 bg-[#001529] shrink-0 justify-between md:justify-center lg:justify-start relative overflow-hidden group">
           <div className="flex items-center gap-3 relative z-10">
-             {/* Logo Icon Style - imitating the fingerprint logo */}
              <div className="w-10 h-10 flex items-center justify-center text-clean-primary text-2xl group-hover:scale-110 transition-transform">
                <i className="fas fa-fingerprint"></i>
              </div>
@@ -367,7 +340,6 @@ const App: React.FC = () => {
           </button>
         </div>
 
-        {/* Menu Items (Filtered by Role) */}
         <nav className="flex-1 py-8 overflow-y-auto custom-scrollbar px-3 space-y-8">
           {MENU_GROUPS.map((group, groupIndex) => {
             const filteredItems = group.items.filter(item => 
@@ -397,7 +369,6 @@ const App: React.FC = () => {
           })}
         </nav>
 
-        {/* User Footer with Logout - Darker Shade */}
         <div className="p-4 border-t border-white/10 bg-[#000b14] shrink-0">
           <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group mb-2">
             <div className="w-10 h-10 rounded-full bg-[#001529] flex items-center justify-center text-sm font-bold text-white border border-white/20 group-hover:border-clean-primary transition-all shrink-0">
@@ -414,9 +385,7 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content Wrapper */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-[#f8fafc]">
-        {/* Top Header */}
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 shrink-0 z-30 shadow-sm relative">
           <div className="flex items-center gap-4 text-base text-slate-600 overflow-hidden">
              <button 
@@ -435,7 +404,6 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3 sm:gap-6">
-             {/* Status Sync */}
              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
                 <span className={`w-2 h-2 rounded-full ${syncStatus === 'online' ? 'bg-clean-primary' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
@@ -450,7 +418,6 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Content Scroll Area */}
         <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 scroll-smooth">
           <div className="max-w-[1920px] mx-auto pb-10">
             {renderContent()}
@@ -483,7 +450,6 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ active, onClick, icon, label 
     </div>
     <span className="block md:hidden lg:block text-sm tracking-tight truncate">{label}</span>
     
-    {/* Tooltip for collapsed state on Desktop */}
     <div className="hidden md:block lg:hidden absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-xl border border-slate-700 font-bold">
       {label}
     </div>

@@ -277,9 +277,8 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard title="Capex Planejado" value={`R$ ${formatCurrency(stats.totalEstimated)}`} icon="fa-sack-dollar" color="blue" sub="Orçamento Global" />
+      {/* KPI Cards - Removido Capex Planejado, Ajustado Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KpiCard title="Total Executado" value={`R$ ${formatCurrency(stats.totalSpent)}`} icon="fa-chart-line" color="emerald" sub="Realizado Acumulado" />
         <KpiCard title="OS Críticas" value={stats.delayedOS.toString()} icon="fa-triangle-exclamation" color={stats.delayedOS > 0 ? "red" : "slate"} sub="Fora do SLA" />
         <KpiCard title="Projetos Ativos" value={projects.length.toString()} icon="fa-network-wired" color="purple" sub="Em Andamento" />

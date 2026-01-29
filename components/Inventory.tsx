@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Material, StockMovement, StockLocation, User } from '../types';
 import * as XLSX from 'xlsx';
+import { supabase } from '../services/supabase';
 
 interface Props {
   materials: Material[];
@@ -509,9 +510,11 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                    )}
                                </td>
                                <td className="px-8 py-5 text-center">
-                                   <button onClick={() => openLocationManager(m)} className="bg-white border border-slate-300 text-slate-600 hover:text-clean-primary hover:border-clean-primary font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2 mx-auto">
-                                       <i className="fas fa-boxes-stacked"></i> Gerenciar
-                                   </button>
+                                   <div className="flex items-center justify-center gap-2">
+                                       <button onClick={() => openLocationManager(m)} className="bg-white border border-slate-300 text-slate-600 hover:text-clean-primary hover:border-clean-primary font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2">
+                                           <i className="fas fa-boxes-stacked"></i> Gerenciar
+                                       </button>
+                                   </div>
                                </td>
                            </tr>
                        );
