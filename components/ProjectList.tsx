@@ -269,6 +269,235 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   const filteredProjects = projects.filter(p => p.code.toLowerCase().includes(searchTerm.toLowerCase()) || p.description.toLowerCase().includes(searchTerm.toLowerCase()));
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  // Helpers para o detalhamento de custos
+  const getActualMaterialQty = (projectId: string, materialId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.materials.find(m => m.materialId === materialId)?.quantity || 0), 0);
+  const getActualServiceHours = (projectId: string, serviceId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.services.find(s => s.serviceTypeId === serviceId)?.quantity || 0), 0);
+
+  const generateProjectDetailPDF = (project: Project) => {
+    const doc = new jsPDF();
+    const costs = calculateProjectCosts(project, oss, materials, services);
+
+    // Header Color Block
+    doc.setFillColor(71, 122, 127);
+    doc.rect(0, 0, 210, 24, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("FICHA TÉCNICA DE PROJETO (CAPEX)", 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString()}`, 196, 16, { align: 'right' });
+
+    // Project Info
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    
+    let yPos = 35;
+    doc.text(`Código: ${project.code}`, 14, yPos);
+    doc.text(`Status: ${project.status}`, 120, yPos);
+    
+    yPos += 6;
+    doc.text(`Descrição:`, 14, yPos);
+    doc.setFont("helvetica", "normal");
+    const descLines = doc.splitTextToSize(project.description, 170);
+    doc.text(descLines, 35, yPos);
+    yPos += descLines.length * 5;
+
+    if (project.detailedDescription) {
+        doc.setFont("helvetica", "bold");
+        doc.text(`Escopo:`, 14, yPos);
+        doc.setFont("helvetica", "normal");
+        const detLines = doc.splitTextToSize(project.detailedDescription, 170);
+        doc.text(detLines, 35, yPos);
+        yPos += detLines.length * 5 + 4;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`Local: ${project.location || '-'} | Cidade: ${project.city || '-'}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Responsável: ${project.responsible || '-'} | Centro de Custo: ${project.costCenter || '-'}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Datas: Início ${formatDate(project.startDate)} | Fim Est. ${formatDate(project.estimatedEndDate)}`, 14, yPos);
+    
+    yPos += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, yPos, 196, yPos);
+    yPos += 10;
+
+    // Financial Summary
+    doc.setFontSize(11);
+    doc.setTextColor(71, 122, 127);
+    doc.text("RESUMO FINANCEIRO", 14, yPos);
+    yPos += 8;
+    
+    const summaryData = [
+        ["Orçamento Aprovado (Budget)", `R$ ${formatCurrency(project.estimatedValue)}`],
+        ["Custo Realizado (Total)", `R$ ${formatCurrency(costs.totalReal)}`],
+        ["Variação / Saldo", `R$ ${formatCurrency(costs.variance)} (${costs.variancePercent.toFixed(1)}% utilizado)`]
+    ];
+    
+    autoTable(doc, {
+        startY: yPos,
+        head: [],
+        body: summaryData,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 2 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 }, 1: { halign: 'right' } }
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+
+    // Materials Table
+    doc.text("PLANEJAMENTO DE MATERIAIS (FÍSICO)", 14, yPos);
+    yPos += 5;
+    
+    const materialRows = project.plannedMaterials.map(pm => {
+        const actual = getActualMaterialQty(project.id, pm.materialId);
+        const mat = materials.find(m => m.id === pm.materialId);
+        const diff = actual - pm.quantity;
+        return [
+            mat?.code || '-',
+            mat?.description || 'Item excluído',
+            pm.quantity.toString(),
+            actual.toString(),
+            diff > 0 ? `+${diff}` : diff.toString()
+        ];
+    });
+
+    if (materialRows.length > 0) {
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Cód', 'Material', 'Plan', 'Real', 'Var']],
+            body: materialRows,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [71, 122, 127] },
+            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'center' } }
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+    } else {
+        doc.setFontSize(9);
+        doc.setTextColor(150);
+        doc.text("Nenhum material planejado.", 14, yPos + 5);
+        yPos += 15;
+    }
+
+    // Services Table
+    doc.setFontSize(11);
+    doc.setTextColor(71, 122, 127);
+    doc.text("PLANEJAMENTO DE SERVIÇOS (HH)", 14, yPos);
+    yPos += 5;
+
+    const serviceRows = project.plannedServices.map(ps => {
+        const actual = getActualServiceHours(project.id, ps.serviceTypeId);
+        const srv = services.find(s => s.id === ps.serviceTypeId);
+        const diff = actual - ps.hours;
+        return [
+            srv?.name || 'Serviço excluído',
+            ps.hours.toString(),
+            actual.toString(),
+            diff > 0 ? `+${diff}` : diff.toString()
+        ];
+    });
+
+    if (serviceRows.length > 0) {
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Serviço', 'Plan (h)', 'Real (h)', 'Var']],
+            body: serviceRows,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [71, 122, 127] },
+            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'center' } }
+        });
+    } else {
+        doc.setFontSize(9);
+        doc.setTextColor(150);
+        doc.text("Nenhum serviço planejado.", 14, yPos + 5);
+    }
+
+    doc.save(`${project.code}_Detalhado.pdf`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const today = new Date().toLocaleDateString('pt-BR');
+
+    // Branding Header
+    doc.setFillColor(71, 122, 127); // Brand Green
+    doc.rect(0, 0, 297, 24, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("RELATÓRIO DE PORTFÓLIO DE PROJETOS (CAPEX)", 14, 16);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+
+    // Data Calculation
+    const rows = filteredProjects.map(p => {
+        const costs = calculateProjectCosts(p, oss, materials, services);
+        const balance = p.estimatedValue - costs.totalReal;
+        return [
+            p.code,
+            p.description,
+            p.status,
+            p.responsible,
+            formatDate(p.startDate),
+            formatDate(p.estimatedEndDate),
+            `R$ ${formatCurrency(p.estimatedValue)}`,
+            `R$ ${formatCurrency(costs.totalReal)}`,
+            `R$ ${formatCurrency(balance)}`
+        ];
+    });
+
+    // Totals Row
+    const totalBudget = filteredProjects.reduce((acc, p) => acc + p.estimatedValue, 0);
+    const totalReal = filteredProjects.reduce((acc, p) => acc + calculateProjectCosts(p, oss, materials, services).totalReal, 0);
+    const totalBalance = totalBudget - totalReal;
+
+    rows.push([
+        '', 
+        'TOTAIS CONSOLIDADOS', 
+        '', 
+        '', 
+        '', 
+        '', 
+        `R$ ${formatCurrency(totalBudget)}`, 
+        `R$ ${formatCurrency(totalReal)}`, 
+        `R$ ${formatCurrency(totalBalance)}`
+    ]);
+
+    autoTable(doc, {
+        head: [['Código', 'Projeto', 'Status', 'Responsável', 'Início', 'Fim Est.', 'Orçamento (Budget)', 'Realizado', 'Saldo']],
+        body: rows,
+        startY: 35,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [71, 122, 127], textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+            0: { fontStyle: 'bold' },
+            6: { halign: 'right' },
+            7: { halign: 'right' },
+            8: { halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: (data) => {
+             // Style for Summary Row
+             if (data.row.index === rows.length - 1) {
+                 data.cell.styles.fontStyle = 'bold';
+                 data.cell.styles.fillColor = [240, 240, 240];
+                 if (data.column.index === 1) data.cell.colSpan = 5;
+             }
+             // Colorize Balance
+             if (data.column.index === 8 && data.row.index !== rows.length - 1) {
+                 const val = parseFloat(data.cell.raw.toString().replace('R$ ', '').replace('.', '').replace(',', '.'));
+                 if (val < 0) data.cell.styles.textColor = [220, 50, 50];
+                 else data.cell.styles.textColor = [50, 150, 100];
+             }
+        }
+    });
+
+    doc.save(`Projetos_Export_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   const exportToCSV = () => {
     const headers = ['Código', 'Descrição', 'Status', 'Cidade', 'Responsável', 'Budget (R$)', 'Realizado (R$)', 'Início', 'Fim Estimado'];
     const rows = filteredProjects.map(p => {
@@ -278,12 +507,6 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     const csvContent = "\uFEFF" + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `projetos_export.csv`; link.click();
-  };
-
-  const exportToPDF = () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    autoTable(doc, { head: [["Código", "Descrição", "Status", "Resp.", "Início", "Budget"]], body: filteredProjects.map(p => [p.code, p.description, p.status, p.responsible, formatDate(p.startDate), `R$ ${formatCurrency(p.estimatedValue)}`]), });
-    doc.save(`projetos_export.pdf`);
   };
 
   return (
@@ -309,7 +532,11 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                         <div className="flex flex-wrap items-center gap-3 mb-2"><span className="text-sm font-bold bg-slate-100 text-slate-800 px-3 py-1 rounded-md border border-slate-300 font-mono">{p.code}</span><span className={`text-sm font-bold px-3 py-1 rounded-md border uppercase ${p.status === ProjectStatus.IN_PROGRESS ? 'bg-blue-50 text-blue-800 border-blue-300' : 'bg-slate-100 text-slate-700 border-slate-300'}`}>{p.status}</span></div>
                         <h3 className="text-2xl font-bold text-slate-900 leading-tight mb-2">{p.description}</h3>
                     </div>
-                    <div className="flex gap-2 shrink-0"><button onClick={() => openEditProjectModal(p)} className="px-4 py-2.5 rounded-lg border border-slate-300 flex items-center justify-center gap-2 text-slate-600 hover:text-blue-700 hover:border-blue-400 bg-white hover:bg-blue-50 transition-all text-base font-bold shadow-sm"><i className="fas fa-pencil"></i> Editar</button><button onClick={() => setShowCostDetail(p)} className="px-4 py-2.5 rounded-lg border border-slate-300 flex items-center justify-center gap-2 text-slate-600 hover:text-clean-primary hover:border-clean-primary bg-white hover:bg-slate-50 transition-all text-base font-bold shadow-sm"><i className="fas fa-eye"></i> Detalhes</button></div>
+                    <div className="flex gap-2 shrink-0">
+                        <button onClick={() => generateProjectDetailPDF(p)} className="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-slate-300 text-slate-600 hover:text-red-600 hover:bg-red-50 transition-all shadow-sm" title="Baixar PDF"><i className="fas fa-file-pdf"></i></button>
+                        <button onClick={() => openEditProjectModal(p)} className="px-4 py-2.5 rounded-lg border border-slate-300 flex items-center justify-center gap-2 text-slate-600 hover:text-blue-700 hover:border-blue-400 bg-white hover:bg-blue-50 transition-all text-base font-bold shadow-sm"><i className="fas fa-pencil"></i> Editar</button>
+                        <button onClick={() => setShowCostDetail(p)} className="px-4 py-2.5 rounded-lg border border-slate-300 flex items-center justify-center gap-2 text-slate-600 hover:text-clean-primary hover:border-clean-primary bg-white hover:bg-slate-50 transition-all text-base font-bold shadow-sm"><i className="fas fa-eye"></i> Detalhes</button>
+                    </div>
                  </div>
                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-base items-end mt-6">
                     <div><p className="text-xs text-slate-500 uppercase font-black tracking-wider mb-1.5">Localização</p><p className="font-bold text-slate-800 truncate">{p.location || 'N/A'}</p></div>
@@ -505,7 +732,139 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
         </div>
       )}
       {showCostDetail && (
-        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col animate-in zoom-in-95 fade-in duration-300 overflow-hidden border border-slate-200"><div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10"><div><h3 className="text-2xl font-bold text-slate-900 tracking-tight">Detalhamento Financeiro</h3></div><button onClick={() => setShowCostDetail(null)} className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"><i className="fas fa-times text-lg"></i></button></div><div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white">{/* Content */}</div></div></div>
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col animate-in zoom-in-95 fade-in duration-300 overflow-hidden border border-slate-200">
+                <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                    <div>
+                        <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Detalhamento Financeiro</h3>
+                        <p className="text-sm text-slate-500 mt-1 font-medium">{showCostDetail.code} - {showCostDetail.description}</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => generateProjectDetailPDF(showCostDetail)} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-50 flex items-center gap-2"><i className="fas fa-print text-red-500"></i> Imprimir PDF</button>
+                        <button onClick={() => setShowCostDetail(null)} className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"><i className="fas fa-times text-lg"></i></button>
+                    </div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50">
+                    {(() => {
+                        const costs = calculateProjectCosts(showCostDetail, oss, materials, services);
+                        return (
+                            <>
+                                {/* FINANCIAL SUMMARY CARDS */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Orçamento (Budget)</p>
+                                        <p className="text-3xl font-black text-slate-800">R$ {formatCurrency(showCostDetail.estimatedValue)}</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Custo Realizado</p>
+                                        <p className="text-3xl font-black text-blue-900">R$ {formatCurrency(costs.totalReal)}</p>
+                                        <div className="flex gap-3 text-[10px] uppercase font-bold mt-2 pt-2 border-t border-slate-100">
+                                            <span className="text-slate-500">Mat: <span className="text-slate-700">R$ {formatCurrency(costs.totalMaterials)}</span></span>
+                                            <span className="text-slate-500">Srv: <span className="text-slate-700">R$ {formatCurrency(costs.totalServices)}</span></span>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                                        <div className={`absolute top-0 left-0 w-1.5 h-full ${costs.variance >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Saldo / Variação</p>
+                                        <p className={`text-3xl font-black ${costs.variance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                            {costs.variance >= 0 ? '+' : ''} R$ {formatCurrency(costs.variance)}
+                                        </p>
+                                        <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">{costs.variancePercent.toFixed(1)}% utilizado</p>
+                                    </div>
+                                </div>
+
+                                {/* Tabelas de Comparativo */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {/* MATERIAIS */}
+                                    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                                        <h4 className="text-sm font-bold text-slate-900 uppercase mb-5 border-b border-slate-200 pb-3 flex items-center gap-2">
+                                            <i className="fas fa-cubes text-clean-primary"></i> Materiais (Físico-Financeiro)
+                                        </h4>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                                                        <th className="text-left pb-3">Item</th>
+                                                        <th className="text-right pb-3">Plan</th>
+                                                        <th className="text-right pb-3">Real</th>
+                                                        <th className="text-center pb-3">Var</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {showCostDetail.plannedMaterials.map(pm => {
+                                                        const actualQty = getActualMaterialQty(showCostDetail.id, pm.materialId);
+                                                        const mat = materials.find(m => m.id === pm.materialId);
+                                                        const diff = actualQty - pm.quantity;
+                                                        return (
+                                                            <tr key={pm.materialId}>
+                                                                <td className="py-3 text-slate-800 font-bold truncate max-w-[150px]" title={mat?.description}>{mat?.description || '---'}</td>
+                                                                <td className="text-right text-slate-500 font-medium">{pm.quantity}</td>
+                                                                <td className="text-right text-slate-900 font-bold">{actualQty}</td>
+                                                                <td className="text-center">
+                                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${diff > 0 ? 'bg-red-100 text-red-700' : diff < 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                        {diff > 0 ? `+${diff}` : diff}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        )
+                                                    })}
+                                                    {(!showCostDetail.plannedMaterials || showCostDetail.plannedMaterials.length === 0) && (
+                                                        <tr><td colSpan={4} className="text-center py-4 text-slate-400 italic text-xs">Sem materiais planejados.</td></tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    {/* SERVIÇOS */}
+                                    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                                        <h4 className="text-sm font-bold text-slate-900 uppercase mb-5 border-b border-slate-200 pb-3 flex items-center gap-2">
+                                            <i className="fas fa-clock text-clean-primary"></i> Serviços (Horas)
+                                        </h4>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                                                        <th className="text-left pb-3">Tipo</th>
+                                                        <th className="text-right pb-3">Plan</th>
+                                                        <th className="text-right pb-3">Real</th>
+                                                        <th className="text-center pb-3">Var</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {showCostDetail.plannedServices.map(ps => {
+                                                        const actualHrs = getActualServiceHours(showCostDetail.id, ps.serviceTypeId);
+                                                        const srv = services.find(s => s.id === ps.serviceTypeId);
+                                                        const diff = actualHrs - ps.hours;
+                                                        return (
+                                                            <tr key={ps.serviceTypeId}>
+                                                                <td className="py-3 text-slate-800 font-bold truncate max-w-[150px]" title={srv?.name}>{srv?.name || '---'}</td>
+                                                                <td className="text-right text-slate-500 font-medium">{ps.hours}</td>
+                                                                <td className="text-right text-slate-900 font-bold">{actualHrs}</td>
+                                                                <td className="text-center">
+                                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${diff > 0 ? 'bg-red-100 text-red-700' : diff < 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                        {diff > 0 ? `+${diff}` : diff}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        )
+                                                    })}
+                                                    {(!showCostDetail.plannedServices || showCostDetail.plannedServices.length === 0) && (
+                                                        <tr><td colSpan={4} className="text-center py-4 text-slate-400 italic text-xs">Sem serviços planejados.</td></tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        );
+                    })()}
+                </div>
+            </div>
+        </div>
       )}
 
       {/* QUICK MATERIAL MODAL */}

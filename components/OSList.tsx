@@ -12,7 +12,7 @@ interface Props {
   projects: Project[];
   buildings: Building[]; 
   materials: Material[];
-  setMaterials?: React.Dispatch<React.SetStateAction<Material[]>>; // Nova prop
+  setMaterials?: React.Dispatch<React.SetStateAction<Material[]>>; 
   services: ServiceType[];
   users: User[]; 
   setUsers: React.Dispatch<React.SetStateAction<User[]>>; 
@@ -35,15 +35,15 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
   const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING'>('PROJECT');
   
-  // New States for Allocation in Creation Modal (AUTOCOMPLETE)
+  // Creation Modal States
   const [allocMatId, setAllocMatId] = useState('');
-  const [allocMatSearch, setAllocMatSearch] = useState(''); // Search Term
+  const [allocMatSearch, setAllocMatSearch] = useState(''); 
   const [showAllocMatSuggestions, setShowAllocMatSuggestions] = useState(false);
   const [allocMatQty, setAllocMatQty] = useState('');
   const [plannedMaterials, setPlannedMaterials] = useState<OSItem[]>([]);
   
   const [allocSrvId, setAllocSrvId] = useState('');
-  const [allocSrvSearch, setAllocSrvSearch] = useState(''); // Search Term
+  const [allocSrvSearch, setAllocSrvSearch] = useState(''); 
   const [showAllocSrvSuggestions, setShowAllocSrvSuggestions] = useState(false);
   const [allocSrvQty, setAllocSrvQty] = useState('');
   const [plannedServices, setPlannedServices] = useState<OSService[]>([]);
@@ -52,14 +52,16 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   const [showQuickMatModal, setShowQuickMatModal] = useState(false);
   const [quickMat, setQuickMat] = useState({ description: '', unit: 'Un', cost: '' });
 
+  // Detail Modal States
   const [newItem, setNewItem] = useState<{ id: string, qty: number | '', cost: number | '' }>({ id: '', qty: '', cost: '' });
   const [itemSearchTerm, setItemSearchTerm] = useState('');
+  const [showDetailSuggestions, setShowDetailSuggestions] = useState(false); // Autocomplete suggestion visibility
+
   const [showExecutorModal, setShowExecutorModal] = useState(false);
   const [newExecutorData, setNewExecutorData] = useState({ name: '', email: '', department: '' });
 
   const executors = useMemo(() => users.filter(u => u.role === 'EXECUTOR'), [users]);
 
-  // Debounce reduzido para 300ms para melhor resposta da UI
   useEffect(() => { const timer = setTimeout(() => { setSearchTerm(searchInput); }, 300); return () => clearTimeout(timer); }, [searchInput]);
   useEffect(() => { setItemSearchTerm(''); setNewItem({ id: '', qty: '', cost: '' }); }, [activeSubTab]);
 
@@ -76,20 +78,16 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
           
           try {
               const { error } = await supabase.from('oss').delete().eq('id', id);
-              
-              if (error) {
-                  throw error;
-              }
+              if (error) throw error;
           } catch (e: any) {
               console.error('Erro ao excluir OS:', e);
-              // Revert
               setOss(previousOss);
               alert(`FALHA AO EXCLUIR:\n${e.message || JSON.stringify(e)}\n\nSOLUÇÃO: Vá em "Sistema > Documentação", copie o novo script "Correção de Permissões" e execute no Supabase.`);
           }
       }
   };
 
-  const filteredItems = useMemo(() => {
+  const filteredDetailItems = useMemo(() => {
       if (activeSubTab === 'services') {
           return services.filter(s => s.name.toLowerCase().includes(itemSearchTerm.toLowerCase()));
       } else {
@@ -118,7 +116,44 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
 
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
   
-  // Função de Cadastro Rápido de Material
+  // Helper Translation
+  const translatePriority = (p: string) => {
+      switch(p) {
+          case 'LOW': return 'Baixa';
+          case 'MEDIUM': return 'Média';
+          case 'HIGH': return 'Alta';
+          case 'CRITICAL': return 'Crítica';
+          default: return p;
+      }
+  };
+
+  // Handler for Detail Modal Add Item
+  const handleAddItemToOS = () => {
+      if (!selectedOS || !newItem.id || !newItem.qty || !isEditable(selectedOS)) return;
+      
+      if (activeSubTab === 'services') {
+          const serviceTemplate = services.find(s => s.id === newItem.id);
+          if (!serviceTemplate) return;
+          const finalCost = serviceTemplate.unitValue;
+          const newEntry: OSService = { serviceTypeId: serviceTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
+          const updatedOS = { ...selectedOS, services: [...selectedOS.services, newEntry] };
+          setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+          setSelectedOS(updatedOS);
+      } else {
+          const materialTemplate = materials.find(m => m.id === newItem.id);
+          if (!materialTemplate) return;
+          if (materialTemplate.currentStock < Number(newItem.qty)) { alert("Estoque insuficiente."); return; }
+          const finalCost = materialTemplate.unitCost;
+          const newEntry: OSItem = { materialId: materialTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
+          onStockChange(materialTemplate.id, Number(newItem.qty), selectedOS.number);
+          const updatedOS = { ...selectedOS, materials: [...selectedOS.materials, newEntry] };
+          setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+          setSelectedOS(updatedOS);
+      }
+      setNewItem({ id: '', qty: '', cost: '' });
+      setItemSearchTerm('');
+  };
+
   const handleQuickSaveMaterial = (e: React.FormEvent) => {
       e.preventDefault();
       if (!quickMat.description || !quickMat.cost || !setMaterials) return;
@@ -143,7 +178,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
 
       setMaterials(prev => [...prev, newMaterial]);
       
-      // Auto Select
+      // Auto Select for Creation Modal
       setAllocMatId(newMaterial.id);
       setAllocMatSearch(newMaterial.description);
 
@@ -160,7 +195,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       
       const newOSNumber = `OS-${Date.now().toString().slice(-4)}`;
 
-      // Se houver materiais planejados, consumir estoque imediatamente (Reserva)
       plannedMaterials.forEach(pm => {
           onStockChange(pm.materialId, pm.quantity, newOSNumber);
       });
@@ -191,7 +225,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   };
 
   const openNewOS = () => {
-      // Limpeza total do estado ao abrir modal
       setFormOS({ 
           priority: 'MEDIUM', 
           status: OSStatus.OPEN, 
@@ -219,12 +252,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
           alert(`Estoque insuficiente! Disponível: ${mat.currentStock} ${mat.unit}`);
           return;
       }
-      setPlannedMaterials([...plannedMaterials, { 
-          materialId: allocMatId, 
-          quantity: qty, 
-          unitCost: mat.unitCost, 
-          timestamp: new Date().toISOString() 
-      }]);
+      setPlannedMaterials([...plannedMaterials, { materialId: allocMatId, quantity: qty, unitCost: mat.unitCost, timestamp: new Date().toISOString() }]);
       setAllocMatId(''); setAllocMatSearch(''); setAllocMatQty('');
   };
 
@@ -232,12 +260,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       if(!allocSrvId || !allocSrvQty) return;
       const srv = services.find(s => s.id === allocSrvId);
       if(!srv) return;
-      setPlannedServices([...plannedServices, {
-          serviceTypeId: allocSrvId,
-          quantity: Number(allocSrvQty),
-          unitCost: srv.unitValue,
-          timestamp: new Date().toISOString()
-      }]);
+      setPlannedServices([...plannedServices, { serviceTypeId: allocSrvId, quantity: Number(allocSrvQty), unitCost: srv.unitValue, timestamp: new Date().toISOString() }]);
       setAllocSrvId(''); setAllocSrvSearch(''); setAllocSrvQty('');
   };
 
@@ -262,11 +285,156 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       setNewExecutorData({ name: '', email: '', department: '' }); 
   };
 
-  const handleGoogleCalendarSync = (os: OS) => { const executor = users.find(u => u.id === os.executorId); const context = getContextInfo(os); const formatDateForGoogle = (dateStr: string) => { return new Date(dateStr).toISOString().replace(/-|:|\.\d\d\d/g, ""); }; const start = os.startTime ? formatDateForGoogle(os.startTime) : formatDateForGoogle(os.openDate); const end = os.limitDate ? formatDateForGoogle(os.limitDate) : formatDateForGoogle(new Date(new Date(os.openDate).getTime() + 2 * 60 * 60 * 1000).toISOString()); const title = encodeURIComponent(`OS ${os.number} - ${os.description.substring(0, 40)}...`); const details = encodeURIComponent(`Serviço: ${os.description}\nPrioridade: ${os.priority}\nTipo: ${os.type}\nLocal: ${context.label} - ${context.sub}\nSistema: CropService`); const location = encodeURIComponent(`${context.label}, ${context.sub}`); const emails = executor?.email ? encodeURIComponent(executor.email) : ''; const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${start}/${end}&add=${emails}`; window.open(googleUrl, '_blank'); };
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const getStatusTooltip = (status: OSStatus) => { switch (status) { case OSStatus.OPEN: return 'Aguardando início.'; case OSStatus.IN_PROGRESS: return 'Atividade em execução.'; case OSStatus.PAUSED: return 'Atividade paralisada.'; case OSStatus.COMPLETED: return 'Atividade concluída.'; case OSStatus.CANCELED: return 'Atividade cancelada.'; default: return ''; } };
   const getContextInfo = (os: OS) => { if (os.projectId) { const p = projects.find(proj => proj.id === os.projectId); return { label: p?.code || 'N/A', sub: p?.city || '', type: 'PROJECT' }; } else if (os.buildingId) { const b = buildings.find(bld => bld.id === os.buildingId); return { label: b?.name || 'N/A', sub: b?.city || '', type: 'BUILDING' }; } return { label: '---', sub: '', type: 'UNKNOWN' }; };
   
+  const generateOSDetailPDF = (os: OS) => {
+    const doc = new jsPDF();
+    const context = getContextInfo(os);
+    const executor = users.find(u => u.id === os.executorId);
+    const costs = calculateOSCosts(os, materials, services);
+
+    // Header Color Block
+    doc.setFillColor(71, 122, 127);
+    doc.rect(0, 0, 210, 24, 'F');
+    
+    // Title
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text(`ORDEM DE SERVIÇO: ${os.number}`, 14, 16);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Emissão: ${new Date().toLocaleString()}`, 196, 16, { align: 'right' });
+
+    let y = 35;
+
+    // General Info Grid
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("DADOS GERAIS", 14, y);
+    doc.setLineWidth(0.5);
+    doc.line(14, y + 2, 196, y + 2);
+    y += 8;
+
+    const infoData = [
+        [`Vínculo: ${context.type}`, `${context.label} - ${context.sub}`],
+        ["Status", os.status],
+        ["Prioridade", translatePriority(os.priority)],
+        ["Tipo", os.type],
+        ["Executor", executor ? executor.name : 'Não Atribuído'],
+        ["Abertura", new Date(os.openDate).toLocaleString()],
+        ["Prazo Limite", new Date(os.limitDate).toLocaleString()]
+    ];
+
+    autoTable(doc, {
+        startY: y,
+        body: infoData,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 1.5 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 }, 1: { cellWidth: 100 } }
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Description
+    doc.setFont("helvetica", "bold");
+    doc.text("DESCRIÇÃO DA ATIVIDADE", 14, y);
+    doc.line(14, y + 2, 196, y + 2);
+    y += 8;
+    
+    doc.setFont("helvetica", "normal");
+    const descLines = doc.splitTextToSize(os.description, 180);
+    doc.text(descLines, 14, y);
+    y += descLines.length * 5 + 10;
+
+    // Resources Tables
+    // Materials
+    if (os.materials.length > 0) {
+        doc.setFont("helvetica", "bold");
+        doc.text("MATERIAIS APLICADOS", 14, y);
+        y += 4;
+        
+        const matRows = os.materials.map(m => {
+            const mat = materials.find(x => x.id === m.materialId);
+            return [
+                mat?.code || '-',
+                mat?.description || 'Item excluído',
+                `${m.quantity} ${mat?.unit || ''}`,
+                `R$ ${formatCurrency(m.unitCost)}`,
+                `R$ ${formatCurrency(m.quantity * m.unitCost)}`
+            ];
+        });
+
+        autoTable(doc, {
+            startY: y,
+            head: [['Cód', 'Descrição', 'Qtd', 'Unit.', 'Total']],
+            body: matRows,
+            headStyles: { fillColor: [220, 220, 220], textColor: 50 },
+            styles: { fontSize: 9 },
+            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
+        });
+        
+        y = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Services
+    if (os.services.length > 0) {
+        doc.setFont("helvetica", "bold");
+        doc.text("SERVIÇOS / MÃO DE OBRA", 14, y);
+        y += 4;
+
+        const srvRows = os.services.map(s => {
+            const srv = services.find(x => x.id === s.serviceTypeId);
+            return [
+                srv?.name || 'Serviço excluído',
+                `${s.quantity} h`,
+                `R$ ${formatCurrency(s.unitCost)}`,
+                `R$ ${formatCurrency(s.quantity * s.unitCost)}`
+            ];
+        });
+
+        autoTable(doc, {
+            startY: y,
+            head: [['Serviço', 'Qtd (h)', 'Valor/h', 'Total']],
+            body: srvRows,
+            headStyles: { fillColor: [220, 220, 220], textColor: 50 },
+            styles: { fontSize: 9 },
+            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
+        });
+
+        y = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Totals
+    doc.setFontSize(12);
+    doc.setTextColor(71, 122, 127);
+    doc.text(`CUSTO TOTAL ESTIMADO: R$ ${formatCurrency(costs.totalCost)}`, 196, y, { align: 'right' });
+    y += 20;
+
+    // Signatures
+    if (y > 250) {
+        doc.addPage();
+        y = 40;
+    }
+
+    doc.setDrawColor(150);
+    doc.setLineWidth(0.5);
+    doc.setTextColor(100);
+    doc.setFontSize(8);
+
+    doc.line(20, y + 20, 90, y + 20);
+    doc.text("EXECUTOR RESPONSÁVEL", 55, y + 25, { align: 'center' });
+
+    doc.line(120, y + 20, 190, y + 20);
+    doc.text("GESTOR / APROVADOR", 155, y + 25, { align: 'center' });
+
+    doc.save(`OS_${os.number}_Detalhado.pdf`);
+  };
+
   return (
     <div className="space-y-8">
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-200 pb-6">
@@ -285,7 +453,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
             const executor = users.find(u => u.id === os.executorId);
             return (
               <div key={os.id} className={`bg-white rounded-xl border p-6 shadow-sm hover:shadow-lg transition-all flex flex-col relative group ${isOverdue ? 'border-l-8 border-l-red-500 border-t-slate-200 border-r-slate-200 border-b-slate-200' : 'border-slate-200'}`}>
-                 <div className="flex justify-between items-start mb-4"><span className="font-mono text-base font-bold bg-slate-100 px-3 py-1.5 rounded-lg text-slate-800 border border-slate-300">{os.number}</span><span className={`text-xs font-bold uppercase px-3 py-1.5 rounded-lg border ${os.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : os.priority === 'HIGH' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{os.priority}</span></div>
+                 <div className="flex justify-between items-start mb-4"><span className="font-mono text-base font-bold bg-slate-100 px-3 py-1.5 rounded-lg text-slate-800 border border-slate-300">{os.number}</span><span className={`text-xs font-bold uppercase px-3 py-1.5 rounded-lg border ${os.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : os.priority === 'HIGH' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{translatePriority(os.priority)}</span></div>
                  <h4 className="text-xl font-bold text-slate-900 mb-3 leading-tight flex-1 line-clamp-2">{os.description}</h4>
                  <div className="mb-4"><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2 mb-1"><i className={`fas ${context.type === 'PROJECT' ? 'fa-folder' : 'fa-building'} text-slate-400 w-4`}></i> {context.label}</p><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2"><i className="fas fa-user-hard-hat text-slate-400 w-4"></i>{executor ? <span className="text-emerald-600 font-bold">{executor.name}</span> : <span className="text-slate-400 italic">Sem executor</span>}</p></div>
                  <div className="grid grid-cols-2 gap-4 text-base mb-6"><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Materiais</span><span className="font-bold text-slate-800 text-lg">R$ {formatCurrency(costs.materialCost)}</span></div><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Mão de Obra</span><span className="font-bold text-slate-800 text-lg">{os.services.reduce((a,b)=>a+b.quantity,0)} h</span></div></div>
@@ -298,239 +466,227 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       
       {filteredOSs.length === 0 && <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed text-slate-400 text-lg">Nenhuma Ordem de Serviço encontrada.</div>}
       
-      {/* Detail Modal (Existing logic kept) */}
+      {/* DETAILED MODAL */}
       {selectedOS && (
-        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col animate-in zoom-in-95 fade-in duration-300 overflow-hidden border border-slate-200"><div className="px-8 py-6 border-b border-slate-100 bg-white rounded-t-2xl flex justify-between items-center sticky top-0 z-20"><div><h3 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">Gerenciamento OS<span className="text-clean-primary bg-emerald-50 px-3 py-1 rounded-lg text-lg border border-emerald-100">{selectedOS.number}</span></h3></div><div className="flex items-center gap-3"><button onClick={() => setSelectedOS(null)} className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-xl"></i></button></div></div><div className="flex-1 flex overflow-hidden bg-slate-50"><div className="w-full p-8 flex justify-center items-center text-slate-400">Detalhes da OS... (Implementação mantida)</div></div></div></div>
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col animate-in zoom-in-95 fade-in duration-300 overflow-hidden border border-slate-200">
+                <div className="px-8 py-6 border-b border-slate-100 bg-white rounded-t-2xl flex justify-between items-center sticky top-0 z-20">
+                    <div>
+                        <div className="flex items-center gap-3 mb-1">
+                            <span className="font-mono font-bold text-lg text-slate-900 bg-slate-100 px-3 py-1 rounded border border-slate-300">{selectedOS.number}</span>
+                            <span className={`text-xs font-bold uppercase px-3 py-1 rounded border ${selectedOS.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{selectedOS.status}</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-700 tracking-tight">{selectedOS.description}</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => generateOSDetailPDF(selectedOS)} className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all"><i className="fas fa-file-pdf text-red-500"></i> PDF</button>
+                        <button onClick={() => setSelectedOS(null)} className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-xl"></i></button>
+                    </div>
+                </div>
+                
+                <div className="flex-1 flex overflow-hidden bg-slate-50/50">
+                    {/* LEFT: INFO */}
+                    <div className="w-1/3 border-r border-slate-200 p-8 overflow-y-auto custom-scrollbar bg-white">
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Informações Técnicas</h4>
+                        <div className="space-y-6">
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-1">Local / Contexto</p>
+                                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                    <p className="font-bold text-slate-800">{getContextInfo(selectedOS).label}</p>
+                                    <p className="text-xs text-slate-500">{getContextInfo(selectedOS).sub}</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</p><span className="font-bold text-slate-800">{translatePriority(selectedOS.priority)}</span></div>
+                                <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Tipo</p><span className="font-bold text-slate-800">{selectedOS.type}</span></div>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executor</p>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs">{users.find(u=>u.id===selectedOS.executorId)?.avatar || 'U'}</div>
+                                    <span className="font-bold text-slate-800">{users.find(u=>u.id===selectedOS.executorId)?.name || 'Não Atribuído'}</span>
+                                </div>
+                            </div>
+                            <div className="pt-6 border-t border-slate-100">
+                                <p className="text-xs font-bold text-slate-500 uppercase mb-3">Cronograma</p>
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex justify-between"><span className="text-slate-500">Abertura:</span><span className="font-mono font-bold text-slate-700">{new Date(selectedOS.openDate).toLocaleDateString()}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-500">Prazo (SLA):</span><span className="font-mono font-bold text-red-600">{new Date(selectedOS.limitDate).toLocaleDateString()}</span></div>
+                                    {selectedOS.startTime && <div className="flex justify-between"><span className="text-slate-500">Início Real:</span><span className="font-mono font-bold text-blue-600">{new Date(selectedOS.startTime).toLocaleString()}</span></div>}
+                                    {selectedOS.endTime && <div className="flex justify-between"><span className="text-slate-500">Conclusão:</span><span className="font-mono font-bold text-emerald-600">{new Date(selectedOS.endTime).toLocaleString()}</span></div>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* RIGHT: RESOURCES & CHECKLIST */}
+                    <div className="flex-1 flex flex-col h-full bg-slate-50">
+                        <div className="flex border-b border-slate-200 bg-white px-6 gap-6">
+                            <button onClick={() => setActiveSubTab('services')} className={`py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeSubTab === 'services' ? 'border-clean-primary text-clean-primary' : 'border-transparent text-slate-500'}`}><i className="fas fa-tools"></i> Serviços & Mão de Obra</button>
+                            <button onClick={() => setActiveSubTab('materials')} className={`py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeSubTab === 'materials' ? 'border-clean-primary text-clean-primary' : 'border-transparent text-slate-500'}`}><i className="fas fa-boxes"></i> Materiais & Peças</button>
+                        </div>
+
+                        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                            {/* Autocomplete Input Area */}
+                            {isEditable(selectedOS) && (
+                                <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                    <h5 className="text-xs font-bold text-slate-500 uppercase mb-3">Adicionar {activeSubTab === 'services' ? 'Serviço' : 'Material'}</h5>
+                                    <div className="flex gap-3 relative">
+                                        <div className="flex-1 relative">
+                                            <input 
+                                                type="text" 
+                                                className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
+                                                placeholder={activeSubTab === 'services' ? 'Buscar serviço...' : 'Buscar material...'}
+                                                value={itemSearchTerm}
+                                                onChange={(e) => { setItemSearchTerm(e.target.value); setNewItem(prev => ({ ...prev, id: '' })); setShowDetailSuggestions(true); }}
+                                                onFocus={() => setShowDetailSuggestions(true)}
+                                                onBlur={() => setTimeout(() => setShowDetailSuggestions(false), 200)}
+                                            />
+                                            {showDetailSuggestions && itemSearchTerm && (
+                                                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1 custom-scrollbar">
+                                                    {filteredDetailItems.map(item => (
+                                                        <li 
+                                                            key={item.id} 
+                                                            className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
+                                                            onClick={() => { setNewItem({ ...newItem, id: item.id, cost: (item as any).unitCost || (item as any).unitValue }); setItemSearchTerm((item as any).description || (item as any).name); setShowDetailSuggestions(false); }}
+                                                        >
+                                                            <div className="font-bold text-slate-700">{(item as any).description || (item as any).name}</div>
+                                                            <div className="text-xs text-slate-500">{(item as any).code || (item as any).team}</div>
+                                                        </li>
+                                                    ))}
+                                                    {filteredDetailItems.length === 0 && <li className="px-3 py-2 text-slate-400 italic text-xs">Nenhum item encontrado.</li>}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        <div className="w-24">
+                                            <input type="number" min="0.1" placeholder="Qtd" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium" value={newItem.qty} onChange={e => setNewItem({ ...newItem, qty: Number(e.target.value) })} />
+                                        </div>
+                                        <button onClick={handleAddItemToOS} className="h-10 px-5 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors">Adicionar</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* List of Items */}
+                            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase"><tr className="border-b border-slate-100"><th className="p-4">Item</th><th className="p-4 text-right">Qtd</th><th className="p-4 text-right">Custo Unit.</th><th className="p-4 text-right">Total</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {activeSubTab === 'services' ? (
+                                            selectedOS.services.map((s, i) => {
+                                                const srv = services.find(x => x.id === s.serviceTypeId);
+                                                return (
+                                                    <tr key={i} className="hover:bg-slate-50">
+                                                        <td className="p-4 font-bold text-slate-700">{srv?.name || 'Item Excluído'}</td>
+                                                        <td className="p-4 text-right font-mono">{s.quantity} h</td>
+                                                        <td className="p-4 text-right text-slate-600">R$ {formatCurrency(s.unitCost)}</td>
+                                                        <td className="p-4 text-right font-bold text-slate-800">R$ {formatCurrency(s.quantity * s.unitCost)}</td>
+                                                    </tr>
+                                                );
+                                            })
+                                        ) : (
+                                            selectedOS.materials.map((m, i) => {
+                                                const mat = materials.find(x => x.id === m.materialId);
+                                                return (
+                                                    <tr key={i} className="hover:bg-slate-50">
+                                                        <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluído'}</td>
+                                                        <td className="p-4 text-right font-mono">{m.quantity} {mat?.unit}</td>
+                                                        <td className="p-4 text-right text-slate-600">R$ {formatCurrency(m.unitCost)}</td>
+                                                        <td className="p-4 text-right font-bold text-slate-800">R$ {formatCurrency(m.quantity * m.unitCost)}</td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                        {((activeSubTab === 'services' && selectedOS.services.length === 0) || (activeSubTab === 'materials' && selectedOS.materials.length === 0)) && (
+                                            <tr><td colSpan={4} className="p-8 text-center text-slate-400 italic">Nenhum item registrado nesta categoria.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
       )}
 
-      {/* NEW OS MODAL (UPDATED SIZE AND LAYOUT) */}
+      {/* NEW OS MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
           <div className="bg-white rounded-2xl w-full max-w-6xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
-            
             {/* Header */}
             <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
-              <div>
-                <h3 className="font-bold text-xl text-slate-800">Nova Ordem de Serviço</h3>
-                <p className="text-sm text-slate-500 mt-1">Abertura de chamado técnico.</p>
-              </div>
+              <div><h3 className="font-bold text-xl text-slate-800">Nova Ordem de Serviço</h3><p className="text-sm text-slate-500 mt-1">Abertura de chamado técnico.</p></div>
               <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50">
               <form id="osForm" onSubmit={handleCreate} className="space-y-6">
-                
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* LEFT COLUMN: FORM DETAILS */}
+                    {/* LEFT COLUMN */}
                     <div className="space-y-6">
-                        {/* Context Selector */}
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                          <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Vínculo da OS (Contexto)</label>
+                          <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Vínculo da OS</label>
                           <div className="flex gap-2 mb-4">
-                            <button type="button" onClick={() => setCreationContext('PROJECT')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'PROJECT' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                              <i className="fas fa-folder-tree mr-2"></i> Projeto (Capex)
-                            </button>
-                            <button type="button" onClick={() => setCreationContext('BUILDING')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'BUILDING' ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                              <i className="fas fa-building mr-2"></i> Edifício / Facilities
-                            </button>
+                            <button type="button" onClick={() => setCreationContext('PROJECT')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'PROJECT' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-folder-tree mr-2"></i> Projeto</button>
+                            <button type="button" onClick={() => setCreationContext('BUILDING')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'BUILDING' ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-building mr-2"></i> Edifício</button>
                           </div>
-
                           {creationContext === 'PROJECT' ? (
-                             <div>
-                               <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" value={formOS.projectId || ''} onChange={e => setFormOS({...formOS, projectId: e.target.value, buildingId: undefined})}>
-                                 <option value="">Selecione o Projeto...</option>
-                                 {projects.filter(p => p.status !== 'FINISHED' && p.status !== 'CANCELED').map(p => (
-                                   <option key={p.id} value={p.id}>{p.code} - {p.description}</option>
-                                 ))}
-                               </select>
-                             </div>
+                             <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.projectId || ''} onChange={e => setFormOS({...formOS, projectId: e.target.value, buildingId: undefined})}><option value="">Selecione o Projeto...</option>{projects.filter(p => p.status !== 'FINISHED').map(p => <option key={p.id} value={p.id}>{p.code} - {p.description}</option>)}</select>
                           ) : (
-                             <div>
-                               <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all" value={formOS.buildingId || ''} onChange={e => setFormOS({...formOS, buildingId: e.target.value, projectId: undefined})}>
-                                 <option value="">Selecione o Edifício...</option>
-                                 {buildings.map(b => (
-                                   <option key={b.id} value={b.id}>{b.name} ({b.city})</option>
-                                 ))}
-                               </select>
-                             </div>
+                             <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.buildingId || ''} onChange={e => setFormOS({...formOS, buildingId: e.target.value, projectId: undefined})}><option value="">Selecione o Edifício...</option>{buildings.map(b => <option key={b.id} value={b.id}>{b.name} ({b.city})</option>)}</select>
                           )}
                         </div>
-
-                        {/* Description */}
-                        <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição da Atividade</label>
-                          <textarea required className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all h-24" placeholder="Descreva o que precisa ser feito..." value={formOS.description} onChange={e => setFormOS({...formOS, description: e.target.value})} />
-                        </div>
-
-                        {/* Type & Priority */}
+                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição</label><textarea required className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium h-24" value={formOS.description} onChange={e => setFormOS({...formOS, description: e.target.value})} /></div>
                         <div className="grid grid-cols-2 gap-6">
-                           <div>
-                              <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tipo de Manutenção</label>
-                              <select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formOS.type} onChange={e => setFormOS({...formOS, type: e.target.value as any})}>
-                                 {Object.values(OSType).map(t => <option key={t} value={t}>{t}</option>)}
-                              </select>
-                           </div>
-                           <div>
-                              <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Prioridade</label>
-                              <select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formOS.priority} onChange={e => setFormOS({...formOS, priority: e.target.value as any})}>
-                                 <option value="LOW">Baixa</option>
-                                 <option value="MEDIUM">Média</option>
-                                 <option value="HIGH">Alta</option>
-                                 <option value="CRITICAL">Crítica</option>
-                              </select>
-                           </div>
+                           <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tipo</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.type} onChange={e => setFormOS({...formOS, type: e.target.value as any})}>{Object.values(OSType).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                           <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Prioridade</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.priority} onChange={e => setFormOS({...formOS, priority: e.target.value as any})}><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></div>
                         </div>
-
-                        {/* SLA & Executor */}
                         <div className="grid grid-cols-2 gap-6">
-                           <div>
-                              <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">SLA (Horas)</label>
-                              <input type="number" min="1" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formOS.slaHours} onChange={e => setFormOS({...formOS, slaHours: Number(e.target.value)})} />
-                           </div>
-                           <div>
-                              <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Atribuir Executor</label>
-                              <div className="flex gap-2">
-                                 <select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formOS.executorId || ''} onChange={e => setFormOS({...formOS, executorId: e.target.value})}>
-                                    <option value="">-- Pendente --</option>
-                                    {executors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                                 </select>
-                                 <button type="button" onClick={() => setShowExecutorModal(true)} className="w-12 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition-colors border border-slate-200" title="Novo Executor"><i className="fas fa-user-plus"></i></button>
-                              </div>
-                           </div>
+                           <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">SLA (Horas)</label><input type="number" min="1" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.slaHours} onChange={e => setFormOS({...formOS, slaHours: Number(e.target.value)})} /></div>
+                           <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Executor</label><div className="flex gap-2"><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.executorId || ''} onChange={e => setFormOS({...formOS, executorId: e.target.value})}><option value="">-- Pendente --</option>{executors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select><button type="button" onClick={() => setShowExecutorModal(true)} className="w-12 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center"><i className="fas fa-user-plus"></i></button></div></div>
                         </div>
                     </div>
 
-                    {/* RIGHT COLUMN: ALLOCATION SECTION */}
+                    {/* RIGHT COLUMN: ALLOCATION (Simplified View with Autocomplete) */}
                     <div className="space-y-6">
                         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col">
-                            <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-                                <i className="fas fa-boxes-stacked text-clean-primary"></i> Alocação de Recursos (Reserva)
-                            </h4>
+                            <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2 border-b border-slate-100 pb-3"><i className="fas fa-boxes-stacked text-clean-primary"></i> Alocação de Recursos</h4>
                             
                             {/* Materials Autocomplete */}
-                            <div className="mb-6 flex-1 flex flex-col">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Materiais Necessários</label>
-                                
+                            <div className="mb-6 flex-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Materiais</label>
                                 <div className="relative mb-2">
-                                    <input 
-                                        type="text" 
-                                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
-                                        placeholder="Buscar Material (Digite para ver opções)..."
-                                        value={allocMatSearch}
-                                        onChange={(e) => { setAllocMatSearch(e.target.value); setAllocMatId(''); setShowAllocMatSuggestions(true); }}
-                                        onFocus={() => setShowAllocMatSuggestions(true)}
-                                        onBlur={() => setTimeout(() => setShowAllocMatSuggestions(false), 200)}
-                                    />
+                                    <input type="text" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white" placeholder="Buscar Material..." value={allocMatSearch} onChange={(e) => { setAllocMatSearch(e.target.value); setAllocMatId(''); setShowAllocMatSuggestions(true); }} onFocus={() => setShowAllocMatSuggestions(true)} onBlur={() => setTimeout(() => setShowAllocMatSuggestions(false), 200)} />
                                     {showAllocMatSuggestions && (
                                         <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar">
-                                            {filteredMaterialsForAlloc.length > 0 ? filteredMaterialsForAlloc.map(m => (
-                                                <li 
-                                                    key={m.id} 
-                                                    className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
-                                                    onClick={() => { setAllocMatId(m.id); setAllocMatSearch(m.description); setShowAllocMatSuggestions(false); }}
-                                                >
-                                                    <div className="font-bold text-slate-700">{m.description}</div>
-                                                    <div className="text-xs text-slate-500 flex justify-between">
-                                                        <span>{m.code}</span>
-                                                        <span>Estoque: {m.currentStock} {m.unit}</span>
-                                                    </div>
-                                                </li>
-                                            )) : (
-                                                <li className="px-3 py-2 text-sm text-slate-400 italic">Nenhum material encontrado.</li>
-                                            )}
+                                            {filteredMaterialsForAlloc.map(m => ( <li key={m.id} className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50" onClick={() => { setAllocMatId(m.id); setAllocMatSearch(m.description); setShowAllocMatSuggestions(false); }}><div className="font-bold">{m.description}</div><div className="text-xs text-slate-500">Estoque: {m.currentStock}</div></li> ))}
                                         </ul>
                                     )}
                                 </div>
-
-                                <div className="flex gap-2 mb-2">
-                                    <div className="w-24">
-                                        <input type="number" placeholder="Qtd" className="w-full h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white transition-all" value={allocMatQty} onChange={e => setAllocMatQty(e.target.value)} />
-                                    </div>
-                                    <button type="button" onClick={() => setShowQuickMatModal(true)} className="w-10 h-10 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors" title="Criar Novo Material"><i className="fas fa-magic"></i></button>
-                                    <button type="button" onClick={addAllocMaterial} className="flex-1 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-bold text-sm">Adicionar</button>
-                                </div>
-
-                                <div className="space-y-1 h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                    {plannedMaterials.map((pm, idx) => {
-                                        const m = materials.find(x => x.id === pm.materialId);
-                                        return (
-                                            <div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-slate-200 shadow-sm">
-                                                <span className="truncate flex-1 font-bold text-slate-700">{m?.description}</span>
-                                                <span className="font-bold ml-2 bg-slate-100 px-2 py-0.5 rounded text-slate-600">{pm.quantity} {m?.unit}</span>
-                                                <button type="button" onClick={() => setPlannedMaterials(plannedMaterials.filter((_, i) => i !== idx))} className="ml-2 text-red-400 hover:text-red-600 w-6 h-6 flex items-center justify-center rounded hover:bg-red-50"><i className="fas fa-times"></i></button>
-                                            </div>
-                                        );
-                                    })}
-                                    {plannedMaterials.length === 0 && <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">Nenhum material alocado.</div>}
-                                </div>
+                                <div className="flex gap-2 mb-2"><input type="number" placeholder="Qtd" className="w-24 h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={allocMatQty} onChange={e => setAllocMatQty(e.target.value)} /><button type="button" onClick={() => setShowQuickMatModal(true)} className="w-10 h-10 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg"><i className="fas fa-magic"></i></button><button type="button" onClick={addAllocMaterial} className="flex-1 bg-slate-800 text-white rounded-lg font-bold text-sm">Adicionar</button></div>
+                                <div className="space-y-1 h-32 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">{plannedMaterials.map((pm, idx) => { const m = materials.find(x => x.id === pm.materialId); return (<div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-slate-200"><span className="truncate flex-1 font-bold">{m?.description}</span><span className="font-bold ml-2 bg-slate-100 px-2 py-0.5 rounded">{pm.quantity}</span><button type="button" onClick={() => setPlannedMaterials(plannedMaterials.filter((_, i) => i !== idx))} className="ml-2 text-red-400"><i className="fas fa-times"></i></button></div>); })}</div>
                             </div>
 
                             {/* Services Autocomplete */}
-                            <div className="flex-1 flex flex-col">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Serviços Previstos</label>
-                                
+                            <div className="flex-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Serviços</label>
                                 <div className="relative mb-2">
-                                    <input 
-                                        type="text" 
-                                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
-                                        placeholder="Buscar Serviço..."
-                                        value={allocSrvSearch}
-                                        onChange={(e) => { setAllocSrvSearch(e.target.value); setAllocSrvId(''); setShowAllocSrvSuggestions(true); }}
-                                        onFocus={() => setShowAllocSrvSuggestions(true)}
-                                        onBlur={() => setTimeout(() => setShowAllocSrvSuggestions(false), 200)}
-                                    />
+                                    <input type="text" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white" placeholder="Buscar Serviço..." value={allocSrvSearch} onChange={(e) => { setAllocSrvSearch(e.target.value); setAllocSrvId(''); setShowAllocSrvSuggestions(true); }} onFocus={() => setShowAllocSrvSuggestions(true)} onBlur={() => setTimeout(() => setShowAllocSrvSuggestions(false), 200)} />
                                     {showAllocSrvSuggestions && (
                                         <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar top-full">
-                                            {filteredServicesForAlloc.length > 0 ? filteredServicesForAlloc.map(s => (
-                                                <li 
-                                                    key={s.id} 
-                                                    className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
-                                                    onClick={() => { setAllocSrvId(s.id); setAllocSrvSearch(s.name); setShowAllocSrvSuggestions(false); }}
-                                                >
-                                                    <div className="font-bold text-slate-700">{s.name}</div>
-                                                    <div className="text-xs text-slate-500">{s.team} - R$ {s.unitValue}/h</div>
-                                                </li>
-                                            )) : (
-                                                <li className="px-3 py-2 text-sm text-slate-400 italic">Nenhum serviço encontrado.</li>
-                                            )}
+                                            {filteredServicesForAlloc.map(s => ( <li key={s.id} className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50" onClick={() => { setAllocSrvId(s.id); setAllocSrvSearch(s.name); setShowAllocSrvSuggestions(false); }}><div className="font-bold">{s.name}</div></li> ))}
                                         </ul>
                                     )}
                                 </div>
-
-                                <div className="flex gap-2 mb-2">
-                                    <div className="w-24">
-                                        <input type="number" placeholder="Hrs" className="w-full h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white transition-all" value={allocSrvQty} onChange={e => setAllocSrvQty(e.target.value)} />
-                                    </div>
-                                    <button type="button" onClick={addAllocService} className="flex-1 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-bold text-sm">Adicionar</button>
-                                </div>
-
-                                <div className="space-y-1 h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                    {plannedServices.map((ps, idx) => {
-                                        const s = services.find(x => x.id === ps.serviceTypeId);
-                                        return (
-                                            <div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-slate-200 shadow-sm">
-                                                <span className="truncate flex-1 font-bold text-slate-700">{s?.name}</span>
-                                                <span className="font-bold ml-2 bg-slate-100 px-2 py-0.5 rounded text-slate-600">{ps.quantity} h</span>
-                                                <button type="button" onClick={() => setPlannedServices(plannedServices.filter((_, i) => i !== idx))} className="ml-2 text-red-400 hover:text-red-600 w-6 h-6 flex items-center justify-center rounded hover:bg-red-50"><i className="fas fa-times"></i></button>
-                                            </div>
-                                        );
-                                    })}
-                                    {plannedServices.length === 0 && <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">Nenhum serviço previsto.</div>}
-                                </div>
+                                <div className="flex gap-2 mb-2"><input type="number" placeholder="Hrs" className="w-24 h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={allocSrvQty} onChange={e => setAllocSrvQty(e.target.value)} /><button type="button" onClick={addAllocService} className="flex-1 bg-slate-800 text-white rounded-lg font-bold text-sm">Adicionar</button></div>
+                                <div className="space-y-1 h-32 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">{plannedServices.map((ps, idx) => { const s = services.find(x => x.id === ps.serviceTypeId); return (<div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-slate-200"><span className="truncate flex-1 font-bold">{s?.name}</span><span className="font-bold ml-2 bg-slate-100 px-2 py-0.5 rounded">{ps.quantity}h</span><button type="button" onClick={() => setPlannedServices(plannedServices.filter((_, i) => i !== idx))} className="ml-2 text-red-400"><i className="fas fa-times"></i></button></div>); })}</div>
                             </div>
                         </div>
                     </div>
                 </div>
-
               </form>
             </div>
-
-            {/* Footer */}
-            <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10">
-               <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button>
-               <button type="submit" form="osForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg transition-all">Abrir OS</button>
-            </div>
-
+            <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10"><button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button><button type="submit" form="osForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg transition-all">Abrir OS</button></div>
           </div>
         </div>
       )}
@@ -541,51 +697,27 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
                   <h3 className="font-bold text-lg text-slate-800 mb-4">Cadastro Rápido de Material</h3>
                   <form onSubmit={handleQuickSaveMaterial} className="space-y-4">
-                      <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Descrição</label>
-                          <input autoFocus required className="w-full h-10 px-3 border border-slate-200 rounded-lg" placeholder="Ex: Parafuso Inox" value={quickMat.description} onChange={e => setQuickMat({...quickMat, description: e.target.value})} />
-                      </div>
+                      <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Descrição</label><input autoFocus required className="w-full h-10 px-3 border border-slate-200 rounded-lg" placeholder="Ex: Parafuso Inox" value={quickMat.description} onChange={e => setQuickMat({...quickMat, description: e.target.value})} /></div>
                       <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Unidade</label>
-                              <input required className="w-full h-10 px-3 border border-slate-200 rounded-lg" placeholder="Un, Kg" value={quickMat.unit} onChange={e => setQuickMat({...quickMat, unit: e.target.value})} />
-                          </div>
-                          <div>
-                              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Custo Est. (R$)</label>
-                              <input type="number" required step="0.01" className="w-full h-10 px-3 border border-slate-200 rounded-lg" value={quickMat.cost} onChange={e => setQuickMat({...quickMat, cost: e.target.value})} />
-                          </div>
+                          <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Unidade</label><input required className="w-full h-10 px-3 border border-slate-200 rounded-lg" placeholder="Un, Kg" value={quickMat.unit} onChange={e => setQuickMat({...quickMat, unit: e.target.value})} /></div>
+                          <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Custo Est. (R$)</label><input type="number" required step="0.01" className="w-full h-10 px-3 border border-slate-200 rounded-lg" value={quickMat.cost} onChange={e => setQuickMat({...quickMat, cost: e.target.value})} /></div>
                       </div>
-                      <div className="flex justify-end gap-2 pt-2">
-                          <button type="button" onClick={() => setShowQuickMatModal(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                          <button type="submit" className="px-4 py-2 text-sm font-bold bg-clean-primary text-white rounded-lg hover:bg-clean-primary/90">Salvar e Usar</button>
-                      </div>
+                      <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowQuickMatModal(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 text-sm font-bold bg-clean-primary text-white rounded-lg hover:bg-clean-primary/90">Salvar e Usar</button></div>
                   </form>
               </div>
           </div>
       )}
 
-      {/* NEW EXECUTOR MODAL (ADDED) */}
+      {/* NEW EXECUTOR MODAL */}
       {showExecutorModal && (
         <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[10000]">
            <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95">
               <h3 className="font-bold text-lg text-slate-900 mb-4">Novo Executor</h3>
               <form onSubmit={handleCreateExecutor} className="space-y-4">
-                  <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome</label>
-                      <input required className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.name} onChange={e => setNewExecutorData({...newExecutorData, name: e.target.value})} />
-                  </div>
-                  <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
-                      <input required type="email" className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.email} onChange={e => setNewExecutorData({...newExecutorData, email: e.target.value})} />
-                  </div>
-                  <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Departamento</label>
-                      <input className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.department} onChange={e => setNewExecutorData({...newExecutorData, department: e.target.value})} />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                      <button type="button" onClick={() => setShowExecutorModal(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                      <button type="submit" className="px-4 py-2 text-sm font-bold bg-clean-primary text-white rounded-lg hover:bg-clean-primary/90">Salvar</button>
-                  </div>
+                  <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome</label><input required className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.name} onChange={e => setNewExecutorData({...newExecutorData, name: e.target.value})} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label><input required type="email" className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.email} onChange={e => setNewExecutorData({...newExecutorData, email: e.target.value})} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Departamento</label><input className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.department} onChange={e => setNewExecutorData({...newExecutorData, department: e.target.value})} /></div>
+                  <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowExecutorModal(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 text-sm font-bold bg-clean-primary text-white rounded-lg hover:bg-clean-primary/90">Salvar</button></div>
               </form>
            </div>
         </div>
