@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
+import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 
 const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
   const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formUser, setFormUser] = useState<Partial<User>>({
     active: true,
     role: 'USER',
@@ -25,27 +27,96 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
     { id: 'USER', label: 'Usuário Comum', desc: 'Acesso básico de visualização.' },
   ];
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     
-    if (isEditing && formUser.id) {
-        setUsers(prev => prev.map(u => u.id === formUser.id ? { ...u, ...formUser } as User : u));
-    } else {
-        const newUser: User = {
-            id: Math.random().toString(36).substr(2, 9),
-            name: formUser.name!,
-            email: formUser.email!,
-            password: formUser.password || '123456', // Default password
-            role: formUser.role || 'USER',
-            department: formUser.department || '',
-            active: formUser.active ?? true,
-            avatar: formUser.name?.substr(0, 2).toUpperCase() || 'US'
-        };
-        setUsers(prev => [...prev, newUser]);
+    try {
+        let userToSave: User;
+
+        if (isEditing && formUser.id) {
+            // Edição
+            const existing = users.find(u => u.id === formUser.id);
+            if (!existing) throw new Error("Usuário original não encontrado.");
+            userToSave = { ...existing, ...formUser } as User;
+        } else {
+            // Criação
+            if (!formUser.name || !formUser.email) {
+                alert("Nome e Email são obrigatórios.");
+                setLoading(false);
+                return;
+            }
+
+            // Verifica duplicidade de email
+            if (users.some(u => u.email === formUser.email)) {
+                alert("Erro: Este e-mail já está cadastrado no sistema.");
+                setLoading(false);
+                return;
+            }
+
+            userToSave = {
+                id: Math.random().toString(36).substr(2, 9),
+                name: formUser.name,
+                email: formUser.email,
+                password: formUser.password || '123456',
+                role: formUser.role || 'USER',
+                department: formUser.department || '',
+                active: formUser.active ?? true,
+                avatar: formUser.name.substr(0, 2).toUpperCase()
+            };
+        }
+
+        // 1. Tenta gravar diretamente no Banco de Dados
+        const { error } = await supabase.from('users').upsert(mapToSupabase(userToSave));
+
+        if (error) {
+            console.error("Erro Supabase:", error);
+            throw new Error(error.message || "Falha na comunicação com o banco de dados.");
+        }
+
+        // 2. Se deu certo no banco, atualiza a interface local
+        if (isEditing) {
+            setUsers(prev => prev.map(u => u.id === userToSave.id ? userToSave : u));
+        } else {
+            setUsers(prev => [...prev, userToSave]);
+        }
+        
+        setShowModal(false);
+        setFormUser({ active: true, role: 'USER', avatar: 'US' });
+        setIsEditing(false);
+        
+        // Feedback discreto
+        const toast = document.createElement('div');
+        toast.className = "fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-[10000] font-bold animate-in slide-in-from-bottom-5";
+        toast.innerText = "Usuário salvo com sucesso!";
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+
+    } catch (err: any) {
+        alert(`ERRO AO SALVAR USUÁRIO:\n${err.message}`);
+    } finally {
+        setLoading(false);
     }
-    setShowModal(false);
-    setFormUser({ active: true, role: 'USER', avatar: 'US' });
-    setIsEditing(false);
+  };
+
+  const handleDelete = async (userToDelete: User) => {
+      if (userToDelete.id === currentUser.id) {
+          alert("Você não pode excluir seu próprio usuário.");
+          return;
+      }
+
+      if (!confirm(`Tem certeza que deseja excluir o usuário "${userToDelete.name}"? Esta ação não pode ser desfeita.`)) return;
+
+      try {
+          const { error } = await supabase.from('users').delete().eq('id', userToDelete.id);
+          if (error) throw error;
+
+          setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
+          alert("Usuário excluído com sucesso.");
+      } catch (err: any) {
+          console.error("Erro ao excluir:", err);
+          alert(`Erro ao excluir: ${err.message}`);
+      }
   };
 
   const openEdit = (user: User) => {
@@ -122,9 +193,16 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                             }
                         </td>
                         <td className="px-6 py-4 text-center">
-                            <button onClick={() => openEdit(u)} className="text-slate-400 hover:text-clean-primary font-bold text-sm border border-slate-200 px-3 py-1.5 rounded bg-white hover:bg-slate-50 transition-all shadow-sm">
-                                Editar
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                                <button onClick={() => openEdit(u)} className="text-slate-500 hover:text-blue-600 font-bold text-sm px-2 py-1 transition-colors" title="Editar">
+                                    <i className="fas fa-pencil-alt"></i>
+                                </button>
+                                {currentUser.role === 'ADMIN' && u.id !== currentUser.id && (
+                                    <button onClick={() => handleDelete(u)} className="text-slate-500 hover:text-red-600 font-bold text-sm px-2 py-1 transition-colors" title="Excluir">
+                                        <i className="fas fa-trash"></i>
+                                    </button>
+                                )}
+                            </div>
                         </td>
                     </tr>
                 ))}
@@ -198,7 +276,10 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                       {/* Footer Fixo */}
                       <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10 shrink-0">
                           <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button>
-                          <button type="submit" form="userForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/30 transform hover:-translate-y-0.5 transition-all">Salvar Usuário</button>
+                          <button type="submit" form="userForm" disabled={loading} className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/30 transform hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                              {loading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
+                              {loading ? 'Salvando...' : 'Salvar Usuário'}
+                          </button>
                       </div>
                   </div>
               </div>
