@@ -35,15 +35,17 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
   const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING'>('PROJECT');
   
-  // New States for Allocation in Creation Modal
+  // New States for Allocation in Creation Modal (AUTOCOMPLETE)
   const [allocMatId, setAllocMatId] = useState('');
+  const [allocMatSearch, setAllocMatSearch] = useState(''); // Search Term
+  const [showAllocMatSuggestions, setShowAllocMatSuggestions] = useState(false);
   const [allocMatQty, setAllocMatQty] = useState('');
-  const [allocMatFilter, setAllocMatFilter] = useState(''); // Filtro de materiais
   const [plannedMaterials, setPlannedMaterials] = useState<OSItem[]>([]);
   
   const [allocSrvId, setAllocSrvId] = useState('');
+  const [allocSrvSearch, setAllocSrvSearch] = useState(''); // Search Term
+  const [showAllocSrvSuggestions, setShowAllocSrvSuggestions] = useState(false);
   const [allocSrvQty, setAllocSrvQty] = useState('');
-  const [allocSrvFilter, setAllocSrvFilter] = useState(''); // Filtro de serviços
   const [plannedServices, setPlannedServices] = useState<OSService[]>([]);
 
   // Quick Add Material State
@@ -96,14 +98,12 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   }, [materials, services, activeSubTab, itemSearchTerm]);
 
   const filteredMaterialsForAlloc = useMemo(() => {
-      if (!allocMatFilter) return materials;
-      return materials.filter(m => m.description.toLowerCase().includes(allocMatFilter.toLowerCase()) || m.code.toLowerCase().includes(allocMatFilter.toLowerCase()));
-  }, [materials, allocMatFilter]);
+      return materials.filter(m => m.description.toLowerCase().includes(allocMatSearch.toLowerCase()) || m.code.toLowerCase().includes(allocMatSearch.toLowerCase()));
+  }, [materials, allocMatSearch]);
 
   const filteredServicesForAlloc = useMemo(() => {
-      if (!allocSrvFilter) return services;
-      return services.filter(s => s.name.toLowerCase().includes(allocSrvFilter.toLowerCase()));
-  }, [services, allocSrvFilter]);
+      return services.filter(s => s.name.toLowerCase().includes(allocSrvSearch.toLowerCase()));
+  }, [services, allocSrvSearch]);
 
   const filteredOSs = useMemo(() => {
     return oss.filter(os => {
@@ -114,13 +114,9 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
     });
   }, [oss, searchTerm, statusFilter, priorityFilter]);
 
-  const totalPages = Math.ceil(filteredOSs.length / ITEMS_PER_PAGE);
   const currentOSs = filteredOSs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
-  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => { const id = e.target.value; let cost: number | '' = ''; if (id) { if (activeSubTab === 'services') { const s = services.find(s => s.id === id); if (s) cost = s.unitValue; } else { const m = materials.find(m => m.id === id); if (m) cost = m.unitCost; } } setNewItem({ id, qty: '', cost }); };
-  const handleAddService = () => { if (!selectedOS || !newItem.id || !newItem.qty || newItem.cost === '' || !isEditable(selectedOS)) return; const serviceTemplate = services.find(s => s.id === newItem.id); if (!serviceTemplate) return; const finalCost = Number(newItem.cost); const newEntry: OSService = { serviceTypeId: serviceTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() }; const updatedOS = { ...selectedOS, services: [...selectedOS.services, newEntry] }; setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o)); setSelectedOS(updatedOS); setNewItem({ id: '', qty: '', cost: '' }); setItemSearchTerm(''); };
-  const handleAddMaterial = () => { if (!selectedOS || !newItem.id || !newItem.qty || newItem.cost === '' || !isEditable(selectedOS)) return; const materialTemplate = materials.find(m => m.id === newItem.id); if (!materialTemplate || materialTemplate.currentStock < Number(newItem.qty)) { alert("Estoque insuficiente."); return; } const finalCost = Number(newItem.cost); const newEntry: OSItem = { materialId: materialTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() }; onStockChange(materialTemplate.id, Number(newItem.qty), selectedOS.number); const updatedOS = { ...selectedOS, materials: [...selectedOS.materials, newEntry] }; setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o)); setSelectedOS(updatedOS); setNewItem({ id: '', qty: '', cost: '' }); setItemSearchTerm(''); };
   
   // Função de Cadastro Rápido de Material
   const handleQuickSaveMaterial = (e: React.FormEvent) => {
@@ -146,7 +142,11 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       };
 
       setMaterials(prev => [...prev, newMaterial]);
-      setAllocMatId(newMaterial.id); // Seleciona automaticamente
+      
+      // Auto Select
+      setAllocMatId(newMaterial.id);
+      setAllocMatSearch(newMaterial.description);
+
       setQuickMat({ description: '', unit: 'Un', cost: '' });
       setShowQuickMatModal(false);
   };
@@ -204,7 +204,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       });
       setPlannedMaterials([]);
       setPlannedServices([]);
-      setAllocMatFilter(''); setAllocSrvFilter('');
+      setAllocMatSearch(''); setAllocMatId('');
+      setAllocSrvSearch(''); setAllocSrvId('');
       setCreationContext('PROJECT');
       setShowModal(true);
   };
@@ -224,7 +225,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
           unitCost: mat.unitCost, 
           timestamp: new Date().toISOString() 
       }]);
-      setAllocMatId(''); setAllocMatQty(''); setAllocMatFilter('');
+      setAllocMatId(''); setAllocMatSearch(''); setAllocMatQty('');
   };
 
   const addAllocService = () => {
@@ -237,7 +238,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
           unitCost: srv.unitValue,
           timestamp: new Date().toISOString()
       }]);
-      setAllocSrvId(''); setAllocSrvQty(''); setAllocSrvFilter('');
+      setAllocSrvId(''); setAllocSrvSearch(''); setAllocSrvQty('');
   };
 
   const handleCreateExecutor = (e: React.FormEvent) => { 
@@ -265,8 +266,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const getStatusTooltip = (status: OSStatus) => { switch (status) { case OSStatus.OPEN: return 'Aguardando início.'; case OSStatus.IN_PROGRESS: return 'Atividade em execução.'; case OSStatus.PAUSED: return 'Atividade paralisada.'; case OSStatus.COMPLETED: return 'Atividade concluída.'; case OSStatus.CANCELED: return 'Atividade cancelada.'; default: return ''; } };
   const getContextInfo = (os: OS) => { if (os.projectId) { const p = projects.find(proj => proj.id === os.projectId); return { label: p?.code || 'N/A', sub: p?.city || '', type: 'PROJECT' }; } else if (os.buildingId) { const b = buildings.find(bld => bld.id === os.buildingId); return { label: b?.name || 'N/A', sub: b?.city || '', type: 'BUILDING' }; } return { label: '---', sub: '', type: 'UNKNOWN' }; };
-  const generateOSDetailPDF = (os: OS) => { const doc = new jsPDF(); const costs = calculateOSCosts(os, materials, services); const context = getContextInfo(os); const executor = users.find(u => u.id === os.executorId); doc.setFillColor(71, 122, 127); doc.rect(0, 0, 210, 20, 'F'); doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.text(`ORDEM DE SERVIÇO: ${os.number}`, 14, 13); doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont("helvetica", "bold"); let yPos = 30; doc.text(`Vínculo: ${context.type === 'PROJECT' ? 'Projeto' : 'Edifício'} - ${context.label}`, 14, yPos); yPos += 6; doc.text(`Status: ${os.status} | Prioridade: ${os.priority} | Tipo: ${os.type}`, 14, yPos); yPos += 6; doc.text(`Executor: ${executor ? executor.name : 'Não Atribuído'}`, 14, yPos); yPos += 6; doc.text(`Datas: Aberta em ${new Date(os.openDate).toLocaleDateString()} | Limite: ${new Date(os.limitDate).toLocaleDateString()}`, 14, yPos); if (os.startTime) { yPos += 6; doc.text(`Execução: Início ${new Date(os.startTime).toLocaleString()} ${os.endTime ? `| Fim ${new Date(os.endTime).toLocaleString()}` : ''}`, 14, yPos); } yPos += 8; doc.text(`Descrição da Atividade:`, 14, yPos); doc.setFont("helvetica", "normal"); doc.text(doc.splitTextToSize(os.description, 170), 14, yPos + 5); yPos += 20; doc.save(`${os.number}_Detalhado.pdf`); };
-
+  
   return (
     <div className="space-y-8">
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-200 pb-6">
@@ -407,25 +407,49 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
                                 <i className="fas fa-boxes-stacked text-clean-primary"></i> Alocação de Recursos (Reserva)
                             </h4>
                             
-                            {/* Materials */}
+                            {/* Materials Autocomplete */}
                             <div className="mb-6 flex-1 flex flex-col">
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Materiais Necessários</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="Filtrar materiais..." 
-                                    className="w-full mb-2 h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-clean-primary transition-all"
-                                    value={allocMatFilter}
-                                    onChange={e => setAllocMatFilter(e.target.value)}
-                                />
-                                <div className="flex gap-2 mb-2">
-                                    <select className="flex-1 h-10 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium" value={allocMatId} onChange={e => setAllocMatId(e.target.value)}>
-                                        <option value="">Adicionar Material...</option>
-                                        {filteredMaterialsForAlloc.map(m => <option key={m.id} value={m.id}>{m.description} ({m.currentStock} {m.unit})</option>)}
-                                    </select>
-                                    <input type="number" placeholder="Qtd" className="w-16 h-10 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium pl-2" value={allocMatQty} onChange={e => setAllocMatQty(e.target.value)} />
-                                    <button type="button" onClick={() => setShowQuickMatModal(true)} className="w-10 h-10 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors" title="Criar Novo Material"><i className="fas fa-magic"></i></button>
-                                    <button type="button" onClick={addAllocMaterial} className="w-10 h-10 bg-slate-800 text-white rounded-lg hover:bg-slate-900"><i className="fas fa-plus"></i></button>
+                                
+                                <div className="relative mb-2">
+                                    <input 
+                                        type="text" 
+                                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
+                                        placeholder="Buscar Material (Digite para ver opções)..."
+                                        value={allocMatSearch}
+                                        onChange={(e) => { setAllocMatSearch(e.target.value); setAllocMatId(''); setShowAllocMatSuggestions(true); }}
+                                        onFocus={() => setShowAllocMatSuggestions(true)}
+                                        onBlur={() => setTimeout(() => setShowAllocMatSuggestions(false), 200)}
+                                    />
+                                    {showAllocMatSuggestions && (
+                                        <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar">
+                                            {filteredMaterialsForAlloc.length > 0 ? filteredMaterialsForAlloc.map(m => (
+                                                <li 
+                                                    key={m.id} 
+                                                    className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
+                                                    onClick={() => { setAllocMatId(m.id); setAllocMatSearch(m.description); setShowAllocMatSuggestions(false); }}
+                                                >
+                                                    <div className="font-bold text-slate-700">{m.description}</div>
+                                                    <div className="text-xs text-slate-500 flex justify-between">
+                                                        <span>{m.code}</span>
+                                                        <span>Estoque: {m.currentStock} {m.unit}</span>
+                                                    </div>
+                                                </li>
+                                            )) : (
+                                                <li className="px-3 py-2 text-sm text-slate-400 italic">Nenhum material encontrado.</li>
+                                            )}
+                                        </ul>
+                                    )}
                                 </div>
+
+                                <div className="flex gap-2 mb-2">
+                                    <div className="w-24">
+                                        <input type="number" placeholder="Qtd" className="w-full h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white transition-all" value={allocMatQty} onChange={e => setAllocMatQty(e.target.value)} />
+                                    </div>
+                                    <button type="button" onClick={() => setShowQuickMatModal(true)} className="w-10 h-10 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors" title="Criar Novo Material"><i className="fas fa-magic"></i></button>
+                                    <button type="button" onClick={addAllocMaterial} className="flex-1 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-bold text-sm">Adicionar</button>
+                                </div>
+
                                 <div className="space-y-1 h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">
                                     {plannedMaterials.map((pm, idx) => {
                                         const m = materials.find(x => x.id === pm.materialId);
@@ -441,24 +465,45 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
                                 </div>
                             </div>
 
-                            {/* Services */}
+                            {/* Services Autocomplete */}
                             <div className="flex-1 flex flex-col">
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Serviços Previstos</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="Filtrar serviços..." 
-                                    className="w-full mb-2 h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-clean-primary transition-all"
-                                    value={allocSrvFilter}
-                                    onChange={e => setAllocSrvFilter(e.target.value)}
-                                />
-                                <div className="flex gap-2 mb-2">
-                                    <select className="flex-1 h-10 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium" value={allocSrvId} onChange={e => setAllocSrvId(e.target.value)}>
-                                        <option value="">Adicionar Serviço...</option>
-                                        {filteredServicesForAlloc.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                    </select>
-                                    <input type="number" placeholder="Hrs" className="w-16 h-10 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium pl-2" value={allocSrvQty} onChange={e => setAllocSrvQty(e.target.value)} />
-                                    <button type="button" onClick={addAllocService} className="w-10 h-10 bg-slate-800 text-white rounded-lg hover:bg-slate-900"><i className="fas fa-plus"></i></button>
+                                
+                                <div className="relative mb-2">
+                                    <input 
+                                        type="text" 
+                                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
+                                        placeholder="Buscar Serviço..."
+                                        value={allocSrvSearch}
+                                        onChange={(e) => { setAllocSrvSearch(e.target.value); setAllocSrvId(''); setShowAllocSrvSuggestions(true); }}
+                                        onFocus={() => setShowAllocSrvSuggestions(true)}
+                                        onBlur={() => setTimeout(() => setShowAllocSrvSuggestions(false), 200)}
+                                    />
+                                    {showAllocSrvSuggestions && (
+                                        <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar top-full">
+                                            {filteredServicesForAlloc.length > 0 ? filteredServicesForAlloc.map(s => (
+                                                <li 
+                                                    key={s.id} 
+                                                    className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
+                                                    onClick={() => { setAllocSrvId(s.id); setAllocSrvSearch(s.name); setShowAllocSrvSuggestions(false); }}
+                                                >
+                                                    <div className="font-bold text-slate-700">{s.name}</div>
+                                                    <div className="text-xs text-slate-500">{s.team} - R$ {s.unitValue}/h</div>
+                                                </li>
+                                            )) : (
+                                                <li className="px-3 py-2 text-sm text-slate-400 italic">Nenhum serviço encontrado.</li>
+                                            )}
+                                        </ul>
+                                    )}
                                 </div>
+
+                                <div className="flex gap-2 mb-2">
+                                    <div className="w-24">
+                                        <input type="number" placeholder="Hrs" className="w-full h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white transition-all" value={allocSrvQty} onChange={e => setAllocSrvQty(e.target.value)} />
+                                    </div>
+                                    <button type="button" onClick={addAllocService} className="flex-1 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-bold text-sm">Adicionar</button>
+                                </div>
+
                                 <div className="space-y-1 h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">
                                     {plannedServices.map((ps, idx) => {
                                         const s = services.find(x => x.id === ps.serviceTypeId);

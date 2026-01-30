@@ -23,14 +23,16 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   const [showCostDetail, setShowCostDetail] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // States auxiliares para adição de recursos no formulário
+  // States auxiliares para adição de recursos no formulário (AUTOCOMPLETE)
   const [resMatId, setResMatId] = useState('');
+  const [resMatSearch, setResMatSearch] = useState(''); // Texto do input
+  const [showMatSuggestions, setShowMatSuggestions] = useState(false);
   const [resMatQty, setResMatQty] = useState('');
-  const [resMatFilter, setResMatFilter] = useState(''); // Filtro de busca de materiais
   
   const [resSrvId, setResSrvId] = useState('');
+  const [resSrvSearch, setResSrvSearch] = useState(''); // Texto do input
+  const [showSrvSuggestions, setShowSrvSuggestions] = useState(false);
   const [resSrvHrs, setResSrvHrs] = useState('');
-  const [resSrvFilter, setResSrvFilter] = useState(''); // Filtro de busca de serviços
 
   // Estado para criação rápida de material
   const [showQuickMatModal, setShowQuickMatModal] = useState(false);
@@ -92,8 +94,9 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       costCenter: '',
       area: ''
     });
-    setResMatId(''); setResMatQty(''); setResMatFilter('');
-    setResSrvId(''); setResSrvHrs(''); setResSrvFilter('');
+    // Reset Autocomplete
+    setResMatId(''); setResMatSearch(''); setResMatQty('');
+    setResSrvId(''); setResSrvSearch(''); setResSrvHrs('');
     setShowModal(true);
   };
 
@@ -110,8 +113,9 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       plannedMaterials: p.plannedMaterials || [],
       plannedServices: p.plannedServices || []
     });
-    setResMatId(''); setResMatQty(''); setResMatFilter('');
-    setResSrvId(''); setResSrvHrs(''); setResSrvFilter('');
+    // Reset Autocomplete
+    setResMatId(''); setResMatSearch(''); setResMatQty('');
+    setResSrvId(''); setResSrvSearch(''); setResSrvHrs('');
     setShowModal(true);
   };
 
@@ -139,7 +143,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     }
     
     setFormProject({ ...formProject, plannedMaterials: updatedMaterials });
-    setResMatId(''); setResMatQty(''); setResMatFilter('');
+    setResMatId(''); setResMatSearch(''); setResMatQty(''); // Clear Input
   };
 
   const removePlannedMaterial = (id: string) => { 
@@ -170,7 +174,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     }
 
     setFormProject({ ...formProject, plannedServices: updatedServices });
-    setResSrvId(''); setResSrvHrs(''); setResSrvFilter('');
+    setResSrvId(''); setResSrvSearch(''); setResSrvHrs(''); // Clear Input
   };
 
   const removePlannedService = (id: string) => { 
@@ -201,7 +205,11 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       };
 
       setMaterials(prev => [...prev, newMaterial]);
-      setResMatId(newMaterial.id); // Seleciona automaticamente
+      
+      // Auto-seleciona
+      setResMatId(newMaterial.id);
+      setResMatSearch(newMaterial.description);
+      
       setQuickMat({ description: '', unit: 'Un', cost: '' });
       setShowQuickMatModal(false);
   };
@@ -251,14 +259,12 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   const currentPlannedCosts = useMemo(() => calculatePlannedCosts(formProject, materials, services), [formProject, materials, services]);
 
   const filteredMaterials = useMemo(() => {
-      if (!resMatFilter) return materials;
-      return materials.filter(m => m.description.toLowerCase().includes(resMatFilter.toLowerCase()) || m.code.toLowerCase().includes(resMatFilter.toLowerCase()));
-  }, [materials, resMatFilter]);
+      return materials.filter(m => m.description.toLowerCase().includes(resMatSearch.toLowerCase()) || m.code.toLowerCase().includes(resMatSearch.toLowerCase()));
+  }, [materials, resMatSearch]);
 
   const filteredServicesList = useMemo(() => {
-      if (!resSrvFilter) return services;
-      return services.filter(s => s.name.toLowerCase().includes(resSrvFilter.toLowerCase()));
-  }, [services, resSrvFilter]);
+      return services.filter(s => s.name.toLowerCase().includes(resSrvSearch.toLowerCase()));
+  }, [services, resSrvSearch]);
 
   const filteredProjects = projects.filter(p => p.code.toLowerCase().includes(searchTerm.toLowerCase()) || p.description.toLowerCase().includes(searchTerm.toLowerCase()));
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -356,29 +362,46 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full">
                                      <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2"><i className="fas fa-cubes text-clean-primary"></i> Materiais Planejados</h4>
                                      
-                                     {/* Filtro e Seleção */}
+                                     {/* AUTOCOMPLETE MATERIALS */}
                                      <div className="mb-4">
-                                         <input 
-                                            type="text" 
-                                            placeholder="Filtrar materiais..." 
-                                            className="w-full mb-2 h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-clean-primary transition-all"
-                                            value={resMatFilter}
-                                            onChange={e => setResMatFilter(e.target.value)}
-                                         />
+                                         <div className="relative">
+                                             <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Buscar Material (Digite para filtrar)</label>
+                                             <input 
+                                                type="text" 
+                                                className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all mb-2"
+                                                placeholder="Ex: Parafuso, Cabo, Cimento..."
+                                                value={resMatSearch}
+                                                onChange={(e) => { setResMatSearch(e.target.value); setResMatId(''); setShowMatSuggestions(true); }}
+                                                onFocus={() => setShowMatSuggestions(true)}
+                                                onBlur={() => setTimeout(() => setShowMatSuggestions(false), 200)}
+                                             />
+                                             {showMatSuggestions && (
+                                                 <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar top-full left-0">
+                                                     {filteredMaterials.length > 0 ? filteredMaterials.map(m => (
+                                                         <li 
+                                                             key={m.id} 
+                                                             className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
+                                                             onClick={() => { setResMatId(m.id); setResMatSearch(m.description); setShowMatSuggestions(false); }}
+                                                         >
+                                                             <div className="font-bold text-slate-700">{m.description}</div>
+                                                             <div className="text-xs text-slate-500 flex justify-between">
+                                                                 <span>{m.code}</span>
+                                                                 <span>Estoque: {m.currentStock} {m.unit}</span>
+                                                             </div>
+                                                         </li>
+                                                     )) : (
+                                                         <li className="px-3 py-2 text-sm text-slate-400 italic">Nenhum material encontrado.</li>
+                                                     )}
+                                                 </ul>
+                                             )}
+                                         </div>
+
                                          <div className="flex gap-2 items-end">
-                                             <div className="flex-1">
-                                                 <select className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white transition-all" value={resMatId} onChange={e => setResMatId(e.target.value)}>
-                                                     <option value="">Selecione...</option>
-                                                     {filteredMaterials.map(m => (
-                                                         <option key={m.id} value={m.id}>{m.description} ({m.currentStock} {m.unit})</option>
-                                                     ))}
-                                                 </select>
-                                             </div>
-                                             <div className="w-20">
+                                             <div className="w-24">
                                                  <input type="number" min="1" placeholder="Qtd" className="w-full h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white transition-all" value={resMatQty} onChange={e => setResMatQty(e.target.value)} />
                                              </div>
                                              <button type="button" onClick={() => setShowQuickMatModal(true)} className="h-10 w-10 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors" title="Criar Novo Material"><i className="fas fa-magic"></i></button>
-                                             <button type="button" onClick={addPlannedMaterial} className="h-10 px-4 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors"><i className="fas fa-plus"></i></button>
+                                             <button type="button" onClick={addPlannedMaterial} className="h-10 flex-1 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors font-bold text-sm">Adicionar</button>
                                          </div>
                                      </div>
 
@@ -409,28 +432,44 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full">
                                      <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2"><i className="fas fa-users-cog text-clean-primary"></i> Serviços Planejados</h4>
                                      
-                                     {/* Filtro e Seleção */}
+                                     {/* AUTOCOMPLETE SERVICES */}
                                      <div className="mb-4">
-                                         <input 
-                                            type="text" 
-                                            placeholder="Filtrar serviços..." 
-                                            className="w-full mb-2 h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:border-clean-primary transition-all"
-                                            value={resSrvFilter}
-                                            onChange={e => setResSrvFilter(e.target.value)}
-                                         />
+                                         <div className="relative">
+                                             <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Buscar Serviço</label>
+                                             <input 
+                                                type="text" 
+                                                className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all mb-2"
+                                                placeholder="Ex: Instalação, Pintura..."
+                                                value={resSrvSearch}
+                                                onChange={(e) => { setResSrvSearch(e.target.value); setResSrvId(''); setShowSrvSuggestions(true); }}
+                                                onFocus={() => setShowSrvSuggestions(true)}
+                                                onBlur={() => setTimeout(() => setShowSrvSuggestions(false), 200)}
+                                             />
+                                             {showSrvSuggestions && (
+                                                 <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar top-full left-0">
+                                                     {filteredServicesList.length > 0 ? filteredServicesList.map(s => (
+                                                         <li 
+                                                             key={s.id} 
+                                                             className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
+                                                             onClick={() => { setResSrvId(s.id); setResSrvSearch(s.name); setShowSrvSuggestions(false); }}
+                                                         >
+                                                             <div className="font-bold text-slate-700">{s.name}</div>
+                                                             <div className="text-xs text-slate-500">
+                                                                 {s.team} - R$ {s.unitValue}/h
+                                                             </div>
+                                                         </li>
+                                                     )) : (
+                                                         <li className="px-3 py-2 text-sm text-slate-400 italic">Nenhum serviço encontrado.</li>
+                                                     )}
+                                                 </ul>
+                                             )}
+                                         </div>
+
                                          <div className="flex gap-2 items-end">
-                                             <div className="flex-1">
-                                                 <select className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white transition-all" value={resSrvId} onChange={e => setResSrvId(e.target.value)}>
-                                                     <option value="">Selecione...</option>
-                                                     {filteredServicesList.map(s => (
-                                                         <option key={s.id} value={s.id}>{s.name} - {s.team}</option>
-                                                     ))}
-                                                 </select>
-                                             </div>
-                                             <div className="w-20">
+                                             <div className="w-24">
                                                  <input type="number" min="1" placeholder="Hrs" className="w-full h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white transition-all" value={resSrvHrs} onChange={e => setResSrvHrs(e.target.value)} />
                                              </div>
-                                             <button type="button" onClick={addPlannedService} className="h-10 px-4 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors"><i className="fas fa-plus"></i></button>
+                                             <button type="button" onClick={addPlannedService} className="h-10 flex-1 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors font-bold text-sm">Adicionar</button>
                                          </div>
                                      </div>
 
