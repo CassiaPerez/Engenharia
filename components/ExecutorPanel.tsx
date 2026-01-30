@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { OS, User, OSStatus, Project, Building, ServiceType, Material } from '../types';
+import ModalPortal from './ModalPortal';
 
 interface Props {
   user: User;
@@ -8,23 +9,31 @@ interface Props {
   setOss: React.Dispatch<React.SetStateAction<OS[]>>;
   projects: Project[];
   buildings: Building[];
-  materials?: Material[]; // Agora opcional/recebido para detalhes
-  services?: ServiceType[]; // Agora opcional/recebido para detalhes
+  materials?: Material[]; 
+  services?: ServiceType[]; 
   onLogout: () => void;
 }
 
 const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings, materials = [], services = [], onLogout }) => {
   const [activeTab, setActiveTab] = useState<'TODO' | 'DONE' | 'CALENDAR'>('TODO');
   const [finishingOS, setFinishingOS] = useState<OS | null>(null);
-  const [viewDetailOS, setViewDetailOS] = useState<OS | null>(null); // Novo estado para Modal de Detalhes
+  const [viewDetailOS, setViewDetailOS] = useState<OS | null>(null); 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Estados do Calendário
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
 
-  // Filtra apenas OS deste executor
+  const translatePriority = (p: string) => {
+      switch(p) {
+          case 'LOW': return 'Baixa';
+          case 'MEDIUM': return 'Média';
+          case 'HIGH': return 'Alta';
+          case 'CRITICAL': return 'Crítica';
+          default: return p;
+      }
+  };
+
   const myOSs = useMemo(() => {
     return oss.filter(o => o.executorId === user.id || o.executorId === user.email);
   }, [oss, user]);
@@ -32,7 +41,6 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
   const todoList = myOSs.filter(o => o.status !== OSStatus.COMPLETED && o.status !== OSStatus.CANCELED);
   const doneList = myOSs.filter(o => o.status === OSStatus.COMPLETED);
 
-  // Helper para contexto
   const getContext = (os: OS) => {
     if (os.projectId) {
         const p = projects.find(x => x.id === os.projectId);
@@ -44,23 +52,19 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
     return { name: 'Local Não Definido', type: '---', code: '---', location: '', city: '' };
   };
 
-  // Google Calendar Integration
   const handleGoogleCalendarSync = (os: OS) => {
     const context = getContext(os);
     
-    // Formata datas para Google (YYYYMMDDTHHMMSSZ)
     const formatDateForGoogle = (dateStr: string) => {
         return new Date(dateStr).toISOString().replace(/-|:|\.\d\d\d/g, "");
     };
 
     const start = os.startTime ? formatDateForGoogle(os.startTime) : formatDateForGoogle(os.openDate);
-    // Duração estimada padrão de 2h se não houver SLA
     const limit = new Date(os.limitDate); 
     const end = formatDateForGoogle(limit.toISOString());
 
     const title = encodeURIComponent(`OS ${os.number}: ${os.description.substring(0, 40)}...`);
     
-    // Checklist de Serviços para a descrição do evento
     const serviceList = os.services.map(s => {
         const srv = services.find(x => x.id === s.serviceTypeId);
         return `- ${srv?.name || 'Serviço'} (${s.quantity}h)`;
@@ -70,7 +74,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
         `ATIVIDADE: ${os.description}\n\n` +
         `LOCAL: ${context.name} (${context.location}, ${context.city})\n\n` +
         `ESCOPO DETALHADO:\n${serviceList || 'Ver no App'}\n\n` +
-        `PRIORIDADE: ${os.priority}\n` +
+        `PRIORIDADE: ${translatePriority(os.priority)}\n` +
         `Link do Sistema: CropService`
     );
     
@@ -80,7 +84,6 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
     window.open(googleUrl, '_blank');
   };
 
-  // --- Lógica do Calendário ---
   const daysInMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1).getDay(); // 0 = Domingo
   
@@ -90,7 +93,6 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
   const prevMonth = () => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
   const nextMonth = () => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
 
-  // Verifica eventos para o dia
   const getDayStatus = (day: number) => {
       const checkDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day);
       const checkDateStr = checkDate.toDateString();
@@ -105,7 +107,6 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       return { hasCompleted, hasScheduled };
   };
 
-  // Lista de OSs do dia selecionado no calendário
   const selectedDayOSs = useMemo(() => {
       const dateStr = selectedDay.toDateString();
       return myOSs.filter(o => {
@@ -116,9 +117,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
           return target.toDateString() === dateStr;
       });
   }, [myOSs, selectedDay]);
-  // --- Fim Lógica Calendário ---
 
-  // Ordenação das Listas
   const getSortedList = () => {
       if (activeTab === 'TODO') {
           return [...todoList].sort((a, b) => {
@@ -194,7 +193,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
             <div className="pl-3">
                 <div className="flex justify-between items-start mb-2">
                     <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{os.number}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${getPriorityColor(os.priority)}`}>{os.priority === 'CRITICAL' ? 'Crítica' : os.priority === 'HIGH' ? 'Alta' : os.priority === 'MEDIUM' ? 'Média' : 'Baixa'}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${getPriorityColor(os.priority)}`}>{translatePriority(os.priority)}</span>
                 </div>
                 
                 <h3 className="text-lg font-bold text-slate-900 leading-tight mb-1">{os.description}</h3>
@@ -434,168 +433,178 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
 
       {/* --- DETAIL MODAL (Novo) --- */}
       {viewDetailOS && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex flex-col justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg mx-auto overflow-hidden animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                <div className="p-5 border-b border-slate-200 bg-slate-50 flex justify-between items-start">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="bg-slate-800 text-white font-mono text-xs font-bold px-2 py-0.5 rounded">{viewDetailOS.number}</span>
-                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${viewDetailOS.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{viewDetailOS.priority}</span>
+        <ModalPortal>
+            <div className="fixed inset-0 z-[10000]">
+              <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md transition-opacity" onClick={() => setViewDetailOS(null)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-center">
+                <div className="relative bg-white rounded-2xl w-full max-w-lg mx-auto overflow-hidden animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                    <div className="p-5 border-b border-slate-200 bg-slate-50 flex justify-between items-start shrink-0">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="bg-slate-800 text-white font-mono text-xs font-bold px-2 py-0.5 rounded">{viewDetailOS.number}</span>
+                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${viewDetailOS.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{translatePriority(viewDetailOS.priority)}</span>
+                            </div>
+                            <h3 className="font-bold text-lg text-slate-900 leading-tight">{viewDetailOS.description}</h3>
                         </div>
-                        <h3 className="font-bold text-lg text-slate-900 leading-tight">{viewDetailOS.description}</h3>
+                        <button onClick={() => setViewDetailOS(null)} className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center transition-colors"><i className="fas fa-times"></i></button>
                     </div>
-                    <button onClick={() => setViewDetailOS(null)} className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center transition-colors"><i className="fas fa-times"></i></button>
-                </div>
-                
-                <div className="p-5 overflow-y-auto custom-scrollbar space-y-6">
-                    {/* Contexto Local */}
-                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                        <h4 className="text-xs font-black text-blue-800 uppercase tracking-wide mb-2 flex items-center gap-1.5"><i className="fas fa-map-marker-alt"></i> Local de Execução</h4>
-                        <div className="text-sm text-slate-700 space-y-1">
-                            <p><span className="font-bold">Vínculo:</span> {getContext(viewDetailOS).name}</p>
-                            <p><span className="font-bold">Endereço:</span> {getContext(viewDetailOS).location}</p>
-                            <p><span className="font-bold">Cidade:</span> {getContext(viewDetailOS).city}</p>
+                    
+                    <div className="p-5 overflow-y-auto custom-scrollbar space-y-6 min-h-0">
+                        {/* Contexto Local */}
+                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                            <h4 className="text-xs font-black text-blue-800 uppercase tracking-wide mb-2 flex items-center gap-1.5"><i className="fas fa-map-marker-alt"></i> Local de Execução</h4>
+                            <div className="text-sm text-slate-700 space-y-1">
+                                <p><span className="font-bold">Vínculo:</span> {getContext(viewDetailOS).name}</p>
+                                <p><span className="font-bold">Endereço:</span> {getContext(viewDetailOS).location}</p>
+                                <p><span className="font-bold">Cidade:</span> {getContext(viewDetailOS).city}</p>
+                            </div>
+                            <button 
+                                onClick={() => handleGoogleCalendarSync(viewDetailOS)}
+                                className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-sm shadow-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <i className="fab fa-google"></i> Adicionar à Minha Agenda
+                            </button>
                         </div>
-                        <button 
-                            onClick={() => handleGoogleCalendarSync(viewDetailOS)}
-                            className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-sm shadow-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                        >
-                            <i className="fab fa-google"></i> Adicionar à Minha Agenda
-                        </button>
-                    </div>
 
-                    {/* Seleção de Prioridade (Nova Funcionalidade) */}
-                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
-                            <i className="fas fa-flag"></i> Informar Nível de Prioridade
-                        </label>
-                        <div className="flex gap-2">
-                            {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((p) => {
-                                const isSelected = viewDetailOS.priority === p;
-                                return (
-                                    <button
-                                        key={p}
-                                        onClick={() => handlePriorityChange(viewDetailOS.id, p)}
-                                        className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase transition-all border ${
-                                            isSelected 
-                                            ? getPriorityColor(p) + ' shadow-md scale-105' 
-                                            : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-100'
-                                        }`}
-                                    >
-                                        {p === 'LOW' ? 'Baixa' : p === 'MEDIUM' ? 'Média' : p === 'HIGH' ? 'Alta' : 'Crítica'}
-                                    </button>
-                                );
-                            })}
+                        {/* Seleção de Prioridade (Nova Funcionalidade) */}
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                                <i className="fas fa-flag"></i> Informar Nível de Prioridade
+                            </label>
+                            <div className="flex gap-2">
+                                {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((p) => {
+                                    const isSelected = viewDetailOS.priority === p;
+                                    return (
+                                        <button
+                                            key={p}
+                                            onClick={() => handlePriorityChange(viewDetailOS.id, p)}
+                                            className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase transition-all border ${
+                                                isSelected 
+                                                ? getPriorityColor(p) + ' shadow-md scale-105' 
+                                                : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                            {translatePriority(p)}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Checklist Serviços */}
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
+                                <i className="fas fa-tasks text-clean-primary"></i> Checklist de Atividades
+                            </h4>
+                            <ul className="space-y-2">
+                                {viewDetailOS.services.length > 0 ? viewDetailOS.services.map((s, idx) => {
+                                    const srv = services?.find(x => x.id === s.serviceTypeId);
+                                    return (
+                                        <li key={idx} className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                            <div className="w-5 h-5 rounded border-2 border-slate-300 mt-0.5"></div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-800 leading-tight">{srv?.name || 'Serviço'}</p>
+                                                <p className="text-xs text-slate-500 mt-0.5">{srv?.description || 'Executar conforme padrão.'}</p>
+                                                <span className="inline-block mt-1 text-[10px] bg-slate-200 px-1.5 rounded font-bold text-slate-600">Estimado: {s.quantity}h</span>
+                                            </div>
+                                        </li>
+                                    );
+                                }) : <p className="text-sm text-slate-400 italic">Nenhum serviço específico listado. Seguir descrição geral.</p>}
+                            </ul>
+                        </div>
+
+                        {/* Lista de Materiais */}
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
+                                <i className="fas fa-box-open text-orange-500"></i> Materiais Necessários
+                            </h4>
+                            <ul className="space-y-2">
+                                {viewDetailOS.materials.length > 0 ? viewDetailOS.materials.map((m, idx) => {
+                                    const mat = materials?.find(x => x.id === m.materialId);
+                                    return (
+                                        <li key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
+                                            <span className="font-medium text-slate-700">{mat?.description || 'Material'}</span>
+                                            <span className="font-bold text-slate-900 bg-white px-2 py-1 rounded border border-slate-200">{m.quantity} {mat?.unit}</span>
+                                        </li>
+                                    );
+                                }) : <p className="text-sm text-slate-400 italic">Nenhum material alocado previamente.</p>}
+                            </ul>
                         </div>
                     </div>
 
-                    {/* Checklist Serviços */}
-                    <div>
-                        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                            <i className="fas fa-tasks text-clean-primary"></i> Checklist de Atividades
-                        </h4>
-                        <ul className="space-y-2">
-                            {viewDetailOS.services.length > 0 ? viewDetailOS.services.map((s, idx) => {
-                                const srv = services?.find(x => x.id === s.serviceTypeId);
-                                return (
-                                    <li key={idx} className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                        <div className="w-5 h-5 rounded border-2 border-slate-300 mt-0.5"></div>
-                                        <div>
-                                            <p className="text-sm font-bold text-slate-800 leading-tight">{srv?.name || 'Serviço'}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">{srv?.description || 'Executar conforme padrão.'}</p>
-                                            <span className="inline-block mt-1 text-[10px] bg-slate-200 px-1.5 rounded font-bold text-slate-600">Estimado: {s.quantity}h</span>
-                                        </div>
-                                    </li>
-                                );
-                            }) : <p className="text-sm text-slate-400 italic">Nenhum serviço específico listado. Seguir descrição geral.</p>}
-                        </ul>
-                    </div>
-
-                    {/* Lista de Materiais */}
-                    <div>
-                        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                            <i className="fas fa-box-open text-orange-500"></i> Materiais Necessários
-                        </h4>
-                        <ul className="space-y-2">
-                             {viewDetailOS.materials.length > 0 ? viewDetailOS.materials.map((m, idx) => {
-                                 const mat = materials?.find(x => x.id === m.materialId);
-                                 return (
-                                     <li key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
-                                         <span className="font-medium text-slate-700">{mat?.description || 'Material'}</span>
-                                         <span className="font-bold text-slate-900 bg-white px-2 py-1 rounded border border-slate-200">{m.quantity} {mat?.unit}</span>
-                                     </li>
-                                 );
-                             }) : <p className="text-sm text-slate-400 italic">Nenhum material alocado previamente.</p>}
-                        </ul>
+                    <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3 shrink-0">
+                        <button onClick={() => setViewDetailOS(null)} className="flex-1 py-3 text-slate-600 font-bold text-sm bg-white border border-slate-300 rounded-xl hover:bg-slate-100">Fechar</button>
+                        {viewDetailOS.status === OSStatus.OPEN && (
+                            <button onClick={(e) => { handleStart(e, viewDetailOS.id); setViewDetailOS(null); }} className="flex-1 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 shadow-md">Iniciar Agora</button>
+                        )}
+                        {viewDetailOS.status === OSStatus.IN_PROGRESS && (
+                            <button onClick={(e) => { setViewDetailOS(null); openFinishModal(e, viewDetailOS); }} className="flex-1 py-3 bg-clean-primary text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow-md">Finalizar</button>
+                        )}
                     </div>
                 </div>
-
-                <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3">
-                    <button onClick={() => setViewDetailOS(null)} className="flex-1 py-3 text-slate-600 font-bold text-sm bg-white border border-slate-300 rounded-xl hover:bg-slate-100">Fechar</button>
-                    {viewDetailOS.status === OSStatus.OPEN && (
-                        <button onClick={(e) => { handleStart(e, viewDetailOS.id); setViewDetailOS(null); }} className="flex-1 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 shadow-md">Iniciar Agora</button>
-                    )}
-                    {viewDetailOS.status === OSStatus.IN_PROGRESS && (
-                         <button onClick={(e) => { setViewDetailOS(null); openFinishModal(e, viewDetailOS); }} className="flex-1 py-3 bg-clean-primary text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow-md">Finalizar</button>
-                    )}
-                </div>
+              </div>
             </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* --- FINISH MODAL --- */}
       {finishingOS && (
-          <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex flex-col justify-end md:justify-center p-4">
-              <div className="bg-white rounded-t-3xl md:rounded-3xl p-6 md:max-w-md md:mx-auto animate-in slide-in-from-bottom-10 duration-300 w-full">
-                  <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-xl font-bold text-slate-900">Finalizar Serviço</h3>
-                      <button onClick={() => setFinishingOS(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"><i className="fas fa-times"></i></button>
-                  </div>
-
-                  <div className="space-y-6">
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                          <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-2">
-                              <span className="bg-slate-200 px-2 py-0.5 rounded text-xs">{finishingOS.number}</span>
-                              <span className="truncate flex-1">{finishingOS.description}</span>
-                          </p>
+          <ModalPortal>
+            <div className="fixed inset-0 z-[10000]">
+              <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md transition-opacity" onClick={() => setFinishingOS(null)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex flex-col justify-end md:justify-center items-center">
+                  <div className="relative w-full bg-white rounded-t-3xl md:rounded-3xl p-6 md:max-w-md md:mx-auto animate-in slide-in-from-bottom-10 duration-300 shadow-2xl">
+                      <div className="flex justify-between items-center mb-6">
+                          <h3 className="text-xl font-bold text-slate-900">Finalizar Serviço</h3>
+                          <button onClick={() => setFinishingOS(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"><i className="fas fa-times"></i></button>
                       </div>
 
-                      <div>
-                          <label className="block text-sm font-bold text-slate-900 mb-3">Evidência Fotográfica (Obrigatório)</label>
-                          
-                          {!photoPreview ? (
-                              <button onClick={() => fileInputRef.current?.click()} className="w-full h-48 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center gap-3 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:border-clean-primary hover:text-clean-primary transition-all group">
-                                  <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-2xl mb-1 group-hover:scale-110 transition-transform">
-                                      <i className="fas fa-camera"></i>
+                      <div className="space-y-6">
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                              <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-2">
+                                  <span className="bg-slate-200 px-2 py-0.5 rounded text-xs">{finishingOS.number}</span>
+                                  <span className="truncate flex-1">{finishingOS.description}</span>
+                              </p>
+                          </div>
+
+                          <div>
+                              <label className="block text-sm font-bold text-slate-900 mb-3">Evidência Fotográfica (Obrigatório)</label>
+                              
+                              {!photoPreview ? (
+                                  <button onClick={() => fileInputRef.current?.click()} className="w-full h-48 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center gap-3 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:border-clean-primary hover:text-clean-primary transition-all group">
+                                      <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-2xl mb-1 group-hover:scale-110 transition-transform">
+                                          <i className="fas fa-camera"></i>
+                                      </div>
+                                      <span className="font-bold">Tirar Foto / Upload</span>
+                                  </button>
+                              ) : (
+                                  <div className="relative group">
+                                      <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover rounded-2xl border border-slate-200 shadow-sm" />
+                                      <button onClick={() => setPhotoPreview(null)} className="absolute top-3 right-3 bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform"><i className="fas fa-trash"></i></button>
                                   </div>
-                                  <span className="font-bold">Tirar Foto / Upload</span>
-                              </button>
-                          ) : (
-                              <div className="relative group">
-                                  <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover rounded-2xl border border-slate-200 shadow-sm" />
-                                  <button onClick={() => setPhotoPreview(null)} className="absolute top-3 right-3 bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform"><i className="fas fa-trash"></i></button>
-                              </div>
-                          )}
-                          <input 
-                              type="file" 
-                              accept="image/*" 
-                              capture="environment" 
-                              ref={fileInputRef} 
-                              className="hidden" 
-                              onChange={handlePhotoCapture} 
-                          />
-                      </div>
+                              )}
+                              <input 
+                                  type="file" 
+                                  accept="image/*" 
+                                  capture="environment" 
+                                  ref={fileInputRef} 
+                                  className="hidden" 
+                                  onChange={handlePhotoCapture} 
+                              />
+                          </div>
 
-                      <button 
-                          onClick={confirmFinish} 
-                          disabled={!photoPreview}
-                          className="w-full py-4 bg-clean-primary disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-xl shadow-clean-primary/30 transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-emerald-700"
-                      >
-                          <i className="fas fa-check-double"></i> Confirmar Conclusão
-                      </button>
+                          <button 
+                              onClick={confirmFinish} 
+                              disabled={!photoPreview}
+                              className="w-full py-4 bg-clean-primary disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-xl shadow-clean-primary/30 transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-emerald-700"
+                          >
+                              <i className="fas fa-check-double"></i> Confirmar Conclusão
+                          </button>
+                      </div>
                   </div>
               </div>
-          </div>
+            </div>
+          </ModalPortal>
       )}
     </div>
   );

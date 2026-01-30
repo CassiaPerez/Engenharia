@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
+import ModalPortal from './ModalPortal';
 
 interface Props {
   users: User[];
@@ -132,72 +133,77 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
       </div>
 
       {showModal && (
-          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
-              <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
-                  
-                  {/* Header Fixo */}
-                  <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
-                      <div>
-                          <h3 className="font-bold text-xl text-slate-800">{isEditing ? 'Editar Usuário' : 'Criar Novo Usuário'}</h3>
-                          <p className="text-sm text-slate-500 mt-1">Controle de acesso e credenciais.</p>
-                      </div>
-                      <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
-                  </div>
-                  
-                  {/* Conteúdo Scrollable */}
-                  <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50">
-                      <form id="userForm" onSubmit={handleSave} className="space-y-6">
-                          <div className="grid grid-cols-2 gap-6">
-                              <div>
-                                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nome Completo</label>
-                                  <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formUser.name || ''} onChange={e => setFormUser({...formUser, name: e.target.value})} />
-                              </div>
-                              <div>
-                                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Departamento</label>
-                                  <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formUser.department || ''} onChange={e => setFormUser({...formUser, department: e.target.value})} />
-                              </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-6">
-                              <div>
-                                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Email (Login)</label>
-                                  <input type="email" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formUser.email || ''} onChange={e => setFormUser({...formUser, email: e.target.value})} />
-                              </div>
-                              <div>
-                                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Senha</label>
-                                  <input type="text" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" placeholder={isEditing ? "(Manter atual)" : "Defina uma senha"} value={formUser.password || ''} onChange={e => setFormUser({...formUser, password: e.target.value})} />
-                              </div>
-                          </div>
-
+          <ModalPortal>
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => setShowModal(false)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                  <div className="relative w-full max-w-2xl my-8 bg-white rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+                      
+                      {/* Header Fixo */}
+                      <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
                           <div>
-                              <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Nível de Acesso (Cargo)</label>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {roles.map(role => (
-                                      <div key={role.id} onClick={() => setFormUser({...formUser, role: role.id})} className={`p-4 rounded-xl border cursor-pointer transition-all ${formUser.role === role.id ? 'bg-clean-primary/5 border-clean-primary ring-1 ring-clean-primary' : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
-                                          <div className="flex items-center justify-between mb-1">
-                                              <span className={`font-bold text-sm ${formUser.role === role.id ? 'text-clean-primary' : 'text-slate-700'}`}>{role.label}</span>
-                                              {formUser.role === role.id && <i className="fas fa-check-circle text-clean-primary"></i>}
-                                          </div>
-                                          <p className="text-xs text-slate-500 leading-snug">{role.desc}</p>
-                                      </div>
-                                  ))}
+                              <h3 className="font-bold text-xl text-slate-800">{isEditing ? 'Editar Usuário' : 'Criar Novo Usuário'}</h3>
+                              <p className="text-sm text-slate-500 mt-1">Controle de acesso e credenciais.</p>
+                          </div>
+                          <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
+                      </div>
+                      
+                      {/* Conteúdo Scrollable */}
+                      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50 min-h-0">
+                          <form id="userForm" onSubmit={handleSave} className="space-y-6">
+                              <div className="grid grid-cols-2 gap-6">
+                                  <div>
+                                      <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nome Completo</label>
+                                      <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formUser.name || ''} onChange={e => setFormUser({...formUser, name: e.target.value})} />
+                                  </div>
+                                  <div>
+                                      <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Departamento</label>
+                                      <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formUser.department || ''} onChange={e => setFormUser({...formUser, department: e.target.value})} />
+                                  </div>
                               </div>
-                          </div>
 
-                          <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-                              <input type="checkbox" id="activeUser" className="w-5 h-5 text-clean-primary rounded border-slate-300 focus:ring-clean-primary" checked={formUser.active} onChange={e => setFormUser({...formUser, active: e.target.checked})} />
-                              <label htmlFor="activeUser" className="text-sm font-bold text-slate-700 cursor-pointer select-none">Usuário Ativo (Pode fazer login)</label>
-                          </div>
-                      </form>
-                  </div>
+                              <div className="grid grid-cols-2 gap-6">
+                                  <div>
+                                      <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Email (Login)</label>
+                                      <input type="email" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formUser.email || ''} onChange={e => setFormUser({...formUser, email: e.target.value})} />
+                                  </div>
+                                  <div>
+                                      <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Senha</label>
+                                      <input type="text" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" placeholder={isEditing ? "(Manter atual)" : "Defina uma senha"} value={formUser.password || ''} onChange={e => setFormUser({...formUser, password: e.target.value})} />
+                                  </div>
+                              </div>
 
-                  {/* Footer Fixo */}
-                  <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10">
-                      <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button>
-                      <button type="submit" form="userForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/30 transform hover:-translate-y-0.5 transition-all">Salvar Usuário</button>
+                              <div>
+                                  <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Nível de Acesso (Cargo)</label>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {roles.map(role => (
+                                          <div key={role.id} onClick={() => setFormUser({...formUser, role: role.id})} className={`p-4 rounded-xl border cursor-pointer transition-all ${formUser.role === role.id ? 'bg-clean-primary/5 border-clean-primary ring-1 ring-clean-primary' : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+                                              <div className="flex items-center justify-between mb-1">
+                                                  <span className={`font-bold text-sm ${formUser.role === role.id ? 'text-clean-primary' : 'text-slate-700'}`}>{role.label}</span>
+                                                  {formUser.role === role.id && <i className="fas fa-check-circle text-clean-primary"></i>}
+                                              </div>
+                                              <p className="text-xs text-slate-500 leading-snug">{role.desc}</p>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                  <input type="checkbox" id="activeUser" className="w-5 h-5 text-clean-primary rounded border-slate-300 focus:ring-clean-primary" checked={formUser.active} onChange={e => setFormUser({...formUser, active: e.target.checked})} />
+                                  <label htmlFor="activeUser" className="text-sm font-bold text-slate-700 cursor-pointer select-none">Usuário Ativo (Pode fazer login)</label>
+                              </div>
+                          </form>
+                      </div>
+
+                      {/* Footer Fixo */}
+                      <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10 shrink-0">
+                          <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button>
+                          <button type="submit" form="userForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/30 transform hover:-translate-y-0.5 transition-all">Salvar Usuário</button>
+                      </div>
                   </div>
               </div>
-          </div>
+            </div>
+          </ModalPortal>
       )}
     </div>
   );

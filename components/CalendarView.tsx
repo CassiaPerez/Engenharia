@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { OS, Project, OSStatus, Material, ServiceType, User } from '../types';
 import { calculateOSCosts } from '../services/engine';
+import ModalPortal from './ModalPortal';
 
 interface Props {
   oss: OS[];
@@ -173,57 +175,62 @@ const CalendarView: React.FC<Props> = ({ oss, projects, materials, services, use
 
       {/* Modal de Detalhes - INFORMAÇÕES DA RESERVA */}
       {selectedOS && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="font-mono text-xs font-bold bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600 inline-block">{selectedOS.number}</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${getStatusColor(selectedOS.status)}`}>{selectedOS.status}</span>
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-900 line-clamp-1">{selectedOS.description}</h3>
-                    </div>
-                    <button onClick={() => setSelectedOS(null)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"><i className="fas fa-times"></i></button>
-                </div>
-                
-                <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
-                    {/* Detalhes Financeiros */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                             <span className="text-xs font-bold text-slate-500 uppercase">Estimativa Materiais</span>
-                             <p className="text-lg font-bold text-slate-800">R$ {formatCurrency(calculateOSCosts(selectedOS, materials, services).materialCost)}</p>
-                        </div>
-                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                             <span className="text-xs font-bold text-slate-500 uppercase">Estimativa Serviços</span>
-                             <p className="text-lg font-bold text-slate-800">R$ {formatCurrency(calculateOSCosts(selectedOS, materials, services).serviceCost)}</p>
-                        </div>
-                    </div>
+        <ModalPortal>
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setSelectedOS(null)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-center">
+                  <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col max-h-[90vh]">
+                      <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center shrink-0">
+                          <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-mono text-xs font-bold bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600 inline-block">{selectedOS.number}</span>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${getStatusColor(selectedOS.status)}`}>{selectedOS.status}</span>
+                              </div>
+                              <h3 className="text-xl font-bold text-slate-900 line-clamp-1">{selectedOS.description}</h3>
+                          </div>
+                          <button onClick={() => setSelectedOS(null)} className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"><i className="fas fa-times"></i></button>
+                      </div>
+                      
+                      <div className="p-6 overflow-y-auto custom-scrollbar space-y-6 min-h-0">
+                          {/* Detalhes Financeiros */}
+                          <div className="grid grid-cols-2 gap-4">
+                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                  <span className="text-xs font-bold text-slate-500 uppercase">Estimativa Materiais</span>
+                                  <p className="text-lg font-bold text-slate-800">R$ {formatCurrency(calculateOSCosts(selectedOS, materials, services).materialCost)}</p>
+                              </div>
+                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                  <span className="text-xs font-bold text-slate-500 uppercase">Estimativa Serviços</span>
+                                  <p className="text-lg font-bold text-slate-800">R$ {formatCurrency(calculateOSCosts(selectedOS, materials, services).serviceCost)}</p>
+                              </div>
+                          </div>
 
-                    {/* Datas */}
-                    <div>
-                         <h4 className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">Cronograma</h4>
-                         <div className="text-sm text-slate-600 space-y-1">
-                            <p><strong>Abertura:</strong> {new Date(selectedOS.openDate).toLocaleString()}</p>
-                            <p><strong>Prazo Limite:</strong> {new Date(selectedOS.limitDate).toLocaleString()}</p>
-                            {selectedOS.startTime && <p><strong>Início Execução:</strong> {new Date(selectedOS.startTime).toLocaleString()}</p>}
-                            {selectedOS.endTime && <p><strong>Conclusão:</strong> {new Date(selectedOS.endTime).toLocaleString()}</p>}
-                         </div>
-                    </div>
+                          {/* Datas */}
+                          <div>
+                              <h4 className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">Cronograma</h4>
+                              <div className="text-sm text-slate-600 space-y-1">
+                                  <p><strong>Abertura:</strong> {new Date(selectedOS.openDate).toLocaleString()}</p>
+                                  <p><strong>Prazo Limite:</strong> {new Date(selectedOS.limitDate).toLocaleString()}</p>
+                                  {selectedOS.startTime && <p><strong>Início Execução:</strong> {new Date(selectedOS.startTime).toLocaleString()}</p>}
+                                  {selectedOS.endTime && <p><strong>Conclusão:</strong> {new Date(selectedOS.endTime).toLocaleString()}</p>}
+                              </div>
+                          </div>
 
-                     {/* Executor */}
-                     <div>
-                         <h4 className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">Responsável Técnico</h4>
-                         <p className="text-sm text-slate-600">
-                             {users.find(u => u.id === selectedOS.executorId)?.name || 'Não Atribuído'}
-                         </p>
-                    </div>
-                </div>
-                
-                <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
-                    <button onClick={() => setSelectedOS(null)} className="px-6 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-100 transition-all">Fechar</button>
-                </div>
+                          {/* Executor */}
+                          <div>
+                              <h4 className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">Responsável Técnico</h4>
+                              <p className="text-sm text-slate-600">
+                                  {users.find(u => u.id === selectedOS.executorId)?.name || 'Não Atribuído'}
+                              </p>
+                          </div>
+                      </div>
+                      
+                      <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end shrink-0">
+                          <button onClick={() => setSelectedOS(null)} className="px-6 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-100 transition-all">Fechar</button>
+                      </div>
+                  </div>
+              </div>
             </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

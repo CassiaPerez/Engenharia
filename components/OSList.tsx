@@ -5,6 +5,7 @@ import { calculateOSCosts } from '../services/engine';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '../services/supabase';
+import ModalPortal from './ModalPortal';
 
 interface Props {
   oss: OS[];
@@ -35,7 +36,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
   const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING'>('PROJECT');
   
-  // Creation Modal States
   const [allocMatId, setAllocMatId] = useState('');
   const [allocMatSearch, setAllocMatSearch] = useState(''); 
   const [showAllocMatSuggestions, setShowAllocMatSuggestions] = useState(false);
@@ -48,14 +48,12 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   const [allocSrvQty, setAllocSrvQty] = useState('');
   const [plannedServices, setPlannedServices] = useState<OSService[]>([]);
 
-  // Quick Add Material State
   const [showQuickMatModal, setShowQuickMatModal] = useState(false);
   const [quickMat, setQuickMat] = useState({ description: '', unit: 'Un', cost: '' });
 
-  // Detail Modal States
   const [newItem, setNewItem] = useState<{ id: string, qty: number | '', cost: number | '' }>({ id: '', qty: '', cost: '' });
   const [itemSearchTerm, setItemSearchTerm] = useState('');
-  const [showDetailSuggestions, setShowDetailSuggestions] = useState(false); // Autocomplete suggestion visibility
+  const [showDetailSuggestions, setShowDetailSuggestions] = useState(false); 
 
   const [showExecutorModal, setShowExecutorModal] = useState(false);
   const [newExecutorData, setNewExecutorData] = useState({ name: '', email: '', department: '' });
@@ -116,7 +114,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
 
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
   
-  // Helper Translation
   const translatePriority = (p: string) => {
       switch(p) {
           case 'LOW': return 'Baixa';
@@ -127,7 +124,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       }
   };
 
-  // Handler for Detail Modal Add Item
   const handleAddItemToOS = () => {
       if (!selectedOS || !newItem.id || !newItem.qty || !isEditable(selectedOS)) return;
       
@@ -178,7 +174,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
 
       setMaterials(prev => [...prev, newMaterial]);
       
-      // Auto Select for Creation Modal
       setAllocMatId(newMaterial.id);
       setAllocMatSearch(newMaterial.description);
 
@@ -295,11 +290,9 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
     const executor = users.find(u => u.id === os.executorId);
     const costs = calculateOSCosts(os, materials, services);
 
-    // Header Color Block
     doc.setFillColor(71, 122, 127);
     doc.rect(0, 0, 210, 24, 'F');
     
-    // Title
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
@@ -311,7 +304,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
 
     let y = 35;
 
-    // General Info Grid
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -340,7 +332,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
 
     y = (doc as any).lastAutoTable.finalY + 10;
 
-    // Description
     doc.setFont("helvetica", "bold");
     doc.text("DESCRIÇÃO DA ATIVIDADE", 14, y);
     doc.line(14, y + 2, 196, y + 2);
@@ -351,8 +342,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
     doc.text(descLines, 14, y);
     y += descLines.length * 5 + 10;
 
-    // Resources Tables
-    // Materials
     if (os.materials.length > 0) {
         doc.setFont("helvetica", "bold");
         doc.text("MATERIAIS APLICADOS", 14, y);
@@ -381,7 +370,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
         y = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // Services
     if (os.services.length > 0) {
         doc.setFont("helvetica", "bold");
         doc.text("SERVIÇOS / MÃO DE OBRA", 14, y);
@@ -409,13 +397,11 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
         y = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // Totals
     doc.setFontSize(12);
     doc.setTextColor(71, 122, 127);
     doc.text(`CUSTO TOTAL ESTIMADO: R$ ${formatCurrency(costs.totalCost)}`, 196, y, { align: 'right' });
     y += 20;
 
-    // Signatures
     if (y > 250) {
         doc.addPage();
         y = 40;
@@ -468,259 +454,279 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
       
       {/* DETAILED MODAL */}
       {selectedOS && (
-        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col animate-in zoom-in-95 fade-in duration-300 overflow-hidden border border-slate-200">
-                <div className="px-8 py-6 border-b border-slate-100 bg-white rounded-t-2xl flex justify-between items-center sticky top-0 z-20">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <span className="font-mono font-bold text-lg text-slate-900 bg-slate-100 px-3 py-1 rounded border border-slate-300">{selectedOS.number}</span>
-                            <span className={`text-xs font-bold uppercase px-3 py-1 rounded border ${selectedOS.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{selectedOS.status}</span>
+        <ModalPortal>
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity" onClick={() => setSelectedOS(null)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                <div className="relative w-full max-w-6xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="px-8 py-6 border-b border-slate-100 bg-white rounded-t-2xl flex justify-between items-center shrink-0">
+                        <div>
+                            <div className="flex items-center gap-3 mb-1">
+                                <span className="font-mono font-bold text-lg text-slate-900 bg-slate-100 px-3 py-1 rounded border border-slate-300">{selectedOS.number}</span>
+                                <span className={`text-xs font-bold uppercase px-3 py-1 rounded border ${selectedOS.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{selectedOS.status}</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-700 tracking-tight">{selectedOS.description}</h3>
                         </div>
-                        <h3 className="text-xl font-bold text-slate-700 tracking-tight">{selectedOS.description}</h3>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => generateOSDetailPDF(selectedOS)} className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all"><i className="fas fa-file-pdf text-red-500"></i> PDF</button>
-                        <button onClick={() => setSelectedOS(null)} className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-xl"></i></button>
-                    </div>
-                </div>
-                
-                <div className="flex-1 flex overflow-hidden bg-slate-50/50">
-                    {/* LEFT: INFO */}
-                    <div className="w-1/3 border-r border-slate-200 p-8 overflow-y-auto custom-scrollbar bg-white">
-                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Informações Técnicas</h4>
-                        <div className="space-y-6">
-                            <div>
-                                <p className="text-xs font-bold text-slate-500 uppercase mb-1">Local / Contexto</p>
-                                <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                    <p className="font-bold text-slate-800">{getContextInfo(selectedOS).label}</p>
-                                    <p className="text-xs text-slate-500">{getContextInfo(selectedOS).sub}</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</p><span className="font-bold text-slate-800">{translatePriority(selectedOS.priority)}</span></div>
-                                <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Tipo</p><span className="font-bold text-slate-800">{selectedOS.type}</span></div>
-                            </div>
-                            <div>
-                                <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executor</p>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs">{users.find(u=>u.id===selectedOS.executorId)?.avatar || 'U'}</div>
-                                    <span className="font-bold text-slate-800">{users.find(u=>u.id===selectedOS.executorId)?.name || 'Não Atribuído'}</span>
-                                </div>
-                            </div>
-                            <div className="pt-6 border-t border-slate-100">
-                                <p className="text-xs font-bold text-slate-500 uppercase mb-3">Cronograma</p>
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex justify-between"><span className="text-slate-500">Abertura:</span><span className="font-mono font-bold text-slate-700">{new Date(selectedOS.openDate).toLocaleDateString()}</span></div>
-                                    <div className="flex justify-between"><span className="text-slate-500">Prazo (SLA):</span><span className="font-mono font-bold text-red-600">{new Date(selectedOS.limitDate).toLocaleDateString()}</span></div>
-                                    {selectedOS.startTime && <div className="flex justify-between"><span className="text-slate-500">Início Real:</span><span className="font-mono font-bold text-blue-600">{new Date(selectedOS.startTime).toLocaleString()}</span></div>}
-                                    {selectedOS.endTime && <div className="flex justify-between"><span className="text-slate-500">Conclusão:</span><span className="font-mono font-bold text-emerald-600">{new Date(selectedOS.endTime).toLocaleString()}</span></div>}
-                                </div>
-                            </div>
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => generateOSDetailPDF(selectedOS)} className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all"><i className="fas fa-file-pdf text-red-500"></i> PDF</button>
+                            <button onClick={() => setSelectedOS(null)} className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-xl"></i></button>
                         </div>
                     </div>
-
-                    {/* RIGHT: RESOURCES & CHECKLIST */}
-                    <div className="flex-1 flex flex-col h-full bg-slate-50">
-                        <div className="flex border-b border-slate-200 bg-white px-6 gap-6">
-                            <button onClick={() => setActiveSubTab('services')} className={`py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeSubTab === 'services' ? 'border-clean-primary text-clean-primary' : 'border-transparent text-slate-500'}`}><i className="fas fa-tools"></i> Serviços & Mão de Obra</button>
-                            <button onClick={() => setActiveSubTab('materials')} className={`py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeSubTab === 'materials' ? 'border-clean-primary text-clean-primary' : 'border-transparent text-slate-500'}`}><i className="fas fa-boxes"></i> Materiais & Peças</button>
-                        </div>
-
-                        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-                            {/* Autocomplete Input Area */}
-                            {isEditable(selectedOS) && (
-                                <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <h5 className="text-xs font-bold text-slate-500 uppercase mb-3">Adicionar {activeSubTab === 'services' ? 'Serviço' : 'Material'}</h5>
-                                    <div className="flex gap-3 relative">
-                                        <div className="flex-1 relative">
-                                            <input 
-                                                type="text" 
-                                                className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
-                                                placeholder={activeSubTab === 'services' ? 'Buscar serviço...' : 'Buscar material...'}
-                                                value={itemSearchTerm}
-                                                onChange={(e) => { setItemSearchTerm(e.target.value); setNewItem(prev => ({ ...prev, id: '' })); setShowDetailSuggestions(true); }}
-                                                onFocus={() => setShowDetailSuggestions(true)}
-                                                onBlur={() => setTimeout(() => setShowDetailSuggestions(false), 200)}
-                                            />
-                                            {showDetailSuggestions && itemSearchTerm && (
-                                                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1 custom-scrollbar">
-                                                    {filteredDetailItems.map(item => (
-                                                        <li 
-                                                            key={item.id} 
-                                                            className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
-                                                            onClick={() => { setNewItem({ ...newItem, id: item.id, cost: (item as any).unitCost || (item as any).unitValue }); setItemSearchTerm((item as any).description || (item as any).name); setShowDetailSuggestions(false); }}
-                                                        >
-                                                            <div className="font-bold text-slate-700">{(item as any).description || (item as any).name}</div>
-                                                            <div className="text-xs text-slate-500">{(item as any).code || (item as any).team}</div>
-                                                        </li>
-                                                    ))}
-                                                    {filteredDetailItems.length === 0 && <li className="px-3 py-2 text-slate-400 italic text-xs">Nenhum item encontrado.</li>}
-                                                </ul>
-                                            )}
-                                        </div>
-                                        <div className="w-24">
-                                            <input type="number" min="0.1" placeholder="Qtd" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium" value={newItem.qty} onChange={e => setNewItem({ ...newItem, qty: Number(e.target.value) })} />
-                                        </div>
-                                        <button onClick={handleAddItemToOS} className="h-10 px-5 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors">Adicionar</button>
+                    
+                    <div className="flex-1 flex overflow-hidden bg-slate-50/50 min-h-0">
+                        {/* LEFT: INFO */}
+                        <div className="w-1/3 border-r border-slate-200 p-8 overflow-y-auto custom-scrollbar bg-white">
+                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Informações Técnicas</h4>
+                            <div className="space-y-6">
+                                <div>
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Local / Contexto</p>
+                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                        <p className="font-bold text-slate-800">{getContextInfo(selectedOS).label}</p>
+                                        <p className="text-xs text-slate-500">{getContextInfo(selectedOS).sub}</p>
                                     </div>
                                 </div>
-                            )}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</p><span className="font-bold text-slate-800">{translatePriority(selectedOS.priority)}</span></div>
+                                    <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Tipo</p><span className="font-bold text-slate-800">{selectedOS.type}</span></div>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executor</p>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs">{users.find(u=>u.id===selectedOS.executorId)?.avatar || 'U'}</div>
+                                        <span className="font-bold text-slate-800">{users.find(u=>u.id===selectedOS.executorId)?.name || 'Não Atribuído'}</span>
+                                    </div>
+                                </div>
+                                <div className="pt-6 border-t border-slate-100">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-3">Cronograma</p>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex justify-between"><span className="text-slate-500">Abertura:</span><span className="font-mono font-bold text-slate-700">{new Date(selectedOS.openDate).toLocaleDateString()}</span></div>
+                                        <div className="flex justify-between"><span className="text-slate-500">Prazo (SLA):</span><span className="font-mono font-bold text-red-600">{new Date(selectedOS.limitDate).toLocaleDateString()}</span></div>
+                                        {selectedOS.startTime && <div className="flex justify-between"><span className="text-slate-500">Início Real:</span><span className="font-mono font-bold text-blue-600">{new Date(selectedOS.startTime).toLocaleString()}</span></div>}
+                                        {selectedOS.endTime && <div className="flex justify-between"><span className="text-slate-500">Conclusão:</span><span className="font-mono font-bold text-emerald-600">{new Date(selectedOS.endTime).toLocaleString()}</span></div>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                            {/* List of Items */}
-                            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase"><tr className="border-b border-slate-100"><th className="p-4">Item</th><th className="p-4 text-right">Qtd</th><th className="p-4 text-right">Custo Unit.</th><th className="p-4 text-right">Total</th></tr></thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {activeSubTab === 'services' ? (
-                                            selectedOS.services.map((s, i) => {
-                                                const srv = services.find(x => x.id === s.serviceTypeId);
-                                                return (
-                                                    <tr key={i} className="hover:bg-slate-50">
-                                                        <td className="p-4 font-bold text-slate-700">{srv?.name || 'Item Excluído'}</td>
-                                                        <td className="p-4 text-right font-mono">{s.quantity} h</td>
-                                                        <td className="p-4 text-right text-slate-600">R$ {formatCurrency(s.unitCost)}</td>
-                                                        <td className="p-4 text-right font-bold text-slate-800">R$ {formatCurrency(s.quantity * s.unitCost)}</td>
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
-                                            selectedOS.materials.map((m, i) => {
-                                                const mat = materials.find(x => x.id === m.materialId);
-                                                return (
-                                                    <tr key={i} className="hover:bg-slate-50">
-                                                        <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluído'}</td>
-                                                        <td className="p-4 text-right font-mono">{m.quantity} {mat?.unit}</td>
-                                                        <td className="p-4 text-right text-slate-600">R$ {formatCurrency(m.unitCost)}</td>
-                                                        <td className="p-4 text-right font-bold text-slate-800">R$ {formatCurrency(m.quantity * m.unitCost)}</td>
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                        {((activeSubTab === 'services' && selectedOS.services.length === 0) || (activeSubTab === 'materials' && selectedOS.materials.length === 0)) && (
-                                            <tr><td colSpan={4} className="p-8 text-center text-slate-400 italic">Nenhum item registrado nesta categoria.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                        {/* RIGHT: RESOURCES & CHECKLIST */}
+                        <div className="flex-1 flex flex-col h-full bg-slate-50 overflow-hidden">
+                            <div className="flex border-b border-slate-200 bg-white px-6 gap-6 shrink-0">
+                                <button onClick={() => setActiveSubTab('services')} className={`py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeSubTab === 'services' ? 'border-clean-primary text-clean-primary' : 'border-transparent text-slate-500'}`}><i className="fas fa-tools"></i> Serviços & Mão de Obra</button>
+                                <button onClick={() => setActiveSubTab('materials')} className={`py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeSubTab === 'materials' ? 'border-clean-primary text-clean-primary' : 'border-transparent text-slate-500'}`}><i className="fas fa-boxes"></i> Materiais & Peças</button>
+                            </div>
+
+                            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                                {/* Autocomplete Input Area */}
+                                {isEditable(selectedOS) && (
+                                    <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <h5 className="text-xs font-bold text-slate-500 uppercase mb-3">Adicionar {activeSubTab === 'services' ? 'Serviço' : 'Material'}</h5>
+                                        <div className="flex gap-3 relative">
+                                            <div className="flex-1 relative">
+                                                <input 
+                                                    type="text" 
+                                                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
+                                                    placeholder={activeSubTab === 'services' ? 'Buscar serviço...' : 'Buscar material...'}
+                                                    value={itemSearchTerm}
+                                                    onChange={(e) => { setItemSearchTerm(e.target.value); setNewItem(prev => ({ ...prev, id: '' })); setShowDetailSuggestions(true); }}
+                                                    onFocus={() => setShowDetailSuggestions(true)}
+                                                    onBlur={() => setTimeout(() => setShowDetailSuggestions(false), 200)}
+                                                />
+                                                {showDetailSuggestions && itemSearchTerm && (
+                                                    <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto mt-1 custom-scrollbar">
+                                                        {filteredDetailItems.map(item => (
+                                                            <li 
+                                                                key={item.id} 
+                                                                className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50 last:border-0"
+                                                                onClick={() => { setNewItem({ ...newItem, id: item.id, cost: (item as any).unitCost || (item as any).unitValue }); setItemSearchTerm((item as any).description || (item as any).name); setShowDetailSuggestions(false); }}
+                                                            >
+                                                                <div className="font-bold text-slate-700">{(item as any).description || (item as any).name}</div>
+                                                                <div className="text-xs text-slate-500">{(item as any).code || (item as any).team}</div>
+                                                            </li>
+                                                        ))}
+                                                        {filteredDetailItems.length === 0 && <li className="px-3 py-2 text-slate-400 italic text-xs">Nenhum item encontrado.</li>}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                            <div className="w-24">
+                                                <input type="number" min="0.1" placeholder="Qtd" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium" value={newItem.qty} onChange={e => setNewItem({ ...newItem, qty: Number(e.target.value) })} />
+                                            </div>
+                                            <button onClick={handleAddItemToOS} className="h-10 px-5 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors">Adicionar</button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* List of Items */}
+                                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase"><tr className="border-b border-slate-100"><th className="p-4">Item</th><th className="p-4 text-right">Qtd</th><th className="p-4 text-right">Custo Unit.</th><th className="p-4 text-right">Total</th></tr></thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {activeSubTab === 'services' ? (
+                                                selectedOS.services.map((s, i) => {
+                                                    const srv = services.find(x => x.id === s.serviceTypeId);
+                                                    return (
+                                                        <tr key={i} className="hover:bg-slate-50">
+                                                            <td className="p-4 font-bold text-slate-700">{srv?.name || 'Item Excluído'}</td>
+                                                            <td className="p-4 text-right font-mono">{s.quantity} h</td>
+                                                            <td className="p-4 text-right text-slate-600">R$ {formatCurrency(s.unitCost)}</td>
+                                                            <td className="p-4 text-right font-bold text-slate-800">R$ {formatCurrency(s.quantity * s.unitCost)}</td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            ) : (
+                                                selectedOS.materials.map((m, i) => {
+                                                    const mat = materials.find(x => x.id === m.materialId);
+                                                    return (
+                                                        <tr key={i} className="hover:bg-slate-50">
+                                                            <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluído'}</td>
+                                                            <td className="p-4 text-right font-mono">{m.quantity} {mat?.unit}</td>
+                                                            <td className="p-4 text-right text-slate-600">R$ {formatCurrency(m.unitCost)}</td>
+                                                            <td className="p-4 text-right font-bold text-slate-800">R$ {formatCurrency(m.quantity * m.unitCost)}</td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                            {((activeSubTab === 'services' && selectedOS.services.length === 0) || (activeSubTab === 'materials' && selectedOS.materials.length === 0)) && (
+                                                <tr><td colSpan={4} className="p-8 text-center text-slate-400 italic">Nenhum item registrado nesta categoria.</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+              </div>
             </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* NEW OS MODAL */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
-          <div className="bg-white rounded-2xl w-full max-w-6xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
-            {/* Header */}
-            <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
-              <div><h3 className="font-bold text-xl text-slate-800">Nova Ordem de Serviço</h3><p className="text-sm text-slate-500 mt-1">Abertura de chamado técnico.</p></div>
-              <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50">
-              <form id="osForm" onSubmit={handleCreate} className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* LEFT COLUMN */}
-                    <div className="space-y-6">
-                        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                          <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Vínculo da OS</label>
-                          <div className="flex gap-2 mb-4">
-                            <button type="button" onClick={() => setCreationContext('PROJECT')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'PROJECT' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-folder-tree mr-2"></i> Projeto</button>
-                            <button type="button" onClick={() => setCreationContext('BUILDING')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'BUILDING' ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-building mr-2"></i> Edifício</button>
-                          </div>
-                          {creationContext === 'PROJECT' ? (
-                             <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.projectId || ''} onChange={e => setFormOS({...formOS, projectId: e.target.value, buildingId: undefined})}><option value="">Selecione o Projeto...</option>{projects.filter(p => p.status !== 'FINISHED').map(p => <option key={p.id} value={p.id}>{p.code} - {p.description}</option>)}</select>
-                          ) : (
-                             <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.buildingId || ''} onChange={e => setFormOS({...formOS, buildingId: e.target.value, projectId: undefined})}><option value="">Selecione o Edifício...</option>{buildings.map(b => <option key={b.id} value={b.id}>{b.name} ({b.city})</option>)}</select>
-                          )}
-                        </div>
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição</label><textarea required className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium h-24" value={formOS.description} onChange={e => setFormOS({...formOS, description: e.target.value})} /></div>
-                        <div className="grid grid-cols-2 gap-6">
-                           <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tipo</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.type} onChange={e => setFormOS({...formOS, type: e.target.value as any})}>{Object.values(OSType).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                           <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Prioridade</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.priority} onChange={e => setFormOS({...formOS, priority: e.target.value as any})}><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-6">
-                           <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">SLA (Horas)</label><input type="number" min="1" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.slaHours} onChange={e => setFormOS({...formOS, slaHours: Number(e.target.value)})} /></div>
-                           <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Executor</label><div className="flex gap-2"><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.executorId || ''} onChange={e => setFormOS({...formOS, executorId: e.target.value})}><option value="">-- Pendente --</option>{executors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select><button type="button" onClick={() => setShowExecutorModal(true)} className="w-12 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center"><i className="fas fa-user-plus"></i></button></div></div>
-                        </div>
+        <ModalPortal>
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity" onClick={() => setShowModal(false)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                <div className="relative w-full max-w-6xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    {/* Header */}
+                    <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
+                    <div><h3 className="font-bold text-xl text-slate-800">Nova Ordem de Serviço</h3><p className="text-sm text-slate-500 mt-1">Abertura de chamado técnico.</p></div>
+                    <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
                     </div>
 
-                    {/* RIGHT COLUMN: ALLOCATION (Simplified View with Autocomplete) */}
-                    <div className="space-y-6">
-                        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col">
-                            <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2 border-b border-slate-100 pb-3"><i className="fas fa-boxes-stacked text-clean-primary"></i> Alocação de Recursos</h4>
-                            
-                            {/* Materials Autocomplete */}
-                            <div className="mb-6 flex-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Materiais</label>
-                                <div className="relative mb-2">
-                                    <input type="text" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white" placeholder="Buscar Material..." value={allocMatSearch} onChange={(e) => { setAllocMatSearch(e.target.value); setAllocMatId(''); setShowAllocMatSuggestions(true); }} onFocus={() => setShowAllocMatSuggestions(true)} onBlur={() => setTimeout(() => setShowAllocMatSuggestions(false), 200)} />
-                                    {showAllocMatSuggestions && (
-                                        <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar">
-                                            {filteredMaterialsForAlloc.map(m => ( <li key={m.id} className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50" onClick={() => { setAllocMatId(m.id); setAllocMatSearch(m.description); setShowAllocMatSuggestions(false); }}><div className="font-bold">{m.description}</div><div className="text-xs text-slate-500">Estoque: {m.currentStock}</div></li> ))}
-                                        </ul>
-                                    )}
+                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50 min-h-0">
+                    <form id="osForm" onSubmit={handleCreate} className="space-y-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* LEFT COLUMN */}
+                            <div className="space-y-6">
+                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Vínculo da OS</label>
+                                <div className="flex gap-2 mb-4">
+                                    <button type="button" onClick={() => setCreationContext('PROJECT')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'PROJECT' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-folder-tree mr-2"></i> Projeto</button>
+                                    <button type="button" onClick={() => setCreationContext('BUILDING')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'BUILDING' ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-building mr-2"></i> Edifício</button>
                                 </div>
-                                <div className="flex gap-2 mb-2"><input type="number" placeholder="Qtd" className="w-24 h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={allocMatQty} onChange={e => setAllocMatQty(e.target.value)} /><button type="button" onClick={() => setShowQuickMatModal(true)} className="w-10 h-10 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg"><i className="fas fa-magic"></i></button><button type="button" onClick={addAllocMaterial} className="flex-1 bg-slate-800 text-white rounded-lg font-bold text-sm">Adicionar</button></div>
-                                <div className="space-y-1 h-32 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">{plannedMaterials.map((pm, idx) => { const m = materials.find(x => x.id === pm.materialId); return (<div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-slate-200"><span className="truncate flex-1 font-bold">{m?.description}</span><span className="font-bold ml-2 bg-slate-100 px-2 py-0.5 rounded">{pm.quantity}</span><button type="button" onClick={() => setPlannedMaterials(plannedMaterials.filter((_, i) => i !== idx))} className="ml-2 text-red-400"><i className="fas fa-times"></i></button></div>); })}</div>
+                                {creationContext === 'PROJECT' ? (
+                                    <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.projectId || ''} onChange={e => setFormOS({...formOS, projectId: e.target.value, buildingId: undefined})}><option value="">Selecione o Projeto...</option>{projects.filter(p => p.status !== 'FINISHED').map(p => <option key={p.id} value={p.id}>{p.code} - {p.description}</option>)}</select>
+                                ) : (
+                                    <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.buildingId || ''} onChange={e => setFormOS({...formOS, buildingId: e.target.value, projectId: undefined})}><option value="">Selecione o Edifício...</option>{buildings.map(b => <option key={b.id} value={b.id}>{b.name} ({b.city})</option>)}</select>
+                                )}
+                                </div>
+                                <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição</label><textarea required className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium h-24" value={formOS.description} onChange={e => setFormOS({...formOS, description: e.target.value})} /></div>
+                                <div className="grid grid-cols-2 gap-6">
+                                <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tipo</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.type} onChange={e => setFormOS({...formOS, type: e.target.value as any})}>{Object.values(OSType).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                                <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Prioridade</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.priority} onChange={e => setFormOS({...formOS, priority: e.target.value as any})}><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-6">
+                                <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">SLA (Horas)</label><input type="number" min="1" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.slaHours} onChange={e => setFormOS({...formOS, slaHours: Number(e.target.value)})} /></div>
+                                <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Executor</label><div className="flex gap-2"><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.executorId || ''} onChange={e => setFormOS({...formOS, executorId: e.target.value})}><option value="">-- Pendente --</option>{executors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select><button type="button" onClick={() => setShowExecutorModal(true)} className="w-12 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center"><i className="fas fa-user-plus"></i></button></div></div>
+                                </div>
                             </div>
 
-                            {/* Services Autocomplete */}
-                            <div className="flex-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Serviços</label>
-                                <div className="relative mb-2">
-                                    <input type="text" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white" placeholder="Buscar Serviço..." value={allocSrvSearch} onChange={(e) => { setAllocSrvSearch(e.target.value); setAllocSrvId(''); setShowAllocSrvSuggestions(true); }} onFocus={() => setShowAllocSrvSuggestions(true)} onBlur={() => setTimeout(() => setShowAllocSrvSuggestions(false), 200)} />
-                                    {showAllocSrvSuggestions && (
-                                        <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar top-full">
-                                            {filteredServicesForAlloc.map(s => ( <li key={s.id} className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50" onClick={() => { setAllocSrvId(s.id); setAllocSrvSearch(s.name); setShowAllocSrvSuggestions(false); }}><div className="font-bold">{s.name}</div></li> ))}
-                                        </ul>
-                                    )}
+                            {/* RIGHT COLUMN: ALLOCATION (Simplified View with Autocomplete) */}
+                            <div className="space-y-6">
+                                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col">
+                                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-4 flex items-center gap-2 border-b border-slate-100 pb-3"><i className="fas fa-boxes-stacked text-clean-primary"></i> Alocação de Recursos</h4>
+                                    
+                                    {/* Materials Autocomplete */}
+                                    <div className="mb-6 flex-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Materiais</label>
+                                        <div className="relative mb-2">
+                                            <input type="text" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white" placeholder="Buscar Material..." value={allocMatSearch} onChange={(e) => { setAllocMatSearch(e.target.value); setAllocMatId(''); setShowAllocMatSuggestions(true); }} onFocus={() => setShowAllocMatSuggestions(true)} onBlur={() => setTimeout(() => setShowAllocMatSuggestions(false), 200)} />
+                                            {showAllocMatSuggestions && (
+                                                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar">
+                                                    {filteredMaterialsForAlloc.map(m => ( <li key={m.id} className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50" onClick={() => { setAllocMatId(m.id); setAllocMatSearch(m.description); setShowAllocMatSuggestions(false); }}><div className="font-bold">{m.description}</div><div className="text-xs text-slate-500">Estoque: {m.currentStock}</div></li> ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2 mb-2"><input type="number" placeholder="Qtd" className="w-24 h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={allocMatQty} onChange={e => setAllocMatQty(e.target.value)} /><button type="button" onClick={() => setShowQuickMatModal(true)} className="w-10 h-10 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg"><i className="fas fa-magic"></i></button><button type="button" onClick={addAllocMaterial} className="flex-1 bg-slate-800 text-white rounded-lg font-bold text-sm">Adicionar</button></div>
+                                        <div className="space-y-1 h-32 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">{plannedMaterials.map((pm, idx) => { const m = materials.find(x => x.id === pm.materialId); return (<div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-slate-200"><span className="truncate flex-1 font-bold">{m?.description}</span><span className="font-bold ml-2 bg-slate-100 px-2 py-0.5 rounded">{pm.quantity}</span><button type="button" onClick={() => setPlannedMaterials(plannedMaterials.filter((_, i) => i !== idx))} className="ml-2 text-red-400"><i className="fas fa-times"></i></button></div>); })}</div>
+                                    </div>
+
+                                    {/* Services Autocomplete */}
+                                    <div className="flex-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Serviços</label>
+                                        <div className="relative mb-2">
+                                            <input type="text" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white" placeholder="Buscar Serviço..." value={allocSrvSearch} onChange={(e) => { setAllocSrvSearch(e.target.value); setAllocSrvId(''); setShowAllocSrvSuggestions(true); }} onFocus={() => setShowAllocSrvSuggestions(true)} onBlur={() => setTimeout(() => setShowAllocSrvSuggestions(false), 200)} />
+                                            {showAllocSrvSuggestions && (
+                                                <ul className="absolute z-50 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto mt-1 custom-scrollbar top-full">
+                                                    {filteredServicesForAlloc.map(s => ( <li key={s.id} className="px-3 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-50" onClick={() => { setAllocSrvId(s.id); setAllocSrvSearch(s.name); setShowAllocSrvSuggestions(false); }}><div className="font-bold">{s.name}</div></li> ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2 mb-2"><input type="number" placeholder="Hrs" className="w-24 h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={allocSrvQty} onChange={e => setAllocSrvQty(e.target.value)} /><button type="button" onClick={addAllocService} className="flex-1 bg-slate-800 text-white rounded-lg font-bold text-sm">Adicionar</button></div>
+                                        <div className="space-y-1 h-32 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">{plannedServices.map((ps, idx) => { const s = services.find(x => x.id === ps.serviceTypeId); return (<div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-slate-200"><span className="truncate flex-1 font-bold">{s?.name}</span><span className="font-bold ml-2 bg-slate-100 px-2 py-0.5 rounded">{ps.quantity}h</span><button type="button" onClick={() => setPlannedServices(plannedServices.filter((_, i) => i !== idx))} className="ml-2 text-red-400"><i className="fas fa-times"></i></button></div>); })}</div>
+                                    </div>
                                 </div>
-                                <div className="flex gap-2 mb-2"><input type="number" placeholder="Hrs" className="w-24 h-10 px-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={allocSrvQty} onChange={e => setAllocSrvQty(e.target.value)} /><button type="button" onClick={addAllocService} className="flex-1 bg-slate-800 text-white rounded-lg font-bold text-sm">Adicionar</button></div>
-                                <div className="space-y-1 h-32 overflow-y-auto custom-scrollbar bg-slate-50 p-2 rounded-lg border border-slate-100">{plannedServices.map((ps, idx) => { const s = services.find(x => x.id === ps.serviceTypeId); return (<div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded border border-slate-200"><span className="truncate flex-1 font-bold">{s?.name}</span><span className="font-bold ml-2 bg-slate-100 px-2 py-0.5 rounded">{ps.quantity}h</span><button type="button" onClick={() => setPlannedServices(plannedServices.filter((_, i) => i !== idx))} className="ml-2 text-red-400"><i className="fas fa-times"></i></button></div>); })}</div>
                             </div>
                         </div>
+                    </form>
                     </div>
+                    <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0"><button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button><button type="submit" form="osForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg transition-all">Abrir OS</button></div>
                 </div>
-              </form>
+              </div>
             </div>
-            <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10"><button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button><button type="submit" form="osForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg transition-all">Abrir OS</button></div>
-          </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* QUICK MATERIAL MODAL */}
       {showQuickMatModal && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
-                  <h3 className="font-bold text-lg text-slate-800 mb-4">Cadastro Rápido de Material</h3>
-                  <form onSubmit={handleQuickSaveMaterial} className="space-y-4">
-                      <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Descrição</label><input autoFocus required className="w-full h-10 px-3 border border-slate-200 rounded-lg" placeholder="Ex: Parafuso Inox" value={quickMat.description} onChange={e => setQuickMat({...quickMat, description: e.target.value})} /></div>
-                      <div className="grid grid-cols-2 gap-4">
-                          <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Unidade</label><input required className="w-full h-10 px-3 border border-slate-200 rounded-lg" placeholder="Un, Kg" value={quickMat.unit} onChange={e => setQuickMat({...quickMat, unit: e.target.value})} /></div>
-                          <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Custo Est. (R$)</label><input type="number" required step="0.01" className="w-full h-10 px-3 border border-slate-200 rounded-lg" value={quickMat.cost} onChange={e => setQuickMat({...quickMat, cost: e.target.value})} /></div>
-                      </div>
-                      <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowQuickMatModal(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 text-sm font-bold bg-clean-primary text-white rounded-lg hover:bg-clean-primary/90">Salvar e Usar</button></div>
-                  </form>
+          <ModalPortal>
+            <div className="fixed inset-0 z-[10000]">
+              <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onClick={() => setShowQuickMatModal(false)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                  <div className="relative w-full max-w-md my-8 bg-white rounded-xl shadow-2xl p-6 animate-in zoom-in-95">
+                      <h3 className="font-bold text-lg text-slate-800 mb-4">Cadastro Rápido de Material</h3>
+                      <form onSubmit={handleQuickSaveMaterial} className="space-y-4">
+                          <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Descrição</label><input autoFocus required className="w-full h-10 px-3 border border-slate-200 rounded-lg" placeholder="Ex: Parafuso Inox" value={quickMat.description} onChange={e => setQuickMat({...quickMat, description: e.target.value})} /></div>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Unidade</label><input required className="w-full h-10 px-3 border border-slate-200 rounded-lg" placeholder="Un, Kg" value={quickMat.unit} onChange={e => setQuickMat({...quickMat, unit: e.target.value})} /></div>
+                              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Custo Est. (R$)</label><input type="number" required step="0.01" className="w-full h-10 px-3 border border-slate-200 rounded-lg" value={quickMat.cost} onChange={e => setQuickMat({...quickMat, cost: e.target.value})} /></div>
+                          </div>
+                          <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowQuickMatModal(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 text-sm font-bold bg-clean-primary text-white rounded-lg hover:bg-clean-primary/90">Salvar e Usar</button></div>
+                      </form>
+                  </div>
               </div>
-          </div>
+            </div>
+          </ModalPortal>
       )}
 
       {/* NEW EXECUTOR MODAL */}
       {showExecutorModal && (
-        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[10000]">
-           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95">
-              <h3 className="font-bold text-lg text-slate-900 mb-4">Novo Executor</h3>
-              <form onSubmit={handleCreateExecutor} className="space-y-4">
-                  <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome</label><input required className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.name} onChange={e => setNewExecutorData({...newExecutorData, name: e.target.value})} /></div>
-                  <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label><input required type="email" className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.email} onChange={e => setNewExecutorData({...newExecutorData, email: e.target.value})} /></div>
-                  <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Departamento</label><input className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.department} onChange={e => setNewExecutorData({...newExecutorData, department: e.target.value})} /></div>
-                  <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowExecutorModal(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 text-sm font-bold bg-clean-primary text-white rounded-lg hover:bg-clean-primary/90">Salvar</button></div>
-              </form>
-           </div>
-        </div>
+        <ModalPortal>
+            <div className="fixed inset-0 z-[10000]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => setShowExecutorModal(false)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                <div className="relative w-full max-w-md my-8 bg-white rounded-2xl p-6 shadow-2xl animate-in zoom-in-95">
+                    <h3 className="font-bold text-lg text-slate-900 mb-4">Novo Executor</h3>
+                    <form onSubmit={handleCreateExecutor} className="space-y-4">
+                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome</label><input required className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.name} onChange={e => setNewExecutorData({...newExecutorData, name: e.target.value})} /></div>
+                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label><input required type="email" className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.email} onChange={e => setNewExecutorData({...newExecutorData, email: e.target.value})} /></div>
+                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Departamento</label><input className="w-full h-10 px-3 border border-slate-200 rounded-lg text-sm font-medium" value={newExecutorData.department} onChange={e => setNewExecutorData({...newExecutorData, department: e.target.value})} /></div>
+                        <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowExecutorModal(false)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button><button type="submit" className="px-4 py-2 text-sm font-bold bg-clean-primary text-white rounded-lg hover:bg-clean-primary/90">Salvar</button></div>
+                    </form>
+                </div>
+              </div>
+            </div>
+        </ModalPortal>
       )}
     </div>
   );

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Building, User } from '../types';
 import { supabase } from '../services/supabase';
+import ModalPortal from './ModalPortal';
 
 interface Props {
   buildings: Building[];
@@ -60,7 +61,6 @@ const BuildingManager: React.FC<Props> = ({ buildings, setBuildings, currentUser
   };
 
   const openNew = () => {
-      // Reset completo
       setFormData({ 
           type: 'CORPORATE',
           name: '',
@@ -135,27 +135,32 @@ const BuildingManager: React.FC<Props> = ({ buildings, setBuildings, currentUser
       </div>
 
       {showModal && (
-          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
-              <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
-                  <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
-                      <div>
-                          <h3 className="font-bold text-xl text-slate-800">{editingId ? 'Editar Edifício' : 'Novo Edifício'}</h3>
-                          <p className="text-sm text-slate-500 mt-1">Cadastro de unidade física.</p>
+          <ModalPortal>
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => setShowModal(false)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                  <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200 my-8">
+                      <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
+                          <div>
+                              <h3 className="font-bold text-xl text-slate-800">{editingId ? 'Editar Edifício' : 'Novo Edifício'}</h3>
+                              <p className="text-sm text-slate-500 mt-1">Cadastro de unidade física.</p>
+                          </div>
+                          <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
                       </div>
-                      <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
+                      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50 min-h-0">
+                          <form id="buildingForm" onSubmit={handleSave} className="space-y-6">
+                              <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nome do Edifício</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" value={formData.name || ''} onChange={e=>setFormData({...formData, name:e.target.value})} /></div>
+                              <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tipo</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value as any})}><option value="CORPORATE">Corporativo</option><option value="INDUSTRIAL">Industrial</option><option value="LOGISTICS">Logístico</option></select></div>
+                              <div className="grid grid-cols-2 gap-6"><div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Cidade</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.city || ''} onChange={e=>setFormData({...formData, city:e.target.value})} /></div><div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Gestor</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.manager || ''} onChange={e=>setFormData({...formData, manager:e.target.value})} /></div></div>
+                              <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Endereço</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.address || ''} onChange={e=>setFormData({...formData, address:e.target.value})} /></div>
+                              <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Obs</label><textarea className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 shadow-sm h-24 transition-all" value={formData.notes || ''} onChange={e=>setFormData({...formData, notes:e.target.value})} /></div>
+                          </form>
+                      </div>
+                      <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0"><button type="button" onClick={()=>setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button><button type="submit" form="buildingForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg transition-all">Salvar</button></div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50">
-                      <form id="buildingForm" onSubmit={handleSave} className="space-y-6">
-                          <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nome do Edifício</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" value={formData.name || ''} onChange={e=>setFormData({...formData, name:e.target.value})} /></div>
-                          <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tipo</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.type} onChange={e=>setFormData({...formData, type: e.target.value as any})}><option value="CORPORATE">Corporativo</option><option value="INDUSTRIAL">Industrial</option><option value="LOGISTICS">Logístico</option></select></div>
-                          <div className="grid grid-cols-2 gap-6"><div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Cidade</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.city || ''} onChange={e=>setFormData({...formData, city:e.target.value})} /></div><div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Gestor</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.manager || ''} onChange={e=>setFormData({...formData, manager:e.target.value})} /></div></div>
-                          <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Endereço</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.address || ''} onChange={e=>setFormData({...formData, address:e.target.value})} /></div>
-                          <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Obs</label><textarea className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 shadow-sm h-24 transition-all" value={formData.notes || ''} onChange={e=>setFormData({...formData, notes:e.target.value})} /></div>
-                      </form>
-                  </div>
-                  <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10"><button type="button" onClick={()=>setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button><button type="submit" form="buildingForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg transition-all">Salvar</button></div>
               </div>
-          </div>
+            </div>
+          </ModalPortal>
       )}
     </div>
   );

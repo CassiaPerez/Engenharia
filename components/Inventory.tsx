@@ -3,6 +3,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Material, StockMovement, StockLocation, User } from '../types';
 import * as XLSX from 'xlsx';
 import { supabase } from '../services/supabase';
+import ModalPortal from './ModalPortal';
 
 interface Props {
   materials: Material[];
@@ -15,13 +16,11 @@ interface Props {
 const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser }) => {
   const [view, setView] = useState<'stock' | 'history'>('stock');
   
-  // States para Busca com Debounce
-  const [searchInput, setSearchInput] = useState(''); // Valor do Input (Imediato)
-  const [searchTerm, setSearchTerm] = useState('');   // Valor do Filtro (Debounced)
+  const [searchInput, setSearchInput] = useState(''); 
+  const [searchTerm, setSearchTerm] = useState('');   
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Estado para criação de novo material
   const [showModal, setShowModal] = useState(false);
   const [newMaterial, setNewMaterial] = useState<Partial<Material>>({
     status: 'ACTIVE',
@@ -33,7 +32,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     code: ''
   });
 
-  // Estado para Modal de Gestão de Locais
   const [selectedMaterialForLoc, setSelectedMaterialForLoc] = useState<Material | null>(null);
   const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW'>('VIEW');
   const [locForm, setLocForm] = useState({ 
@@ -43,7 +41,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       reason: '' 
   });
 
-  // Efeito de Debounce: Atualiza o searchTerm apenas após 300ms sem digitar (reduzido de 500ms)
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       setSearchTerm(searchInput);
@@ -52,19 +49,16 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     return () => clearTimeout(delayDebounceFn);
   }, [searchInput]);
 
-  // Mapeia TODOS os locais existentes no sistema para sugerir no autocomplete (Criação/Reuso)
   const globalLocations = useMemo(() => {
     const locs = new Set<string>();
     materials.forEach(m => {
         if (m.location) locs.add(m.location);
         m.stockLocations?.forEach(l => locs.add(l.name));
     });
-    // Adiciona o padrão CD se não existir
     locs.add('CD - Central');
     return Array.from(locs).sort();
   }, [materials]);
 
-  // Gerador de SKU Único (Garante não duplicidade)
   const generateUniqueSKU = () => {
       const prefix = 'MAT';
       const year = new Date().getFullYear().toString().substr(-2);
@@ -72,12 +66,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       let code = '';
       let attempts = 0;
 
-      // Tenta gerar um código único (limite de tentativas para evitar loop infinito teórico)
       while (!unique && attempts < 1000) {
-          const random = Math.floor(1000 + Math.random() * 9000); // 4 digitos
+          const random = Math.floor(1000 + Math.random() * 9000); 
           code = `${prefix}-${year}-${random}`;
           
-          // Verifica se já existe na lista de materiais
           const exists = materials.some(m => m.code === code);
           if (!exists) {
               unique = true;
@@ -89,7 +81,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   };
 
   const openNewItemModal = () => {
-      // Limpeza exaustiva de todos os campos
       setNewMaterial({
         status: 'ACTIVE',
         minStock: 10,
@@ -97,19 +88,16 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         unitCost: 0,
         group: 'Geral',
         unit: 'Un',
-        description: '', // Garante vazio
+        description: '', 
         location: 'CD - Central', 
         code: generateUniqueSKU()
       });
       setShowModal(true);
   };
 
-  // Função para abrir o modal de locais
   const openLocationManager = (m: Material) => {
-      // Garante que o material tenha a estrutura de locations inicializada
       if (!m.stockLocations || m.stockLocations.length === 0) {
           const defaultLocs = [{ name: m.location || 'CD - Central', quantity: m.currentStock }];
-          // Atualiza temporariamente para exibição correta
           const updatedM = { ...m, stockLocations: defaultLocs };
           setSelectedMaterialForLoc(updatedM);
       } else {
@@ -119,14 +107,12 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       setLocForm({ location: '', toLocation: '', quantity: '', reason: '' });
   };
 
-  // Processar ação de gestão de locais
   const handleLocationSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!selectedMaterialForLoc) return;
 
       const qty = Number(locForm.quantity);
       
-      // Validação: Quantidade > 0 para movimentações, mas opcional (pode ser 0) para criação de local (ADD)
       if (locAction !== 'ADD' && (isNaN(qty) || qty <= 0)) {
           alert('Quantidade inválida.');
           return;
@@ -137,7 +123,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
               let newLocations = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'CD - Central', quantity: m.currentStock }];
 
               if (locAction === 'ADD') {
-                  // Criação de Local (Com ou sem saldo)
                   if (!locForm.location) return m;
                   if (newLocations.some(l => l.name === locForm.location)) {
                       alert('Este local já existe para este material.');
@@ -147,7 +132,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                   const initialQty = qty || 0;
                   newLocations.push({ name: locForm.location, quantity: initialQty });
 
-                  // Se houve saldo inicial, registra movimentação
                   if (initialQty > 0) {
                       onAddMovement({
                           id: Math.random().toString(36).substr(2, 9),
@@ -202,10 +186,8 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
               } else if (locAction === 'TRANSFER') {
                   const fromIndex = newLocations.findIndex(l => l.name === locForm.location);
                   if (fromIndex >= 0 && newLocations[fromIndex].quantity >= qty) {
-                      // Remove da origem
                       newLocations[fromIndex].quantity -= qty;
                       
-                      // Adiciona no destino (Cria se não existir)
                       const toIndex = newLocations.findIndex(l => l.name === locForm.toLocation);
                       if (toIndex >= 0) {
                           newLocations[toIndex].quantity += qty;
@@ -233,7 +215,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
               const newTotal = newLocations.reduce((acc, l) => acc + l.quantity, 0);
               
-              // Atualiza o objeto do modal também para refletir na tela
               const updatedM = { ...m, currentStock: newTotal, stockLocations: newLocations };
               setSelectedMaterialForLoc(updatedM);
               
@@ -242,7 +223,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           return m;
       }));
 
-      // Reset form mas mantem modal aberto
       setLocForm({ location: '', toLocation: '', quantity: '', reason: '' });
       setLocAction('VIEW');
   };
@@ -251,7 +231,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     e.preventDefault();
     if (!newMaterial.code || !newMaterial.description) return;
 
-    // Dupla verificação de duplicidade antes de salvar
     if (materials.some(m => m.code === newMaterial.code)) {
         alert('Erro: Este código SKU já existe. O sistema irá gerar um novo.');
         setNewMaterial({ ...newMaterial, code: generateUniqueSKU() });
@@ -278,7 +257,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
     setMaterials(prev => [...prev, material]);
 
-    // Se houver estoque inicial, gera movimentação de entrada
     if (material.currentStock > 0) {
         onAddMovement({
             id: Math.random().toString(36).substr(2, 9),
@@ -308,7 +286,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws);
 
-      /* Esperado: Codigo, Descricao, Grupo, Unidade, Custo, Estoque, Minimo */
       const importedMaterials: Material[] = [];
       let generatedCount = 0;
       
@@ -317,13 +294,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         const desc = row['Descricao'] || row['Description'];
         
         if (desc) {
-            // Se não tiver código na planilha, gera um
             if (!code) {
-                code = generateUniqueSKU(); // Atenção: Em loop rápido pode gerar colisão se não atualizar a lista 'materials' em tempo real.
-                // Mas generateUniqueSKU olha para 'materials' que é state.
-                // Para import em lote, precisamos garantir unicidade dentro do próprio lote também.
+                code = generateUniqueSKU(); 
                 while (importedMaterials.some(im => im.code === code) || materials.some(m => m.code === code)) {
-                     // Regenera simples para evitar colisão no loop
                      const random = Math.floor(1000 + Math.random() * 9000);
                      const year = new Date().getFullYear().toString().substr(-2);
                      code = `MAT-${year}-${random}`;
@@ -331,7 +304,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                 generatedCount++;
             }
 
-            // Verifica se já existe (Skip duplicates from file if code match)
             if (materials.some(m => m.code === code)) return;
             
             const qty = Number(row['Estoque']) || 0;
@@ -352,7 +324,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
             };
             importedMaterials.push(newMat);
 
-            // Gerar movimento inicial se tiver estoque
             if (newMat.currentStock > 0) {
                 onAddMovement({
                     id: Math.random().toString(36).substr(2, 9),
@@ -381,7 +352,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   };
 
   const downloadTemplate = () => {
-      // Cabeçalho e dados de exemplo
       const templateData = [
           {
               Codigo: 'EX-001',
@@ -394,7 +364,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
               Local: 'CD - Central'
           },
           {
-              Codigo: '', // Deixar vazio para gerar automatico
+              Codigo: '', 
               Descricao: 'Exemplo Material B (Gerar Codigo)',
               Grupo: 'Elétrica',
               Unidade: 'M',
@@ -415,7 +385,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       XLSX.writeFile(wb, "Modelo_Importacao_Estoque.xlsx");
   };
 
-  // Filtragem usa o termo debounced (searchTerm)
   const filteredMaterials = useMemo(() => {
       return materials.filter(m => 
         m.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -458,9 +427,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       {view === 'stock' ? (
         <>
           <div className="relative max-w-lg group">
-            {/* Ícone muda se estiver aguardando debounce */}
             <i className={`fas ${searchInput !== searchTerm ? 'fa-spinner fa-spin text-clean-primary' : 'fa-search text-slate-400'} absolute left-4 top-1/2 -translate-y-1/2 text-lg transition-colors`}></i>
-            
             <input 
                 type="text" 
                 placeholder="Filtrar materiais por nome ou código..." 
@@ -561,188 +528,198 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
       {/* MODAL DE CRIAÇÃO (Premium Style) */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 fade-in duration-300 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
-                <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                    <div>
-                        <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Novo Item de Estoque</h3>
-                        <p className="text-sm text-slate-500 mt-1">Cadastro de material no almoxarifado.</p>
+        <ModalPortal>
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => setShowModal(false)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                <div className="relative w-full max-w-2xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
+                    <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+                        <div>
+                            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Novo Item de Estoque</h3>
+                            <p className="text-sm text-slate-500 mt-1">Cadastro de material no almoxarifado.</p>
+                        </div>
+                        <button onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-lg"></i></button>
                     </div>
-                    <button onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-lg"></i></button>
-                </div>
-                <form onSubmit={handleCreateMaterial} className="flex-1 overflow-y-auto bg-slate-50/50">
-                    <div className="p-8 space-y-6">
-                        <div className="grid grid-cols-2 gap-6">
-                            <div>
-                                <label className="text-sm font-bold text-slate-700 mb-2 block">Código (SKU) <span className="text-xs font-normal text-emerald-600 ml-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100"><i className="fas fa-lock text-[10px]"></i> Sistema</span></label>
-                                <div className="relative">
-                                    <input 
-                                        readOnly
-                                        className="w-full h-12 px-4 bg-slate-100 border border-slate-200 rounded-xl text-base text-slate-500 font-bold shadow-sm focus:outline-none cursor-not-allowed uppercase" 
-                                        value={newMaterial.code} 
-                                        title="Gerado automaticamente pelo sistema"
-                                    />
+                    <div className="flex-1 overflow-y-auto bg-slate-50/50 min-h-0">
+                        <form onSubmit={handleCreateMaterial} className="p-8 space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Código (SKU) <span className="text-xs font-normal text-emerald-600 ml-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100"><i className="fas fa-lock text-[10px]"></i> Sistema</span></label>
+                                    <div className="relative">
+                                        <input 
+                                            readOnly
+                                            className="w-full h-12 px-4 bg-slate-100 border border-slate-200 rounded-xl text-base text-slate-500 font-bold shadow-sm focus:outline-none cursor-not-allowed uppercase" 
+                                            value={newMaterial.code} 
+                                            title="Gerado automaticamente pelo sistema"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Grupo / Categoria</label>
+                                    <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Elétrica" value={newMaterial.group} onChange={e => setNewMaterial({...newMaterial, group: e.target.value})} />
                                 </div>
                             </div>
                             <div>
-                                <label className="text-sm font-bold text-slate-700 mb-2 block">Grupo / Categoria</label>
-                                <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Elétrica" value={newMaterial.group} onChange={e => setNewMaterial({...newMaterial, group: e.target.value})} />
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Descrição Completa</label>
+                                <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Cabo Flexível 2.5mm Preto" value={newMaterial.description} onChange={e => setNewMaterial({...newMaterial, description: e.target.value})} />
                             </div>
-                        </div>
-                        <div>
-                            <label className="text-sm font-bold text-slate-700 mb-2 block">Descrição Completa</label>
-                            <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Cabo Flexível 2.5mm Preto" value={newMaterial.description} onChange={e => setNewMaterial({...newMaterial, description: e.target.value})} />
-                        </div>
-                        <div className="grid grid-cols-3 gap-6">
-                            <div>
-                                <label className="text-sm font-bold text-slate-700 mb-2 block">Unidade</label>
-                                <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Un, Kg, M" value={newMaterial.unit} onChange={e => setNewMaterial({...newMaterial, unit: e.target.value})} />
+                            <div className="grid grid-cols-3 gap-6">
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Unidade</label>
+                                    <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Un, Kg, M" value={newMaterial.unit} onChange={e => setNewMaterial({...newMaterial, unit: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Custo Unit. (R$)</label>
+                                    <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.unitCost} onChange={e => setNewMaterial({...newMaterial, unitCost: Number(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Local Padrão</label>
+                                    <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="CD - Central" value={newMaterial.location} onChange={e => setNewMaterial({...newMaterial, location: e.target.value})} />
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-sm font-bold text-slate-700 mb-2 block">Custo Unit. (R$)</label>
-                                <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.unitCost} onChange={e => setNewMaterial({...newMaterial, unitCost: Number(e.target.value)})} />
+                            <div className="grid grid-cols-2 gap-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Estoque Mínimo</label>
+                                    <input type="number" min="0" required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.minStock} onChange={e => setNewMaterial({...newMaterial, minStock: Number(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Estoque Inicial</label>
+                                    <input type="number" min="0" required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.currentStock} onChange={e => setNewMaterial({...newMaterial, currentStock: Number(e.target.value)})} />
+                                    <p className="text-xs text-slate-400 mt-1.5 ml-1">Será adicionado ao Local Padrão.</p>
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-sm font-bold text-slate-700 mb-2 block">Local Padrão</label>
-                                <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="CD - Central" value={newMaterial.location} onChange={e => setNewMaterial({...newMaterial, location: e.target.value})} />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
-                            <div>
-                                <label className="text-sm font-bold text-slate-700 mb-2 block">Estoque Mínimo</label>
-                                <input type="number" min="0" required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.minStock} onChange={e => setNewMaterial({...newMaterial, minStock: Number(e.target.value)})} />
-                            </div>
-                            <div>
-                                <label className="text-sm font-bold text-slate-700 mb-2 block">Estoque Inicial</label>
-                                <input type="number" min="0" required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.currentStock} onChange={e => setNewMaterial({...newMaterial, currentStock: Number(e.target.value)})} />
-                                <p className="text-xs text-slate-400 mt-1.5 ml-1">Será adicionado ao Local Padrão.</p>
-                            </div>
-                        </div>
+                        </form>
                     </div>
-                    <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-end gap-4 rounded-b-2xl sticky bottom-0 z-10">
+                    <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-end gap-4 rounded-b-2xl shrink-0">
                         <button type="button" onClick={() => setShowModal(false)} className="px-8 py-3.5 text-base font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">Cancelar</button>
-                        <button type="submit" className="px-10 py-3.5 text-base font-bold text-white bg-clean-primary hover:bg-clean-primary/90 rounded-xl shadow-xl shadow-clean-primary/30 transition-all transform hover:-translate-y-1 active:scale-95 flex items-center gap-2">
+                        <button type="submit" onClick={handleCreateMaterial} className="px-10 py-3.5 text-base font-bold text-white bg-clean-primary hover:bg-clean-primary/90 rounded-xl shadow-xl shadow-clean-primary/30 transition-all transform hover:-translate-y-1 active:scale-95 flex items-center gap-2">
                             <i className="fas fa-check"></i> Cadastrar Material
                         </button>
                     </div>
-                </form>
+                </div>
+              </div>
             </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* MODAL DE GESTÃO DE LOCAIS (Premium Style) */}
       {selectedMaterialForLoc && (
-          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl animate-in zoom-in-95 fade-in duration-300 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
-                  <div className="px-8 py-6 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
-                      <div>
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Gestão de Armazenagem</p>
-                          <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedMaterialForLoc.description}</h3>
-                      </div>
-                      <button onClick={() => setSelectedMaterialForLoc(null)} className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-lg"></i></button>
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                      {/* Resumo de Estoque */}
-                      <div className="grid grid-cols-2 gap-4 mb-8">
-                          <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 flex flex-col justify-center">
-                              <span className="block text-xs font-bold text-emerald-600 uppercase tracking-wide">Saldo Total</span>
-                              <span className="text-4xl font-black text-emerald-800 mt-1">{selectedMaterialForLoc.currentStock} <span className="text-sm font-bold text-emerald-600 align-middle">{selectedMaterialForLoc.unit}</span></span>
-                          </div>
-                          <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 flex flex-col justify-center">
-                               <span className="block text-xs font-bold text-blue-600 uppercase tracking-wide">Locais Ativos</span>
-                               <span className="text-4xl font-black text-blue-800 mt-1">{selectedMaterialForLoc.stockLocations?.filter(l => l.quantity > 0).length || 0}</span>
-                          </div>
-                      </div>
+          <ModalPortal>
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => setSelectedMaterialForLoc(null)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                <div className="relative w-full max-w-3xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
+                    <div className="px-8 py-6 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
+                        <div>
+                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Gestão de Armazenagem</p>
+                            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedMaterialForLoc.description}</h3>
+                        </div>
+                        <button onClick={() => setSelectedMaterialForLoc(null)} className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-lg"></i></button>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar min-h-0">
+                        {/* Resumo de Estoque */}
+                        <div className="grid grid-cols-2 gap-4 mb-8">
+                            <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 flex flex-col justify-center">
+                                <span className="block text-xs font-bold text-emerald-600 uppercase tracking-wide">Saldo Total</span>
+                                <span className="text-4xl font-black text-emerald-800 mt-1">{selectedMaterialForLoc.currentStock} <span className="text-sm font-bold text-emerald-600 align-middle">{selectedMaterialForLoc.unit}</span></span>
+                            </div>
+                            <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 flex flex-col justify-center">
+                                    <span className="block text-xs font-bold text-blue-600 uppercase tracking-wide">Locais Ativos</span>
+                                    <span className="text-4xl font-black text-blue-800 mt-1">{selectedMaterialForLoc.stockLocations?.filter(l => l.quantity > 0).length || 0}</span>
+                            </div>
+                        </div>
 
-                      {/* Lista de Locais */}
-                      <h4 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><i className="fas fa-map-marker-alt text-clean-primary"></i> Distribuição Física</h4>
-                      <div className="space-y-3 mb-8">
-                          {selectedMaterialForLoc.stockLocations?.map((loc, idx) => (
-                              <div key={idx} className="flex justify-between items-center p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
-                                  <div className="flex items-center gap-4">
-                                      <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400"><i className="fas fa-warehouse"></i></div>
-                                      <span className="font-bold text-slate-700 text-lg">{loc.name}</span>
-                                  </div>
-                                  <span className="font-mono font-bold text-xl text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">{loc.quantity} <span className="text-xs text-slate-400 font-sans">{selectedMaterialForLoc.unit}</span></span>
-                              </div>
-                          ))}
-                          {(!selectedMaterialForLoc.stockLocations || selectedMaterialForLoc.stockLocations.length === 0) && (
-                              <p className="text-center text-slate-400 italic py-6 bg-slate-50 rounded-xl border border-slate-100 border-dashed">Nenhum local registrado.</p>
-                          )}
-                      </div>
+                        {/* Lista de Locais */}
+                        <h4 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><i className="fas fa-map-marker-alt text-clean-primary"></i> Distribuição Física</h4>
+                        <div className="space-y-3 mb-8">
+                            {selectedMaterialForLoc.stockLocations?.map((loc, idx) => (
+                                <div key={idx} className="flex justify-between items-center p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400"><i className="fas fa-warehouse"></i></div>
+                                        <span className="font-bold text-slate-700 text-lg">{loc.name}</span>
+                                    </div>
+                                    <span className="font-mono font-bold text-xl text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">{loc.quantity} <span className="text-xs text-slate-400 font-sans">{selectedMaterialForLoc.unit}</span></span>
+                                </div>
+                            ))}
+                            {(!selectedMaterialForLoc.stockLocations || selectedMaterialForLoc.stockLocations.length === 0) && (
+                                <p className="text-center text-slate-400 italic py-6 bg-slate-50 rounded-xl border border-slate-100 border-dashed">Nenhum local registrado.</p>
+                            )}
+                        </div>
 
-                      {/* Ações */}
-                      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
-                          <div className="flex bg-white p-1 rounded-xl border border-slate-200 mb-6 shadow-sm">
-                              <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
-                              <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
-                              <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
-                              <button onClick={() => { setLocAction('OUT'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa</button>
-                          </div>
+                        {/* Ações */}
+                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                            <div className="flex bg-white p-1 rounded-xl border border-slate-200 mb-6 shadow-sm">
+                                <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
+                                <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
+                                <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
+                                <button onClick={() => { setLocAction('OUT'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa</button>
+                            </div>
 
-                          {locAction !== 'VIEW' && (
-                              <form onSubmit={handleLocationSubmit} className="space-y-5 animate-in fade-in slide-in-from-top-2">
-                                  {locAction === 'ADD' ? (
-                                      <div>
-                                          <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Nome do Novo Local</label>
-                                          <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Ex: Prateleira B-02" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})} />
-                                          <p className="text-[10px] text-slate-400 mt-1.5 ml-1">O local ficará disponível na lista global.</p>
-                                      </div>
-                                  ) : locAction === 'TRANSFER' ? (
-                                      <div className="grid grid-cols-2 gap-6">
-                                          <div>
-                                              <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Origem (Onde está)</label>
-                                              <select required className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})}>
-                                                  <option value="">Selecione...</option>
-                                                  {selectedMaterialForLoc.stockLocations?.map((l, i) => <option key={i} value={l.name}>{l.name} ({l.quantity})</option>)}
-                                              </select>
-                                          </div>
-                                          <div>
-                                              <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Destino (Para onde vai)</label>
-                                              <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Selecionar ou Digitar..." value={locForm.toLocation} onChange={e => setLocForm({...locForm, toLocation: e.target.value})} />
-                                          </div>
-                                      </div>
-                                  ) : (
-                                      <div>
-                                          <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Local Alvo</label>
-                                          {locAction === 'OUT' ? (
-                                              <select required className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})}>
-                                                  <option value="">Selecione...</option>
-                                                  {selectedMaterialForLoc.stockLocations?.map((l, i) => <option key={i} value={l.name}>{l.name} ({l.quantity})</option>)}
-                                              </select>
-                                          ) : (
-                                              <>
-                                                <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Selecionar ou Digitar..." value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})} />
-                                              </>
-                                          )}
-                                      </div>
-                                  )}
+                            {locAction !== 'VIEW' && (
+                                <form onSubmit={handleLocationSubmit} className="space-y-5 animate-in fade-in slide-in-from-top-2">
+                                    {locAction === 'ADD' ? (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Nome do Novo Local</label>
+                                            <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Ex: Prateleira B-02" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})} />
+                                            <p className="text-[10px] text-slate-400 mt-1.5 ml-1">O local ficará disponível na lista global.</p>
+                                        </div>
+                                    ) : locAction === 'TRANSFER' ? (
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Origem (Onde está)</label>
+                                                <select required className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})}>
+                                                    <option value="">Selecione...</option>
+                                                    {selectedMaterialForLoc.stockLocations?.map((l, i) => <option key={i} value={l.name}>{l.name} ({l.quantity})</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Destino (Para onde vai)</label>
+                                                <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Selecionar ou Digitar..." value={locForm.toLocation} onChange={e => setLocForm({...locForm, toLocation: e.target.value})} />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Local Alvo</label>
+                                            {locAction === 'OUT' ? (
+                                                <select required className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})}>
+                                                    <option value="">Selecione...</option>
+                                                    {selectedMaterialForLoc.stockLocations?.map((l, i) => <option key={i} value={l.name}>{l.name} ({l.quantity})</option>)}
+                                                </select>
+                                            ) : (
+                                                <>
+                                                    <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Selecionar ou Digitar..." value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})} />
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
 
-                                  {/* Datalist Global para Autocomplete de Criação/Reuso */}
-                                  <datalist id="all-locations-list">
-                                      {globalLocations.map((loc, i) => <option key={i} value={loc} />)}
-                                  </datalist>
+                                    {/* Datalist Global para Autocomplete de Criação/Reuso */}
+                                    <datalist id="all-locations-list">
+                                        {globalLocations.map((loc, i) => <option key={i} value={loc} />)}
+                                    </datalist>
 
-                                  <div className="grid grid-cols-2 gap-6">
-                                      <div>
-                                          <label className="text-xs font-bold text-slate-500 uppercase block mb-2">{locAction === 'ADD' ? 'Saldo Inicial (Opcional)' : 'Quantidade'}</label>
-                                          <input type="number" min="0" step="1" required={locAction !== 'ADD'} className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all font-bold text-slate-800" value={locForm.quantity} onChange={e => setLocForm({...locForm, quantity: e.target.value})} />
-                                      </div>
-                                      <div>
-                                          <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Justificativa</label>
-                                          <input className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.reason} onChange={e => setLocForm({...locForm, reason: e.target.value})} placeholder="Motivo da operação..." />
-                                      </div>
-                                  </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">{locAction === 'ADD' ? 'Saldo Inicial (Opcional)' : 'Quantidade'}</label>
+                                            <input type="number" min="0" step="1" required={locAction !== 'ADD'} className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all font-bold text-slate-800" value={locForm.quantity} onChange={e => setLocForm({...locForm, quantity: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Justificativa</label>
+                                            <input className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.reason} onChange={e => setLocForm({...locForm, reason: e.target.value})} placeholder="Motivo da operação..." />
+                                        </div>
+                                    </div>
 
-                                  <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-all shadow-lg hover:shadow-xl transform active:scale-[0.98]">Confirmar Operação</button>
-                              </form>
-                          )}
-                          {locAction === 'VIEW' && <p className="text-center text-sm text-slate-400 py-4 font-medium">Selecione uma ação acima para movimentar o estoque.</p>}
-                      </div>
-                  </div>
+                                    <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-all shadow-lg hover:shadow-xl transform active:scale-[0.98]">Confirmar Operação</button>
+                                </form>
+                            )}
+                            {locAction === 'VIEW' && <p className="text-center text-sm text-slate-400 py-4 font-medium">Selecione uma ação acima para movimentar o estoque.</p>}
+                        </div>
+                    </div>
+                </div>
               </div>
-          </div>
+            </div>
+          </ModalPortal>
       )}
     </div>
   );
