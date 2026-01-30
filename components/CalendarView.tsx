@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { OS, Project, OSStatus, Material, ServiceType, User } from '../types';
 import { calculateOSCosts } from '../services/engine';
@@ -174,7 +173,7 @@ const CalendarView: React.FC<Props> = ({ oss, projects, materials, services, use
 
       {/* Modal de Detalhes - INFORMAÇÕES DA RESERVA */}
       {selectedOS && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                     <div>
@@ -188,113 +187,40 @@ const CalendarView: React.FC<Props> = ({ oss, projects, materials, services, use
                 </div>
                 
                 <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
-                    {/* Info Básica */}
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm border-b border-slate-100 pb-4">
-                        <div>
-                            <p className="text-slate-500 font-bold uppercase text-[10px]">Projeto Vinculado</p>
-                            <p className="font-medium text-slate-800 truncate" title={projects.find(p => p.id === selectedOS.projectId)?.description}>
-                                {projects.find(p => p.id === selectedOS.projectId)?.code} - {projects.find(p => p.id === selectedOS.projectId)?.description || '---'}
-                            </p>
+                    {/* Detalhes Financeiros */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                             <span className="text-xs font-bold text-slate-500 uppercase">Estimativa Materiais</span>
+                             <p className="text-lg font-bold text-slate-800">R$ {formatCurrency(calculateOSCosts(selectedOS, materials, services).materialCost)}</p>
                         </div>
-                        <div>
-                            <p className="text-slate-500 font-bold uppercase text-[10px]">Data Limite (SLA)</p>
-                            <p className="font-medium text-slate-800">
-                                {new Date(selectedOS.limitDate).toLocaleDateString()} às {new Date(selectedOS.limitDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </p>
-                        </div>
-                        <div className="col-span-2">
-                            <p className="text-slate-500 font-bold uppercase text-[10px]">Executor Responsável</p>
-                            {users.find(u => u.id === selectedOS.executorId) ? (
-                                <div className="flex items-center gap-2 mt-1">
-                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-700">
-                                        {users.find(u => u.id === selectedOS.executorId)?.avatar || 'U'}
-                                    </div>
-                                    <p className="font-bold text-slate-800">{users.find(u => u.id === selectedOS.executorId)?.name}</p>
-                                </div>
-                            ) : (
-                                <p className="text-slate-400 italic">Não atribuído</p>
-                            )}
+                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                             <span className="text-xs font-bold text-slate-500 uppercase">Estimativa Serviços</span>
+                             <p className="text-lg font-bold text-slate-800">R$ {formatCurrency(calculateOSCosts(selectedOS, materials, services).serviceCost)}</p>
                         </div>
                     </div>
 
-                    {/* DADOS DA RESERVA: Horários e Recursos */}
+                    {/* Datas */}
                     <div>
-                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-2">
-                            <i className="fas fa-calendar-check text-clean-primary"></i> Detalhes da Reserva
-                        </h4>
-                        
-                        {/* Se tiver StartTime/EndTime, mostra destaque */}
-                        {selectedOS.startTime && (
-                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4 flex items-center gap-4">
-                                <div>
-                                    <span className="block text-[10px] uppercase font-bold text-blue-500">Início</span>
-                                    <span className="font-bold text-blue-900 text-sm">{new Date(selectedOS.startTime).toLocaleString()}</span>
-                                </div>
-                                {selectedOS.endTime && (
-                                    <>
-                                        <div className="h-6 w-px bg-blue-200"></div>
-                                        <div>
-                                            <span className="block text-[10px] uppercase font-bold text-blue-500">Fim</span>
-                                            <span className="font-bold text-blue-900 text-sm">{new Date(selectedOS.endTime).toLocaleString()}</span>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                             {/* Coluna Materiais */}
-                             <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
-                                <h5 className="font-bold text-xs text-slate-600 uppercase mb-2 border-b border-slate-200 pb-1">Materiais Alocados</h5>
-                                <ul className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
-                                    {selectedOS.materials.length > 0 ? selectedOS.materials.map((item, idx) => {
-                                        const mat = materials.find(m => m.id === item.materialId);
-                                        return (
-                                            <li key={idx} className="text-sm flex justify-between items-center group">
-                                                <span className="truncate text-slate-700 w-3/4" title={mat?.description}>{mat?.description || 'Item não encontrado'}</span>
-                                                <span className="font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-sm text-xs">{item.quantity} un</span>
-                                            </li>
-                                        )
-                                    }) : (
-                                        <li className="text-xs text-slate-400 italic py-2 text-center">Nenhum material reservado.</li>
-                                    )}
-                                </ul>
-                             </div>
-
-                             {/* Coluna Serviços */}
-                             <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
-                                <h5 className="font-bold text-xs text-slate-600 uppercase mb-2 border-b border-slate-200 pb-1">Equipe & Serviços</h5>
-                                <ul className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
-                                    {selectedOS.services.length > 0 ? selectedOS.services.map((item, idx) => {
-                                        const srv = services.find(s => s.id === item.serviceTypeId);
-                                        return (
-                                            <li key={idx} className="text-sm flex justify-between items-center group">
-                                                <span className="truncate text-slate-700 w-3/4" title={srv?.name}>{srv?.name || 'Serviço não encontrado'}</span>
-                                                <span className="font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-sm text-xs">{item.quantity} h</span>
-                                            </li>
-                                        )
-                                    }) : (
-                                        <li className="text-xs text-slate-400 italic py-2 text-center">Nenhum serviço agendado.</li>
-                                    )}
-                                </ul>
-                             </div>
-                        </div>
-                    </div>
-
-                    {/* Resumo Financeiro Compacto */}
-                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex justify-between items-center">
-                         <div className="text-xs text-slate-500 font-medium">
-                            <i className="fas fa-coins text-clean-primary mr-1"></i> Custo Total Apropriado
-                         </div>
-                         <div className="font-black text-clean-primary text-lg">
-                            R$ {formatCurrency(calculateOSCosts(selectedOS, materials, services).totalCost)}
+                         <h4 className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">Cronograma</h4>
+                         <div className="text-sm text-slate-600 space-y-1">
+                            <p><strong>Abertura:</strong> {new Date(selectedOS.openDate).toLocaleString()}</p>
+                            <p><strong>Prazo Limite:</strong> {new Date(selectedOS.limitDate).toLocaleString()}</p>
+                            {selectedOS.startTime && <p><strong>Início Execução:</strong> {new Date(selectedOS.startTime).toLocaleString()}</p>}
+                            {selectedOS.endTime && <p><strong>Conclusão:</strong> {new Date(selectedOS.endTime).toLocaleString()}</p>}
                          </div>
                     </div>
 
-                    {/* Botão de Ação */}
-                    <button onClick={() => setSelectedOS(null)} className="w-full py-3 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors shadow-lg">
-                        Fechar
-                    </button>
+                     {/* Executor */}
+                     <div>
+                         <h4 className="font-bold text-slate-800 mb-2 border-b border-slate-100 pb-1">Responsável Técnico</h4>
+                         <p className="text-sm text-slate-600">
+                             {users.find(u => u.id === selectedOS.executorId)?.name || 'Não Atribuído'}
+                         </p>
+                    </div>
+                </div>
+                
+                <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+                    <button onClick={() => setSelectedOS(null)} className="px-6 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-100 transition-all">Fechar</button>
                 </div>
             </div>
         </div>

@@ -349,7 +349,7 @@ const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
       </div>
 
       {showDetail && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col animate-in zoom-in duration-200">
              <div className="p-8 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
                 <div>

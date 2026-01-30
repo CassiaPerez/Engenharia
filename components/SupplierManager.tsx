@@ -16,6 +16,23 @@ const SupplierManager: React.FC<Props> = ({ suppliers, setSuppliers, currentUser
   const [formData, setFormData] = useState<Partial<Supplier>>({ rating: 5, categoryIds: [], status: 'PENDING', docs: [] });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const openNewSupplier = () => {
+      // Limpeza completa do formulário ao abrir
+      setFormData({ 
+          rating: 5, 
+          categoryIds: [], 
+          status: 'PENDING', 
+          docs: [],
+          name: '',
+          document: '',
+          email: '',
+          phone: '',
+          address: '',
+          notes: ''
+      });
+      setShowModal(true);
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setSuppliers(prev => [...prev, { 
@@ -77,7 +94,7 @@ const SupplierManager: React.FC<Props> = ({ suppliers, setSuppliers, currentUser
     <div className="space-y-8">
       <header className="flex justify-between items-center border-b border-slate-200 pb-6">
         <div><h2 className="text-3xl font-bold text-slate-800 tracking-tight">Fornecedores</h2><p className="text-slate-500 text-base mt-1">Base de parceiros homologados.</p></div>
-        <button onClick={() => setShowModal(true)} className="bg-clean-primary text-white px-6 py-3 rounded-xl text-sm font-bold uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2"><i className="fas fa-plus"></i> Novo Fornecedor</button>
+        <button onClick={openNewSupplier} className="bg-clean-primary text-white px-6 py-3 rounded-xl text-sm font-bold uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2"><i className="fas fa-plus"></i> Novo Fornecedor</button>
       </header>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {suppliers.map(sup => (
@@ -112,21 +129,24 @@ const SupplierManager: React.FC<Props> = ({ suppliers, setSuppliers, currentUser
         ))}
       </div>
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
           <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
             <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
-                <h3 className="font-bold text-xl text-slate-800">Novo Fornecedor</h3>
+                <div>
+                    <h3 className="font-bold text-xl text-slate-800">Novo Fornecedor</h3>
+                    <p className="text-sm text-slate-500 mt-1">Cadastro de parceiro comercial.</p>
+                </div>
                 <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
             </div>
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50">
                 <form id="supplierForm" onSubmit={handleSave} className="space-y-6">
                     <div className="grid grid-cols-2 gap-6">
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Razão Social</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" onChange={e=>setFormData({...formData, name:e.target.value})} /></div>
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">CNPJ</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" onChange={e=>setFormData({...formData, document:e.target.value})} /></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Razão Social</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" value={formData.name || ''} onChange={e=>setFormData({...formData, name:e.target.value})} /></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">CNPJ</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" value={formData.document || ''} onChange={e=>setFormData({...formData, document:e.target.value})} /></div>
                     </div>
                     <div className="grid grid-cols-2 gap-6">
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Email</label><input type="email" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" onChange={e=>setFormData({...formData, email:e.target.value})} /></div>
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Telefone</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" onChange={e=>setFormData({...formData, phone:e.target.value})} /></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Email</label><input type="email" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" value={formData.email || ''} onChange={e=>setFormData({...formData, email:e.target.value})} /></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Telefone</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" value={formData.phone || ''} onChange={e=>setFormData({...formData, phone:e.target.value})} /></div>
                     </div>
                     <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Status</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 transition-all" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value as any})}><option value="PENDING">Pendente</option><option value="HOMOLOGATED">Homologado</option><option value="BLOCKED">Bloqueado</option></select></div>
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
@@ -135,7 +155,7 @@ const SupplierManager: React.FC<Props> = ({ suppliers, setSuppliers, currentUser
                     </div>
                 </form>
             </div>
-            <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10"><button type="button" onClick={()=>setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button><button type="submit" form="supplierForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg">Salvar</button></div>
+            <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10"><button type="button" onClick={()=>setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button><button type="submit" form="supplierForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg transition-all">Salvar</button></div>
           </div>
         </div>
       )}

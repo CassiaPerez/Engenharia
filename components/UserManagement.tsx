@@ -54,7 +54,15 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
   };
 
   const openNew = () => {
-      setFormUser({ active: true, role: 'USER', avatar: 'US' });
+      setFormUser({ 
+          active: true, 
+          role: 'USER', 
+          avatar: 'US',
+          name: '',
+          email: '',
+          department: '',
+          password: '' 
+      });
       setIsEditing(false);
       setShowModal(true);
   };
@@ -124,12 +132,15 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
       </div>
 
       {showModal && (
-          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
               <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
                   
                   {/* Header Fixo */}
                   <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
-                      <h3 className="font-bold text-xl text-slate-800">{isEditing ? 'Editar Usuário' : 'Criar Novo Usuário'}</h3>
+                      <div>
+                          <h3 className="font-bold text-xl text-slate-800">{isEditing ? 'Editar Usuário' : 'Criar Novo Usuário'}</h3>
+                          <p className="text-sm text-slate-500 mt-1">Controle de acesso e credenciais.</p>
+                      </div>
                       <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
                   </div>
                   

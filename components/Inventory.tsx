@@ -43,11 +43,11 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       reason: '' 
   });
 
-  // Efeito de Debounce: Atualiza o searchTerm apenas após 500ms sem digitar
+  // Efeito de Debounce: Atualiza o searchTerm apenas após 300ms sem digitar (reduzido de 500ms)
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       setSearchTerm(searchInput);
-    }, 500);
+    }, 300);
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchInput]);
@@ -89,6 +89,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   };
 
   const openNewItemModal = () => {
+      // Limpeza exaustiva de todos os campos
       setNewMaterial({
         status: 'ACTIVE',
         minStock: 10,
@@ -96,8 +97,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         unitCost: 0,
         group: 'Geral',
         unit: 'Un',
-        location: 'CD - Central', // Padrão solicitado: CD
-        code: generateUniqueSKU() // Gera automaticamente ao abrir e garante unicidade
+        description: '', // Garante vazio
+        location: 'CD - Central', 
+        code: generateUniqueSKU()
       });
       setShowModal(true);
   };
@@ -559,7 +561,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
       {/* MODAL DE CRIAÇÃO (Premium Style) */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-in zoom-in-95 fade-in duration-300 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
                 <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                     <div>
@@ -630,7 +632,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
       {/* MODAL DE GESTÃO DE LOCAIS (Premium Style) */}
       {selectedMaterialForLoc && (
-          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl animate-in zoom-in-95 fade-in duration-300 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
                   <div className="px-8 py-6 border-b border-slate-100 bg-white flex justify-between items-center sticky top-0 z-10">
                       <div>
