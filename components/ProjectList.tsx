@@ -267,10 +267,241 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   const getActualMaterialQty = (projectId: string, materialId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.materials.find(m => m.materialId === materialId)?.quantity || 0), 0);
   const getActualServiceHours = (projectId: string, serviceId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.services.find(s => s.serviceTypeId === serviceId)?.quantity || 0), 0);
 
-  // PDF Functions (same as before, omitted for brevity but assumed present)
-  const generateProjectDetailPDF = (project: Project) => { const doc = new jsPDF(); doc.text("Ficha Técnica", 10, 10); doc.save('project.pdf'); };
-  const exportToPDF = () => { const doc = new jsPDF(); doc.text("Lista Projetos", 10, 10); doc.save('projects.pdf'); };
-  const exportToCSV = () => { /* CSV Logic */ };
+  const generateProjectDetailPDF = (project: Project) => {
+    const doc = new jsPDF();
+    const costs = calculateProjectCosts(project, oss, materials, services);
+
+    // Header Color Block
+    doc.setFillColor(71, 122, 127);
+    doc.rect(0, 0, 210, 24, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("FICHA TÉCNICA DE PROJETO (CAPEX)", 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString()}`, 196, 16, { align: 'right' });
+
+    // Project Info
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    
+    let yPos = 35;
+    doc.text(`Código: ${project.code}`, 14, yPos);
+    doc.text(`Status: ${project.status}`, 120, yPos);
+    
+    yPos += 6;
+    doc.text(`Descrição:`, 14, yPos);
+    doc.setFont("helvetica", "normal");
+    const descLines = doc.splitTextToSize(project.description, 170);
+    doc.text(descLines, 35, yPos);
+    yPos += descLines.length * 5;
+
+    if (project.detailedDescription) {
+        doc.setFont("helvetica", "bold");
+        doc.text(`Escopo:`, 14, yPos);
+        doc.setFont("helvetica", "normal");
+        const detLines = doc.splitTextToSize(project.detailedDescription, 170);
+        doc.text(detLines, 35, yPos);
+        yPos += detLines.length * 5 + 4;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`Local: ${project.location || '-'} | Cidade: ${project.city || '-'}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Responsável: ${project.responsible || '-'} | Centro de Custo: ${project.costCenter || '-'}`, 14, yPos);
+    yPos += 6;
+    doc.text(`Datas: Início ${formatDate(project.startDate)} | Fim Est. ${formatDate(project.estimatedEndDate)}`, 14, yPos);
+    
+    yPos += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, yPos, 196, yPos);
+    yPos += 10;
+
+    // Financial Summary
+    doc.setFontSize(11);
+    doc.setTextColor(71, 122, 127);
+    doc.text("RESUMO FINANCEIRO", 14, yPos);
+    yPos += 8;
+    
+    const summaryData = [
+        ["Orçamento Aprovado (Budget)", `R$ ${formatCurrency(project.estimatedValue)}`],
+        ["Custo Realizado (Total)", `R$ ${formatCurrency(costs.totalReal)}`],
+        ["Variação / Saldo", `R$ ${formatCurrency(costs.variance)} (${costs.variancePercent.toFixed(1)}% utilizado)`]
+    ];
+    
+    autoTable(doc, {
+        startY: yPos,
+        head: [],
+        body: summaryData,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 2 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 }, 1: { halign: 'right' } }
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+
+    // Materials Table
+    doc.text("PLANEJAMENTO DE MATERIAIS (FÍSICO)", 14, yPos);
+    yPos += 5;
+    
+    const materialRows = project.plannedMaterials.map(pm => {
+        const actual = getActualMaterialQty(project.id, pm.materialId);
+        const mat = materials.find(m => m.id === pm.materialId);
+        const diff = actual - pm.quantity;
+        return [
+            mat?.code || '-',
+            mat?.description || 'Item excluído',
+            pm.quantity.toString(),
+            actual.toString(),
+            diff > 0 ? `+${diff}` : diff.toString()
+        ];
+    });
+
+    if (materialRows.length > 0) {
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Cód', 'Material', 'Plan', 'Real', 'Var']],
+            body: materialRows,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [71, 122, 127] },
+            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'center' } }
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+    } else {
+        doc.setFontSize(9);
+        doc.setTextColor(150);
+        doc.text("Nenhum material planejado.", 14, yPos + 5);
+        yPos += 15;
+    }
+
+    // Services Table
+    doc.setFontSize(11);
+    doc.setTextColor(71, 122, 127);
+    doc.text("PLANEJAMENTO DE SERVIÇOS (HH)", 14, yPos);
+    yPos += 5;
+
+    const serviceRows = project.plannedServices.map(ps => {
+        const actual = getActualServiceHours(project.id, ps.serviceTypeId);
+        const srv = services.find(s => s.id === ps.serviceTypeId);
+        const diff = actual - ps.hours;
+        return [
+            srv?.name || 'Serviço excluído',
+            ps.hours.toString(),
+            actual.toString(),
+            diff > 0 ? `+${diff}` : diff.toString()
+        ];
+    });
+
+    if (serviceRows.length > 0) {
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Serviço', 'Plan (h)', 'Real (h)', 'Var']],
+            body: serviceRows,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [71, 122, 127] },
+            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'center' } }
+        });
+    } else {
+        doc.setFontSize(9);
+        doc.setTextColor(150);
+        doc.text("Nenhum serviço planejado.", 14, yPos + 5);
+    }
+
+    doc.save(`${project.code}_Detalhado.pdf`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const today = new Date().toLocaleDateString('pt-BR');
+
+    // Branding Header
+    doc.setFillColor(71, 122, 127); // Brand Green
+    doc.rect(0, 0, 297, 24, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("RELATÓRIO DE PORTFÓLIO DE PROJETOS (CAPEX)", 14, 16);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+
+    // Data Calculation
+    const rows = filteredProjects.map(p => {
+        const costs = calculateProjectCosts(p, oss, materials, services);
+        const balance = p.estimatedValue - costs.totalReal;
+        return [
+            p.code,
+            p.description,
+            p.status,
+            p.responsible,
+            formatDate(p.startDate),
+            formatDate(p.estimatedEndDate),
+            `R$ ${formatCurrency(p.estimatedValue)}`,
+            `R$ ${formatCurrency(costs.totalReal)}`,
+            `R$ ${formatCurrency(balance)}`
+        ];
+    });
+
+    // Totals Row
+    const totalBudget = filteredProjects.reduce((acc, p) => acc + p.estimatedValue, 0);
+    const totalReal = filteredProjects.reduce((acc, p) => acc + calculateProjectCosts(p, oss, materials, services).totalReal, 0);
+    const totalBalance = totalBudget - totalReal;
+
+    rows.push([
+        '', 
+        'TOTAIS CONSOLIDADOS', 
+        '', 
+        '', 
+        '', 
+        '', 
+        `R$ ${formatCurrency(totalBudget)}`, 
+        `R$ ${formatCurrency(totalReal)}`, 
+        `R$ ${formatCurrency(totalBalance)}`
+    ]);
+
+    autoTable(doc, {
+        head: [['Código', 'Projeto', 'Status', 'Responsável', 'Início', 'Fim Est.', 'Orçamento (Budget)', 'Realizado', 'Saldo']],
+        body: rows,
+        startY: 35,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [71, 122, 127], textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+            0: { fontStyle: 'bold' },
+            6: { halign: 'right' },
+            7: { halign: 'right' },
+            8: { halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: (data) => {
+             // Style for Summary Row
+             if (data.row.index === rows.length - 1) {
+                 data.cell.styles.fontStyle = 'bold';
+                 data.cell.styles.fillColor = [240, 240, 240];
+                 if (data.column.index === 1) data.cell.colSpan = 5;
+             }
+             // Colorize Balance
+             if (data.column.index === 8 && data.row.index !== rows.length - 1) {
+                 const val = parseFloat(data.cell.raw.toString().replace('R$ ', '').replace('.', '').replace(',', '.'));
+                 if (val < 0) data.cell.styles.textColor = [220, 50, 50];
+                 else data.cell.styles.textColor = [50, 150, 100];
+             }
+        }
+    });
+
+    doc.save(`Projetos_Export_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const exportToCSV = () => {
+    const headers = ['Código', 'Descrição', 'Status', 'Cidade', 'Responsável', 'Budget (R$)', 'Realizado (R$)', 'Início', 'Fim Estimado'];
+    const rows = filteredProjects.map(p => {
+        const costs = calculateProjectCosts(p, oss, materials, services);
+        return [p.code, `"${p.description}"`, p.status, p.city, p.responsible, p.estimatedValue.toFixed(2).replace('.', ','), costs.totalReal.toFixed(2).replace('.', ','), formatDate(p.startDate), formatDate(p.estimatedEndDate)];
+    });
+    const csvContent = "\uFEFF" + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `projetos_export.csv`; link.click();
+  };
 
   return (
     <div className="space-y-8">

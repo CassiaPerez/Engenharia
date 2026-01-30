@@ -26,7 +26,7 @@ const MENU_GROUPS = [
     items: [
       { id: 'dash', icon: 'fa-chart-pie', label: 'Dashboard', allowedRoles: ['ADMIN', 'MANAGER', 'USER'] },
       { id: 'projects', icon: 'fa-folder-tree', label: 'Projetos (Capex)', allowedRoles: ['ADMIN', 'MANAGER'] },
-      { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço', allowedRoles: ['ADMIN', 'MANAGER'] }
+      { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço', allowedRoles: ['ADMIN', 'MANAGER', 'USER'] }
     ]
   },
   {
