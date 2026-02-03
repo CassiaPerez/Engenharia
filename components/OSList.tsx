@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { OS, OSStatus, Project, Material, ServiceType, OSService, OSItem, OSType, Building, User } from '../types';
+import { OS, OSStatus, Project, Material, ServiceType, OSService, OSItem, OSType, Building, User, Equipment } from '../types';
 import { calculateOSCosts } from '../services/engine';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -12,6 +12,7 @@ interface Props {
   setOss: React.Dispatch<React.SetStateAction<OS[]>>;
   projects: Project[];
   buildings: Building[]; 
+  equipments?: Equipment[]; // Novo
   materials: Material[];
   setMaterials?: React.Dispatch<React.SetStateAction<Material[]>>; 
   services: ServiceType[];
@@ -23,7 +24,7 @@ interface Props {
 
 const ITEMS_PER_PAGE = 9;
 
-const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, setMaterials, services, users, setUsers, onStockChange, currentUser }) => {
+const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments = [], materials, setMaterials, services, users, setUsers, onStockChange, currentUser }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
@@ -34,7 +35,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
   
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
-  const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING'>('PROJECT');
+  const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING' | 'EQUIPMENT'>('PROJECT');
   
   const [allocMatId, setAllocMatId] = useState('');
   const [allocMatSearch, setAllocMatSearch] = useState(''); 
@@ -183,8 +184,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
 
   const handleCreate = (e: React.FormEvent) => { 
       e.preventDefault(); 
-      if (!formOS.projectId && !formOS.buildingId) {
-          alert('Selecione um Projeto ou Edifício para vincular a OS.');
+      if (!formOS.projectId && !formOS.buildingId && !formOS.equipmentId) {
+          alert('Selecione um Projeto, Edifício ou Equipamento para vincular a OS.');
           return;
       }
       
@@ -199,6 +200,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
           number: newOSNumber, 
           projectId: formOS.projectId, 
           buildingId: formOS.buildingId, 
+          equipmentId: formOS.equipmentId,
           executorId: formOS.executorId, 
           description: formOS.description || '', 
           type: formOS.type || OSType.PREVENTIVE, 
@@ -228,6 +230,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
           description: '',
           projectId: '',
           buildingId: '',
+          equipmentId: '',
           executorId: ''
       });
       setPlannedMaterials([]);
@@ -282,7 +285,12 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const getStatusTooltip = (status: OSStatus) => { switch (status) { case OSStatus.OPEN: return 'Aguardando início.'; case OSStatus.IN_PROGRESS: return 'Atividade em execução.'; case OSStatus.PAUSED: return 'Atividade paralisada.'; case OSStatus.COMPLETED: return 'Atividade concluída.'; case OSStatus.CANCELED: return 'Atividade cancelada.'; default: return ''; } };
-  const getContextInfo = (os: OS) => { if (os.projectId) { const p = projects.find(proj => proj.id === os.projectId); return { label: p?.code || 'N/A', sub: p?.city || '', type: 'PROJECT' }; } else if (os.buildingId) { const b = buildings.find(bld => bld.id === os.buildingId); return { label: b?.name || 'N/A', sub: b?.city || '', type: 'BUILDING' }; } return { label: '---', sub: '', type: 'UNKNOWN' }; };
+  const getContextInfo = (os: OS) => { 
+      if (os.projectId) { const p = projects.find(proj => proj.id === os.projectId); return { label: p?.code || 'N/A', sub: p?.city || '', type: 'PROJECT' }; } 
+      else if (os.buildingId) { const b = buildings.find(bld => bld.id === os.buildingId); return { label: b?.name || 'N/A', sub: b?.city || '', type: 'BUILDING' }; } 
+      else if (os.equipmentId) { const eq = equipments.find(e => e.id === os.equipmentId); return { label: eq?.name || 'N/A', sub: eq?.code || '', type: 'EQUIPMENT' }; }
+      return { label: '---', sub: '', type: 'UNKNOWN' }; 
+  };
   
   const generateOSDetailPDF = (os: OS) => {
     const doc = new jsPDF();
@@ -441,7 +449,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
               <div key={os.id} className={`bg-white rounded-xl border p-6 shadow-sm hover:shadow-lg transition-all flex flex-col relative group ${isOverdue ? 'border-l-8 border-l-red-500 border-t-slate-200 border-r-slate-200 border-b-slate-200' : 'border-slate-200'}`}>
                  <div className="flex justify-between items-start mb-4"><span className="font-mono text-base font-bold bg-slate-100 px-3 py-1.5 rounded-lg text-slate-800 border border-slate-300">{os.number}</span><span className={`text-xs font-bold uppercase px-3 py-1.5 rounded-lg border ${os.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : os.priority === 'HIGH' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{translatePriority(os.priority)}</span></div>
                  <h4 className="text-xl font-bold text-slate-900 mb-3 leading-tight flex-1 line-clamp-2">{os.description}</h4>
-                 <div className="mb-4"><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2 mb-1"><i className={`fas ${context.type === 'PROJECT' ? 'fa-folder' : 'fa-building'} text-slate-400 w-4`}></i> {context.label}</p><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2"><i className="fas fa-user-hard-hat text-slate-400 w-4"></i>{executor ? <span className="text-emerald-600 font-bold">{executor.name}</span> : <span className="text-slate-400 italic">Sem executor</span>}</p></div>
+                 <div className="mb-4"><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2 mb-1"><i className={`fas ${context.type === 'PROJECT' ? 'fa-folder' : context.type === 'EQUIPMENT' ? 'fa-cogs' : 'fa-building'} text-slate-400 w-4`}></i> {context.label}</p><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2"><i className="fas fa-user-hard-hat text-slate-400 w-4"></i>{executor ? <span className="text-emerald-600 font-bold">{executor.name}</span> : <span className="text-slate-400 italic">Sem executor</span>}</p></div>
                  <div className="grid grid-cols-2 gap-4 text-base mb-6"><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Materiais</span><span className="font-bold text-slate-800 text-lg">R$ {formatCurrency(costs.materialCost)}</span></div><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Mão de Obra</span><span className="font-bold text-slate-800 text-lg">{os.services.reduce((a,b)=>a+b.quantity,0)} h</span></div></div>
                  <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto"><span title={getStatusTooltip(os.status)} className={`text-sm font-bold uppercase px-3 py-1.5 rounded cursor-help ${os.status === 'COMPLETED' ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' : os.status === 'IN_PROGRESS' ? 'text-blue-800 bg-blue-100 border border-blue-200' : 'text-slate-700 bg-slate-100 border border-slate-200'}`}>{os.status.replace('_', ' ')}</span><button onClick={() => setSelectedOS(os)} className="text-base font-bold text-slate-700 hover:text-white hover:bg-clean-primary px-5 py-2.5 rounded-lg transition-all border border-slate-300 hover:border-clean-primary hover:shadow-md"><i className="fas fa-pen-to-square mr-2"></i> {os.status === OSStatus.COMPLETED ? 'Visualizar' : 'Gerenciar'}</button></div>
                  {currentUser.role === 'ADMIN' && ( <button onClick={() => handleDelete(os.id)} className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-red-200 text-red-500 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 shadow-sm z-20" title="Excluir OS"><i className="fas fa-trash text-xs"></i></button> )}
@@ -619,15 +627,18 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, materials, 
                             {/* LEFT COLUMN */}
                             <div className="space-y-6">
                                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Vínculo da OS</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Vínculo da OS (Centro de Custo)</label>
                                 <div className="flex gap-2 mb-4">
                                     <button type="button" onClick={() => setCreationContext('PROJECT')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'PROJECT' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-folder-tree mr-2"></i> Projeto</button>
                                     <button type="button" onClick={() => setCreationContext('BUILDING')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'BUILDING' ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-building mr-2"></i> Edifício</button>
+                                    <button type="button" onClick={() => setCreationContext('EQUIPMENT')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'EQUIPMENT' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-cogs mr-2"></i> Equip</button>
                                 </div>
                                 {creationContext === 'PROJECT' ? (
-                                    <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.projectId || ''} onChange={e => setFormOS({...formOS, projectId: e.target.value, buildingId: undefined})}><option value="">Selecione o Projeto...</option>{projects.filter(p => p.status !== 'FINISHED').map(p => <option key={p.id} value={p.id}>{p.code} - {p.description}</option>)}</select>
+                                    <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.projectId || ''} onChange={e => setFormOS({...formOS, projectId: e.target.value, buildingId: undefined, equipmentId: undefined})}><option value="">Selecione o Projeto...</option>{projects.filter(p => p.status !== 'FINISHED').map(p => <option key={p.id} value={p.id}>{p.code} - {p.description}</option>)}</select>
+                                ) : creationContext === 'BUILDING' ? (
+                                    <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.buildingId || ''} onChange={e => setFormOS({...formOS, buildingId: e.target.value, projectId: undefined, equipmentId: undefined})}><option value="">Selecione o Edifício...</option>{buildings.map(b => <option key={b.id} value={b.id}>{b.name} ({b.city})</option>)}</select>
                                 ) : (
-                                    <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.buildingId || ''} onChange={e => setFormOS({...formOS, buildingId: e.target.value, projectId: undefined})}><option value="">Selecione o Edifício...</option>{buildings.map(b => <option key={b.id} value={b.id}>{b.name} ({b.city})</option>)}</select>
+                                    <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.equipmentId || ''} onChange={e => setFormOS({...formOS, equipmentId: e.target.value, projectId: undefined, buildingId: undefined})}><option value="">Selecione o Equipamento...</option>{equipments.map(e => <option key={e.id} value={e.id}>{e.name} - {e.code}</option>)}</select>
                                 )}
                                 </div>
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição</label><textarea required className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium h-24" value={formOS.description} onChange={e => setFormOS({...formOS, description: e.target.value})} /></div>

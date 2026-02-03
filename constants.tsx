@@ -1,5 +1,5 @@
 
-import { Material, ServiceType, Project, ProjectStatus, Category, OSType, ServiceCostType, User, Building } from './types';
+import { Material, ServiceType, Project, ProjectStatus, Category, OSType, ServiceCostType, User, Building, Equipment } from './types';
 
 // Lista inicial vazia para permitir o cadastro/importação dos itens corretos
 export const INITIAL_MATERIALS: Material[] = [];
@@ -65,11 +65,18 @@ export const INITIAL_USERS: User[] = [
   { id: 'U001', name: 'Administrador', email: 'admin@crop.com', password: '123', role: 'ADMIN', active: true, department: 'TI' },
   { id: 'U002', name: 'Gerente de Planta', email: 'gerente@crop.com', password: '123', role: 'MANAGER', active: true, department: 'Industrial' },
   { id: 'U003', name: 'Técnico Executor', email: 'tecnico@crop.com', password: '123', role: 'EXECUTOR', active: true, department: 'Manutenção' },
-  { id: 'U004', name: 'Usuário Comum', email: 'user@crop.com', password: '123', role: 'USER', active: true, department: 'PCP' }
+  { id: 'U004', name: 'Almoxarife Chefe', email: 'almox@crop.com', password: '123', role: 'WAREHOUSE', active: true, department: 'Logística' },
+  { id: 'U005', name: 'Usuário Comum', email: 'user@crop.com', password: '123', role: 'USER', active: true, department: 'PCP' }
 ];
 
 export const INITIAL_BUILDINGS: Building[] = [
   { id: 'BLD-001', name: 'Planta Industrial Jandaia', address: 'Rodovia BR-376, km 200', city: 'Jandaia do Sul', manager: 'Roberto Almeida', type: 'INDUSTRIAL', notes: 'Unidade fabril principal.' },
   { id: 'BLD-002', name: 'Centro de Distribuição', address: 'Av. das Indústrias, 500', city: 'Maringá', manager: 'Fernanda Costa', type: 'LOGISTICS', notes: 'Armazenagem de produto acabado.' },
   { id: 'BLD-003', name: 'Escritório Corporativo', address: 'Rua Santos Dumont, 1200', city: 'Maringá', manager: 'Juliana Silva', type: 'CORPORATE', notes: 'Sede administrativa e RH.' }
+];
+
+export const INITIAL_EQUIPMENTS: Equipment[] = [
+  { id: 'EQP-001', code: 'EMP-05', name: 'Empilhadeira GLP', description: 'Empilhadeira Toyota 2.5ton', location: 'Expedição', model: 'Serie 8', serialNumber: '8FGL25-1234', manufacturer: 'Toyota', status: 'ACTIVE', notes: 'Revisão preventiva a cada 500h' },
+  { id: 'EQP-002', code: 'COM-01', name: 'Compressor Parafuso', description: 'Compressor de ar principal da fábrica', location: 'Sala de Máquinas', model: 'GA-30', serialNumber: 'AIF-998877', manufacturer: 'Atlas Copco', status: 'ACTIVE', notes: 'Verificar nível de óleo semanalmente' },
+  { id: 'EQP-003', code: 'GER-02', name: 'Gerador Diesel', description: 'Gerador de emergência 500kVA', location: 'Área Externa', model: 'C15', serialNumber: 'CAT-5544', manufacturer: 'Caterpillar', status: 'MAINTENANCE', notes: 'Aguardando troca de filtros' }
 ];

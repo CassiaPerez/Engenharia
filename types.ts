@@ -46,6 +46,20 @@ export interface Building {
   notes?: string;
 }
 
+export interface Equipment {
+  id: string;
+  code: string;     // TAG do equipamento
+  name: string;
+  description: string;
+  location: string; // Onde está instalado
+  model: string;
+  serialNumber: string;
+  manufacturer: string;
+  status: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE';
+  purchaseDate?: string;
+  notes?: string;
+}
+
 export interface StockLocation {
   name: string;
   quantity: number;
@@ -114,8 +128,9 @@ export interface Project {
 export interface OS {
   id: string;
   number: string;
-  projectId?: string; // Agora opcional
-  buildingId?: string; // Novo campo para vincular a Edifício
+  projectId?: string; 
+  buildingId?: string; 
+  equipmentId?: string; // Novo campo para vincular a Equipamento
   description: string;
   type: OSType;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -154,6 +169,7 @@ export interface StockMovement {
   date: string;
   userId: string;
   osId?: string;
+  projectId?: string; // Para baixa direta em projeto
   description: string;
   fromLocation?: string; // Para transferências e saídas
   toLocation?: string;   // Para transferências e entradas
@@ -191,17 +207,14 @@ export interface PurchaseRecord {
 }
 
 // User Role Definitions
-// ADMIN: Acesso Total
-// MANAGER: Gestão (Sem criar usuários)
-// EXECUTOR: Prestador de Serviço (Foco Operacional)
-// USER: Usuário Comum (Visualização)
-export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR' | 'USER';
+// WAREHOUSE: Almoxarife (Pode fazer baixa direta para projetos)
+export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR' | 'USER' | 'WAREHOUSE';
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  password: string; // Em produção, usar hash ou Auth Provider externo
+  password: string; 
   role: UserRole;
   department?: string;
   active: boolean;

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Material, StockMovement, StockLocation, User } from '../types';
+import { Material, StockMovement, StockLocation, User, Project } from '../types';
 import * as XLSX from 'xlsx';
 import { supabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
@@ -11,9 +11,10 @@ interface Props {
   setMaterials: React.Dispatch<React.SetStateAction<Material[]>>;
   onAddMovement: (mov: StockMovement) => void;
   currentUser: User;
+  projects?: Project[]; // Opcional, passado do App.tsx
 }
 
-const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser }) => {
+const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser, projects = [] }) => {
   const [view, setView] = useState<'stock' | 'history'>('stock');
   
   const [searchInput, setSearchInput] = useState(''); 
@@ -33,12 +34,13 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   });
 
   const [selectedMaterialForLoc, setSelectedMaterialForLoc] = useState<Material | null>(null);
-  const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW'>('VIEW');
+  const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW' | 'PROJECT_OUT'>('VIEW');
   const [locForm, setLocForm] = useState({ 
       location: '', 
       toLocation: '', 
       quantity: '', 
-      reason: '' 
+      reason: '',
+      projectId: '' 
   });
 
   useEffect(() => {
@@ -104,7 +106,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           setSelectedMaterialForLoc(m);
       }
       setLocAction('VIEW');
-      setLocForm({ location: '', toLocation: '', quantity: '', reason: '' });
+      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '' });
   };
 
   const handleLocationSubmit = (e: React.FormEvent) => {
@@ -164,7 +166,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       toLocation: locForm.location
                   });
 
-              } else if (locAction === 'OUT') {
+              } else if (locAction === 'OUT' || locAction === 'PROJECT_OUT') {
                   const targetLocIndex = newLocations.findIndex(l => l.name === locForm.location);
                   if (targetLocIndex >= 0 && newLocations[targetLocIndex].quantity >= qty) {
                       newLocations[targetLocIndex].quantity -= qty;
@@ -172,6 +174,11 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       alert('Saldo insuficiente no local selecionado.');
                       return m;
                   }
+                   
+                   const desc = locAction === 'PROJECT_OUT' 
+                      ? `Baixa p/ Projeto: ${projects.find(p => p.id === locForm.projectId)?.code || '---'}` 
+                      : (locForm.reason || 'Saque Manual (Baixa)');
+
                    onAddMovement({
                       id: Math.random().toString(36).substr(2, 9),
                       type: 'OUT',
@@ -179,8 +186,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       quantity: qty,
                       date: new Date().toISOString(),
                       userId: currentUser.id,
-                      description: locForm.reason || 'Saque Manual (Baixa)',
-                      fromLocation: locForm.location
+                      description: desc,
+                      fromLocation: locForm.location,
+                      projectId: locAction === 'PROJECT_OUT' ? locForm.projectId : undefined
                   });
 
               } else if (locAction === 'TRANSFER') {
@@ -223,7 +231,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           return m;
       }));
 
-      setLocForm({ location: '', toLocation: '', quantity: '', reason: '' });
+      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '' });
       setLocAction('VIEW');
   };
 
@@ -394,6 +402,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  // Permissão de Almoxarife para baixa direta
+  const canDirectIssue = currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE';
+
   return (
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
@@ -517,7 +528,14 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                    )}
                                </td>
                                <td className="p-5 text-slate-700 font-medium">{mov.userId}</td>
-                               <td className="p-5 text-slate-500 font-medium">{mov.description}</td>
+                               <td className="p-5 text-slate-500 font-medium">
+                                   {mov.description}
+                                   {mov.projectId && (
+                                       <span className="block text-[10px] font-bold text-slate-400 bg-slate-100 rounded px-1 mt-1 w-fit">
+                                           Proj: {projects.find(p => p.id === mov.projectId)?.code || '---'}
+                                       </span>
+                                   )}
+                               </td>
                            </tr>
                        ))}
                    </tbody>
@@ -649,11 +667,15 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
                         {/* Ações */}
                         <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
-                            <div className="flex bg-white p-1 rounded-xl border border-slate-200 mb-6 shadow-sm">
-                                <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
-                                <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
-                                <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
-                                <button onClick={() => { setLocAction('OUT'); setLocForm({...locForm, location: '', toLocation: '', quantity: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa</button>
+                            <div className="flex flex-wrap bg-white p-1 rounded-xl border border-slate-200 mb-6 shadow-sm">
+                                <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
+                                <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
+                                <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
+                                <button onClick={() => { setLocAction('OUT'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa</button>
+                                
+                                {canDirectIssue && (
+                                    <button onClick={() => { setLocAction('PROJECT_OUT'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'PROJECT_OUT' ? 'bg-orange-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Proj.</button>
+                                )}
                             </div>
 
                             {locAction !== 'VIEW' && (
@@ -681,7 +703,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                     ) : (
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Local Alvo</label>
-                                            {locAction === 'OUT' ? (
+                                            {(locAction === 'OUT' || locAction === 'PROJECT_OUT') ? (
                                                 <select required className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})}>
                                                     <option value="">Selecione...</option>
                                                     {selectedMaterialForLoc.stockLocations?.map((l, i) => <option key={i} value={l.name}>{l.name} ({l.quantity})</option>)}
@@ -691,6 +713,20 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                                     <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Selecionar ou Digitar..." value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})} />
                                                 </>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {/* SELEÇÃO DE PROJETO PARA BAIXA DIRETA */}
+                                    {locAction === 'PROJECT_OUT' && (
+                                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                                            <label className="text-xs font-bold text-orange-700 uppercase block mb-2">Projeto de Destino</label>
+                                            <select required className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800" value={locForm.projectId} onChange={e => setLocForm({...locForm, projectId: e.target.value})}>
+                                                <option value="">Selecione o Projeto...</option>
+                                                {projects.filter(p => p.status !== 'FINISHED').map(p => (
+                                                    <option key={p.id} value={p.id}>{p.code} - {p.description}</option>
+                                                ))}
+                                            </select>
+                                            <p className="text-[10px] text-orange-600 mt-1">O custo será alocado ao projeto selecionado sem abrir OS.</p>
                                         </div>
                                     )}
 
@@ -706,7 +742,11 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Justificativa</label>
-                                            <input className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.reason} onChange={e => setLocForm({...locForm, reason: e.target.value})} placeholder="Motivo da operação..." />
+                                            {locAction === 'PROJECT_OUT' ? (
+                                                <input disabled className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-100 shadow-sm text-slate-400 italic cursor-not-allowed" value="Baixa para Projeto (Automático)" />
+                                            ) : (
+                                                <input className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.reason} onChange={e => setLocForm({...locForm, reason: e.target.value})} placeholder="Motivo da operação..." />
+                                            )}
                                         </div>
                                     </div>
 
