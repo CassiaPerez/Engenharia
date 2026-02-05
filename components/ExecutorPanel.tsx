@@ -135,9 +135,23 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
 
   const currentList = getSortedList();
 
-  const handleStart = (e: React.MouseEvent, osId: string) => {
+  const handleStart = async (e: React.MouseEvent, osId: string) => {
       e.stopPropagation();
-      setOss(prev => prev.map(o => o.id === osId ? { ...o, status: OSStatus.IN_PROGRESS, startTime: new Date().toISOString() } : o));
+      const updated = { status: OSStatus.IN_PROGRESS, startTime: new Date().toISOString() };
+      setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
+
+      try {
+          const os = oss.find(o => o.id === osId);
+          if (os) {
+              const { error } = await supabase.from('oss').upsert({
+                  id: osId,
+                  json_content: { ...os, ...updated }
+              });
+              if (error) throw error;
+          }
+      } catch (e) {
+          console.error('Erro ao atualizar OS:', e);
+      }
   };
 
   const openFinishModal = (e: React.MouseEvent, os: OS) => {
@@ -155,23 +169,48 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       }
   };
 
-  const confirmFinish = () => {
+  const confirmFinish = async () => {
       if (!finishingOS || !photoPreview) return;
-      setOss(prev => prev.map(o => o.id === finishingOS.id ? { 
-          ...o, 
-          status: OSStatus.COMPLETED, 
+      const updated = {
+          ...finishingOS,
+          status: OSStatus.COMPLETED,
           endTime: new Date().toISOString(),
           completionImage: photoPreview
-      } : o));
+      };
+      setOss(prev => prev.map(o => o.id === finishingOS.id ? updated : o));
+
+      try {
+          const { error } = await supabase.from('oss').upsert({
+              id: finishingOS.id,
+              json_content: updated
+          });
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao finalizar OS:', e);
+      }
+
       setFinishingOS(null);
       setPhotoPreview(null);
   };
 
-  const handlePriorityChange = (osId: string, newPriority: string) => {
+  const handlePriorityChange = async (osId: string, newPriority: string) => {
       const p = newPriority as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
       setOss(prev => prev.map(o => o.id === osId ? { ...o, priority: p } : o));
       if (viewDetailOS && viewDetailOS.id === osId) {
           setViewDetailOS({ ...viewDetailOS, priority: p });
+      }
+
+      try {
+          const os = oss.find(o => o.id === osId);
+          if (os) {
+              const { error } = await supabase.from('oss').upsert({
+                  id: osId,
+                  json_content: { ...os, priority: p }
+              });
+              if (error) throw error;
+          }
+      } catch (e) {
+          console.error('Erro ao atualizar prioridade:', e);
       }
   };
 

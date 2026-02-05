@@ -15,24 +15,43 @@ const BuildingManager: React.FC<Props> = ({ buildings, setBuildings, currentUser
   const [formData, setFormData] = useState<Partial<Building>>({ type: 'CORPORATE' });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-        setBuildings(prev => prev.map(b => b.id === editingId ? { ...b, ...formData } as Building : b));
-    } else {
-        setBuildings(prev => [...prev, { 
-          id: Math.random().toString(36).substr(2, 9), 
-          name: formData.name || '', 
-          address: formData.address || '',
-          city: formData.city || '',
-          manager: formData.manager || '',
-          type: formData.type || 'CORPORATE',
-          notes: formData.notes || ''
-        }]);
+    try {
+        if (editingId) {
+            const updated = { ...formData, id: editingId } as Building;
+            setBuildings(prev => prev.map(b => b.id === editingId ? updated : b));
+
+            const { error } = await supabase.from('buildings').upsert({
+                id: editingId,
+                json_content: updated
+            });
+            if (error) throw error;
+        } else {
+            const newBuilding: Building = {
+              id: Math.random().toString(36).substr(2, 9),
+              name: formData.name || '',
+              address: formData.address || '',
+              city: formData.city || '',
+              manager: formData.manager || '',
+              type: formData.type || 'CORPORATE',
+              notes: formData.notes || ''
+            };
+            setBuildings(prev => [...prev, newBuilding]);
+
+            const { error } = await supabase.from('buildings').insert({
+                id: newBuilding.id,
+                json_content: newBuilding
+            });
+            if (error) throw error;
+        }
+        setShowModal(false);
+        setFormData({ type: 'CORPORATE' });
+        setEditingId(null);
+    } catch (e) {
+        console.error('Erro ao salvar:', e);
+        alert('Erro ao salvar no banco de dados.');
     }
-    setShowModal(false);
-    setFormData({ type: 'CORPORATE' });
-    setEditingId(null);
   };
 
   const handleEdit = (b: Building) => {

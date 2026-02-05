@@ -125,15 +125,16 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       }
   };
 
-  const handleAddItemToOS = () => {
+  const handleAddItemToOS = async () => {
       if (!selectedOS || !newItem.id || !newItem.qty || !isEditable(selectedOS)) return;
-      
+
+      let updatedOS: OS;
       if (activeSubTab === 'services') {
           const serviceTemplate = services.find(s => s.id === newItem.id);
           if (!serviceTemplate) return;
           const finalCost = serviceTemplate.unitValue;
           const newEntry: OSService = { serviceTypeId: serviceTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
-          const updatedOS = { ...selectedOS, services: [...selectedOS.services, newEntry] };
+          updatedOS = { ...selectedOS, services: [...selectedOS.services, newEntry] };
           setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
           setSelectedOS(updatedOS);
       } else {
@@ -143,10 +144,21 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
           const finalCost = materialTemplate.unitCost;
           const newEntry: OSItem = { materialId: materialTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
           onStockChange(materialTemplate.id, Number(newItem.qty), selectedOS.number);
-          const updatedOS = { ...selectedOS, materials: [...selectedOS.materials, newEntry] };
+          updatedOS = { ...selectedOS, materials: [...selectedOS.materials, newEntry] };
           setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
           setSelectedOS(updatedOS);
       }
+
+      try {
+          const { error } = await supabase.from('oss').upsert({
+              id: updatedOS.id,
+              json_content: updatedOS
+          });
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao salvar item na OS:', e);
+      }
+
       setNewItem({ id: '', qty: '', cost: '' });
       setItemSearchTerm('');
   };
@@ -182,41 +194,53 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       setShowQuickMatModal(false);
   };
 
-  const handleCreate = (e: React.FormEvent) => { 
-      e.preventDefault(); 
+  const handleCreate = async (e: React.FormEvent) => {
+      e.preventDefault();
       if (!formOS.projectId && !formOS.buildingId && !formOS.equipmentId) {
           alert('Selecione um Projeto, Edifício ou Equipamento para vincular a OS.');
           return;
       }
-      
+
       const newOSNumber = `OS-${Date.now().toString().slice(-4)}`;
 
       plannedMaterials.forEach(pm => {
           onStockChange(pm.materialId, pm.quantity, newOSNumber);
       });
 
-      const newOS: OS = { 
-          id: Math.random().toString(36).substr(2, 9), 
-          number: newOSNumber, 
-          projectId: formOS.projectId, 
-          buildingId: formOS.buildingId, 
+      const newOS: OS = {
+          id: Math.random().toString(36).substr(2, 9),
+          number: newOSNumber,
+          projectId: formOS.projectId,
+          buildingId: formOS.buildingId,
           equipmentId: formOS.equipmentId,
-          executorId: formOS.executorId, 
-          description: formOS.description || '', 
-          type: formOS.type || OSType.PREVENTIVE, 
-          priority: formOS.priority as any, 
-          slaHours: Number(formOS.slaHours), 
-          openDate: new Date().toISOString(), 
-          limitDate: new Date(Date.now() + (Number(formOS.slaHours)) * 3600000).toISOString(), 
-          status: OSStatus.OPEN, 
-          materials: plannedMaterials, 
-          services: plannedServices 
+          executorId: formOS.executorId,
+          description: formOS.description || '',
+          type: formOS.type || OSType.PREVENTIVE,
+          priority: formOS.priority as any,
+          slaHours: Number(formOS.slaHours),
+          openDate: new Date().toISOString(),
+          limitDate: new Date(Date.now() + (Number(formOS.slaHours)) * 3600000).toISOString(),
+          status: OSStatus.OPEN,
+          materials: plannedMaterials,
+          services: plannedServices
       };
 
-      setOss(prev => [...prev, newOS]); 
-      setShowModal(false); 
-      setFormOS({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE }); 
-      setCreationContext('PROJECT'); 
+      setOss(prev => [...prev, newOS]);
+
+      try {
+          const { error } = await supabase.from('oss').insert({
+              id: newOS.id,
+              json_content: newOS
+          });
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao salvar OS:', e);
+          alert('Erro ao salvar no banco de dados.');
+      }
+
+      setShowModal(false);
+      setFormOS({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
+      setCreationContext('PROJECT');
       setPlannedMaterials([]);
       setPlannedServices([]);
   };

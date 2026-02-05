@@ -15,25 +15,43 @@ const ServiceManager: React.FC<Props> = ({ services, setServices, currentUser })
   const [formData, setFormData] = useState<Partial<ServiceType>>({ costType: ServiceCostType.HOURLY, unitValue: 0, team: '', category: 'INTERNAL' });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-        setServices(prev => prev.map(s => s.id === editingId ? { ...s, ...formData } as ServiceType : s));
-    } else {
-        setServices(prev => [...prev, { 
-          id: Math.random().toString(36).substr(2, 9), 
-          name: formData.name || '', 
-          description: formData.description || '',
-          team: formData.team || 'Geral', 
-          costType: ServiceCostType.HOURLY, 
-          unitValue: Number(formData.unitValue) || 0, 
-          category: formData.category || 'INTERNAL' 
-        }]);
+    try {
+        if (editingId) {
+            const updated = { ...formData, id: editingId } as ServiceType;
+            setServices(prev => prev.map(s => s.id === editingId ? updated : s));
+
+            const { error } = await supabase.from('services').upsert({
+                id: editingId,
+                json_content: updated
+            });
+            if (error) throw error;
+        } else {
+            const newService: ServiceType = {
+              id: Math.random().toString(36).substr(2, 9),
+              name: formData.name || '',
+              description: formData.description || '',
+              team: formData.team || 'Geral',
+              costType: ServiceCostType.HOURLY,
+              unitValue: Number(formData.unitValue) || 0,
+              category: formData.category || 'INTERNAL'
+            };
+            setServices(prev => [...prev, newService]);
+
+            const { error } = await supabase.from('services').insert({
+                id: newService.id,
+                json_content: newService
+            });
+            if (error) throw error;
+        }
+        setShowModal(false);
+        setFormData({ costType: ServiceCostType.HOURLY, unitValue: 0, team: '', category: 'INTERNAL' });
+        setEditingId(null);
+    } catch (e) {
+        console.error('Erro ao salvar:', e);
+        alert('Erro ao salvar no banco de dados.');
     }
-    
-    setShowModal(false);
-    setFormData({ costType: ServiceCostType.HOURLY, unitValue: 0, team: '', category: 'INTERNAL' });
-    setEditingId(null);
   };
 
   const handleEdit = (service: ServiceType) => {

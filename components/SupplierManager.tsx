@@ -33,22 +33,36 @@ const SupplierManager: React.FC<Props> = ({ suppliers, setSuppliers, currentUser
       setShowModal(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSuppliers(prev => [...prev, { 
-        id: Math.random().toString(36).substr(2, 9), 
-        name: formData.name || '', 
-        document: formData.document || '', 
-        email: formData.email || '', 
-        phone: formData.phone || '', 
-        address: formData.address || '', 
-        rating: formData.rating || 5, 
-        notes: formData.notes || '', 
-        categoryIds: [],
-        status: formData.status || 'PENDING',
-        docs: formData.docs || []
-    }]);
-    setShowModal(false); setFormData({ rating: 5, status: 'PENDING', docs: [] });
+    try {
+        const newSupplier: Supplier = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: formData.name || '',
+            document: formData.document || '',
+            email: formData.email || '',
+            phone: formData.phone || '',
+            address: formData.address || '',
+            rating: formData.rating || 5,
+            notes: formData.notes || '',
+            categoryIds: [],
+            status: formData.status || 'PENDING',
+            docs: formData.docs || []
+        };
+        setSuppliers(prev => [...prev, newSupplier]);
+
+        const { error } = await supabase.from('suppliers').insert({
+            id: newSupplier.id,
+            json_content: newSupplier
+        });
+        if (error) throw error;
+
+        setShowModal(false);
+        setFormData({ rating: 5, status: 'PENDING', docs: [] });
+    } catch (e) {
+        console.error('Erro ao salvar:', e);
+        alert('Erro ao salvar no banco de dados.');
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

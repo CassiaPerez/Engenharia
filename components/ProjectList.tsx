@@ -210,45 +210,66 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       setShowQuickMatModal(false);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const startDate = formProject.startDate || '';
     const slaDays = Number(formProject.slaDays) || 30;
     const limitDate = new Date(startDate);
     limitDate.setDate(limitDate.getDate() + slaDays);
 
-    if (editingProject) {
-      setProjects(prev => prev.map(p => p.id === editingProject.id ? { 
-        ...p, ...formProject, estimatedEndDate: limitDate.toISOString().split('T')[0],
-        auditLogs: [...p.auditLogs, { date: new Date().toISOString(), action: 'Alteração de Escopo', user: currentUser.id }]
-      } as Project : p));
-    } else {
-      const project: Project = {
-        id: Math.random().toString(36).substr(2, 9),
-        code: `PRJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-        description: formProject.description || '',
-        detailedDescription: formProject.detailedDescription || '',
-        location: formProject.location || '',
-        city: formProject.city || '',
-        category: formProject.category as Category,
-        reason: formProject.reason || '',
-        reasonType: OSType.PREVENTIVE,
-        responsible: formProject.responsible || '',
-        area: formProject.area || '',
-        costCenter: formProject.costCenter || '',
-        estimatedValue: Number(formProject.estimatedValue) || 0,
-        plannedMaterials: formProject.plannedMaterials || [],
-        plannedServices: formProject.plannedServices || [],
-        startDate: startDate,
-        estimatedEndDate: limitDate.toISOString().split('T')[0],
-        slaDays: slaDays,
-        status: ProjectStatus.PLANNED,
-        postponementHistory: [],
-        auditLogs: [{ date: new Date().toISOString(), action: 'Criação', user: currentUser.id }]
-      };
-      setProjects([...projects, project]);
+    try {
+        if (editingProject) {
+          const updated: Project = {
+            ...editingProject,
+            ...formProject,
+            estimatedEndDate: limitDate.toISOString().split('T')[0],
+            auditLogs: [...editingProject.auditLogs, { date: new Date().toISOString(), action: 'Alteração de Escopo', user: currentUser.id }]
+          } as Project;
+          setProjects(prev => prev.map(p => p.id === editingProject.id ? updated : p));
+
+          const { error } = await supabase.from('projects').upsert({
+              id: updated.id,
+              json_content: updated
+          });
+          if (error) throw error;
+        } else {
+          const project: Project = {
+            id: Math.random().toString(36).substr(2, 9),
+            code: `PRJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+            description: formProject.description || '',
+            detailedDescription: formProject.detailedDescription || '',
+            location: formProject.location || '',
+            city: formProject.city || '',
+            category: formProject.category as Category,
+            reason: formProject.reason || '',
+            reasonType: OSType.PREVENTIVE,
+            responsible: formProject.responsible || '',
+            area: formProject.area || '',
+            costCenter: formProject.costCenter || '',
+            estimatedValue: Number(formProject.estimatedValue) || 0,
+            plannedMaterials: formProject.plannedMaterials || [],
+            plannedServices: formProject.plannedServices || [],
+            startDate: startDate,
+            estimatedEndDate: limitDate.toISOString().split('T')[0],
+            slaDays: slaDays,
+            status: ProjectStatus.PLANNED,
+            postponementHistory: [],
+            auditLogs: [{ date: new Date().toISOString(), action: 'Criação', user: currentUser.id }]
+          };
+          setProjects([...projects, project]);
+
+          const { error } = await supabase.from('projects').insert({
+              id: project.id,
+              json_content: project
+          });
+          if (error) throw error;
+        }
+        setShowModal(false);
+        setEditingProject(null);
+    } catch (e) {
+        console.error('Erro ao salvar projeto:', e);
+        alert('Erro ao salvar no banco de dados.');
     }
-    setShowModal(false); setEditingProject(null);
   };
 
   const currentPlannedCosts = useMemo(() => calculatePlannedCosts(formProject, materials, services), [formProject, materials, services]);

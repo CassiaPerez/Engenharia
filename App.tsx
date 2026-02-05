@@ -132,39 +132,6 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
-  // Auto-sync para Supabase com debounce (backup de segurança)
-  // As operações principais devem salvar diretamente, mas isso garante consistência
-  useEffect(() => {
-    if (firstLoad) return;
-
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-    timeoutRef.current = setTimeout(async () => {
-       if (syncStatus === 'error') return;
-
-       setSyncStatus('syncing');
-       try {
-          await Promise.all([
-             ...projects.map(item => supabase.from('projects').upsert(mapToSupabase(item))),
-             ...materials.map(item => supabase.from('materials').upsert(mapToSupabase(item))),
-             ...services.map(item => supabase.from('services').upsert(mapToSupabase(item))),
-             ...oss.map(item => supabase.from('oss').upsert(mapToSupabase(item))),
-             ...movements.map(item => supabase.from('stock_movements').upsert(mapToSupabase(item))),
-             ...suppliers.map(item => supabase.from('suppliers').upsert(mapToSupabase(item))),
-             ...users.map(item => supabase.from('users').upsert(mapToSupabase(item))),
-             ...purchases.map(item => supabase.from('purchases').upsert(mapToSupabase(item))),
-             ...buildings.map(item => supabase.from('buildings').upsert(mapToSupabase(item))),
-             ...equipments.map(item => supabase.from('equipments').upsert(mapToSupabase(item))),
-          ]);
-          setSyncStatus('online');
-       } catch (e) {
-          console.error("Erro ao sincronizar com Supabase:", e);
-          setSyncStatus('error');
-       }
-    }, 1500);
-
-    return () => { if(timeoutRef.current) clearTimeout(timeoutRef.current); };
-  }, [projects, materials, services, oss, movements, suppliers, users, purchases, buildings, equipments, firstLoad, syncStatus]);
 
   // Função para gerenciar baixa de estoque via OS
   // Agora suporta múltiplos locais (FIFO de locais: consome do primeiro com saldo)

@@ -124,16 +124,18 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '' });
   };
 
-  const handleLocationSubmit = (e: React.FormEvent) => {
+  const handleLocationSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!selectedMaterialForLoc) return;
 
       const qty = Number(locForm.quantity);
-      
+
       if (locAction !== 'ADD' && (isNaN(qty) || qty <= 0)) {
           alert('Quantidade inválida.');
           return;
       }
+
+      let updatedMaterial: Material | null = null;
 
       setMaterials(prev => prev.map(m => {
           if (m.id === selectedMaterialForLoc.id) {
@@ -145,7 +147,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       alert('Este local já existe para este material.');
                       return m;
                   }
-                  
+
                   const initialQty = qty || 0;
                   newLocations.push({ name: locForm.location, quantity: initialQty });
 
@@ -169,7 +171,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                   } else {
                       newLocations.push({ name: locForm.location, quantity: qty });
                   }
-                  
+
                   onAddMovement({
                       id: Math.random().toString(36).substr(2, 9),
                       type: 'IN',
@@ -189,9 +191,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       alert('Saldo insuficiente no local selecionado.');
                       return m;
                   }
-                   
-                   const desc = locAction === 'PROJECT_OUT' 
-                      ? `Baixa p/ Projeto: ${projects.find(p => p.id === locForm.projectId)?.code || '---'}` 
+
+                   const desc = locAction === 'PROJECT_OUT'
+                      ? `Baixa p/ Projeto: ${projects.find(p => p.id === locForm.projectId)?.code || '---'}`
                       : (locForm.reason || 'Saque Manual (Baixa)');
 
                    onAddMovement({
@@ -210,7 +212,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                   const fromIndex = newLocations.findIndex(l => l.name === locForm.location);
                   if (fromIndex >= 0 && newLocations[fromIndex].quantity >= qty) {
                       newLocations[fromIndex].quantity -= qty;
-                      
+
                       const toIndex = newLocations.findIndex(l => l.name === locForm.toLocation);
                       if (toIndex >= 0) {
                           newLocations[toIndex].quantity += qty;
@@ -237,20 +239,33 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
               }
 
               const newTotal = newLocations.reduce((acc, l) => acc + l.quantity, 0);
-              
+
               const updatedM = { ...m, currentStock: newTotal, stockLocations: newLocations };
               setSelectedMaterialForLoc(updatedM);
-              
+              updatedMaterial = updatedM;
+
               return updatedM;
           }
           return m;
       }));
 
+      if (updatedMaterial) {
+          try {
+              const { error } = await supabase.from('materials').upsert({
+                  id: updatedMaterial.id,
+                  json_content: updatedMaterial
+              });
+              if (error) throw error;
+          } catch (e) {
+              console.error('Erro ao salvar alteração:', e);
+          }
+      }
+
       setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '' });
       setLocAction('VIEW');
   };
 
-  const handleCreateMaterial = (e: React.FormEvent) => {
+  const handleCreateMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMaterial.code || !newMaterial.description) return;
 
@@ -279,6 +294,17 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     };
 
     setMaterials(prev => [...prev, material]);
+
+    try {
+        const { error } = await supabase.from('materials').insert({
+            id: material.id,
+            json_content: material
+        });
+        if (error) throw error;
+    } catch (e) {
+        console.error('Erro ao salvar material:', e);
+        alert('Erro ao salvar no banco de dados.');
+    }
 
     if (material.currentStock > 0) {
         onAddMovement({
