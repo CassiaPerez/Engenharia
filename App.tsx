@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Project, OS, Material, ServiceType, StockMovement, 
+import {
+  Project, OS, Material, ServiceType, StockMovement,
   UserRole, OSStatus, ProjectStatus, User, PurchaseRecord, Building, StockLocation, Equipment
 } from './types';
-import { INITIAL_MATERIALS, INITIAL_SERVICES, INITIAL_PROJECTS, INITIAL_USERS, INITIAL_BUILDINGS, INITIAL_EQUIPMENTS } from './constants';
 import Dashboard from './components/Dashboard';
 import ProjectList from './components/ProjectList';
 import OSList from './components/OSList';
@@ -61,17 +60,17 @@ const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<TabId>('dash');
   
-  // Dados do Sistema
-  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
-  const [materials, setMaterials] = useState<Material[]>(INITIAL_MATERIALS);
-  const [services, setServices] = useState<ServiceType[]>(INITIAL_SERVICES);
+  // Dados do Sistema (Sempre vazio no início - carregados do Supabase)
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [services, setServices] = useState<ServiceType[]>([]);
   const [oss, setOss] = useState<OS[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]); 
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>(INITIAL_BUILDINGS);
-  const [equipments, setEquipments] = useState<Equipment[]>(INITIAL_EQUIPMENTS);
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [equipments, setEquipments] = useState<Equipment[]>([]);
   
   // Estado de Layout Mobile
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -83,12 +82,11 @@ const App: React.FC = () => {
   // Refs para debounce de salvamento
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Carregamento Inicial Híbrido (Supabase > LocalStorage > Initial)
+  // Carregamento Inicial do Supabase (Única Fonte de Dados)
   useEffect(() => {
     const loadData = async () => {
       setSyncStatus('syncing');
       try {
-        // Tenta buscar do Supabase
         const [p, m, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
           supabase.from('projects').select('*'),
           supabase.from('materials').select('*'),
@@ -102,63 +100,30 @@ const App: React.FC = () => {
           supabase.from('equipments').select('*')
         ]);
 
-        if (p.error || m.error) throw new Error("Erro de conexão com DB");
+        if (p.error || m.error || s.error || usr.error) {
+          console.error("Erro ao carregar dados:", { p: p.error, m: m.error, s: s.error, usr: usr.error });
+          throw new Error("Erro de conexão com Supabase");
+        }
 
-        const dbProjects = mapFromSupabase<Project>(p.data);
-        const dbMaterials = mapFromSupabase<Material>(m.data);
-        
-        // Se o banco retornar dados, usamos eles. Se estiver vazio (tabela nova), tentamos localStorage
-        if (dbProjects.length > 0 || dbMaterials.length > 0) {
-            setProjects(dbProjects.length ? dbProjects : INITIAL_PROJECTS);
-            setMaterials(dbMaterials.length ? dbMaterials : INITIAL_MATERIALS);
-            setServices(mapFromSupabase<ServiceType>(s.data).length ? mapFromSupabase<ServiceType>(s.data) : INITIAL_SERVICES);
-            setOss(mapFromSupabase<OS>(o.data));
-            setMovements(mapFromSupabase<StockMovement>(mov.data));
-            setSuppliers(mapFromSupabase<any>(sup.data));
-            setUsers(mapFromSupabase<User>(usr.data).length ? mapFromSupabase<User>(usr.data) : INITIAL_USERS);
-            setPurchases(mapFromSupabase<PurchaseRecord>(pur.data));
-            setBuildings(mapFromSupabase<Building>(bld.data).length ? mapFromSupabase<Building>(bld.data) : INITIAL_BUILDINGS);
-            setEquipments(mapFromSupabase<Equipment>(eqp.data).length ? mapFromSupabase<Equipment>(eqp.data) : INITIAL_EQUIPMENTS);
-            setSyncStatus('online');
-        } else {
-            // Fallback para LocalStorage se o banco estiver vazio (primeiro uso)
-            const stored = localStorage.getItem('crop_service_v3_data');
-            if (stored) {
-                const data = JSON.parse(stored);
-                if (data.projects) setProjects(data.projects);
-                if (data.materials) setMaterials(data.materials);
-                if (data.services) setServices(data.services);
-                if (data.oss) setOss(data.oss);
-                if (data.movements) setMovements(data.movements);
-                if (data.suppliers) setSuppliers(data.suppliers);
-                if (data.users) setUsers(data.users);
-                if (data.purchases) setPurchases(data.purchases);
-                if (data.buildings) setBuildings(data.buildings);
-                if (data.equipments) setEquipments(data.equipments);
-            }
-            setSyncStatus('online'); // Consideramos online mas vazio
-        }
+        setProjects(mapFromSupabase<Project>(p.data || []));
+        setMaterials(mapFromSupabase<Material>(m.data || []));
+        setServices(mapFromSupabase<ServiceType>(s.data || []));
+        setOss(mapFromSupabase<OS>(o.data || []));
+        setMovements(mapFromSupabase<StockMovement>(mov.data || []));
+        setSuppliers(mapFromSupabase<any>(sup.data || []));
+        setUsers(mapFromSupabase<User>(usr.data || []));
+        setPurchases(mapFromSupabase<PurchaseRecord>(pur.data || []));
+        setBuildings(mapFromSupabase<Building>(bld.data || []));
+        setEquipments(mapFromSupabase<Equipment>(eqp.data || []));
+
+        setSyncStatus('online');
       } catch (err) {
-        console.warn("Supabase não conectado ou tabelas inexistentes. Usando LocalStorage.", err);
-        // Fallback completo para LocalStorage
-        const stored = localStorage.getItem('crop_service_v3_data');
-        if (stored) {
-          const data = JSON.parse(stored);
-          if (data.projects) setProjects(data.projects);
-          if (data.materials) setMaterials(data.materials);
-          if (data.services) setServices(data.services);
-          if (data.oss) setOss(data.oss);
-          if (data.movements) setMovements(data.movements);
-          if (data.suppliers) setSuppliers(data.suppliers);
-          if (data.users) setUsers(data.users);
-          if (data.purchases) setPurchases(data.purchases);
-          if (data.buildings) setBuildings(data.buildings);
-          if (data.equipments) setEquipments(data.equipments);
-        }
-        setSyncStatus('offline');
+        console.error("Falha ao conectar com Supabase:", err);
+        setSyncStatus('error');
+        alert("Erro ao conectar com o banco de dados. Verifique sua conexão com a internet.");
       } finally {
         setFirstLoad(false);
-        // Verifica sessão persistida
+        // Verifica sessão persistida (apenas login fica no localStorage)
         const savedUser = localStorage.getItem('crop_user_session');
         if (savedUser) setCurrentUser(JSON.parse(savedUser));
       }
@@ -167,22 +132,18 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
-  // Sincronização e Persistência
+  // Auto-sync para Supabase com debounce (backup de segurança)
+  // As operações principais devem salvar diretamente, mas isso garante consistência
   useEffect(() => {
     if (firstLoad) return;
 
-    // 1. Salva Localmente
-    localStorage.setItem('crop_service_v3_data', JSON.stringify({ projects, materials, services, oss, movements, suppliers, users, purchases, buildings, equipments }));
-
-    // 2. Debounce para salvar no Supabase
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    
+
     timeoutRef.current = setTimeout(async () => {
-       if (syncStatus === 'offline') return;
-       
+       if (syncStatus === 'error') return;
+
        setSyncStatus('syncing');
        try {
-          // Upsert em Batch
           await Promise.all([
              ...projects.map(item => supabase.from('projects').upsert(mapToSupabase(item))),
              ...materials.map(item => supabase.from('materials').upsert(mapToSupabase(item))),
@@ -197,13 +158,13 @@ const App: React.FC = () => {
           ]);
           setSyncStatus('online');
        } catch (e) {
-          console.error("Erro ao sincronizar", e);
+          console.error("Erro ao sincronizar com Supabase:", e);
           setSyncStatus('error');
        }
-    }, 2000); 
+    }, 1500);
 
     return () => { if(timeoutRef.current) clearTimeout(timeoutRef.current); };
-  }, [projects, materials, services, oss, movements, suppliers, users, purchases, buildings, equipments, firstLoad]);
+  }, [projects, materials, services, oss, movements, suppliers, users, purchases, buildings, equipments, firstLoad, syncStatus]);
 
   // Função para gerenciar baixa de estoque via OS
   // Agora suporta múltiplos locais (FIFO de locais: consome do primeiro com saldo)
