@@ -24,7 +24,9 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
     { id: 'ADMIN', label: 'Administrador', desc: 'Acesso total ao sistema e configurações.' },
     { id: 'MANAGER', label: 'Gerente', desc: 'Gestão de projetos e relatórios. Sem acesso a usuários.' },
     { id: 'EXECUTOR', label: 'Prestador de Serviço', desc: 'Foco em execução de OS e Agenda.' },
-    { id: 'WAREHOUSE', label: 'Almoxarifado', desc: 'Gestão de estoque e baixa direta por projeto.' },
+    { id: 'WAREHOUSE', label: 'Almoxarifado (Geral)', desc: 'Supervisão de todos os estoques.' },
+    { id: 'WAREHOUSE_BIO', label: 'Almox. CropBio', desc: 'Acesso restrito à unidade Bio.' },
+    { id: 'WAREHOUSE_FERT', label: 'Almox. CropFert', desc: 'Acesso restrito à unidade Fert.' },
     { id: 'USER', label: 'Usuário Comum', desc: 'Acesso básico de visualização.' },
   ];
 
@@ -181,7 +183,7 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                                 u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700 border-purple-200' :
                                 u.role === 'MANAGER' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                                 u.role === 'EXECUTOR' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                                u.role === 'WAREHOUSE' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                u.role.startsWith('WAREHOUSE') ? 'bg-amber-100 text-amber-700 border-amber-200' :
                                 'bg-slate-100 text-slate-600 border-slate-200'
                             }`}>
                                 {roles.find(r => r.id === u.role)?.label}

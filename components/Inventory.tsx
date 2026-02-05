@@ -57,7 +57,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         if (m.location) locs.add(m.location);
         m.stockLocations?.forEach(l => locs.add(l.name));
     });
+    // Locais Padrão
     locs.add('CD - Central');
+    locs.add('Almoxarifado CropBio');
+    locs.add('Almoxarifado CropFert');
     return Array.from(locs).sort();
   }, [materials]);
 
@@ -83,15 +86,27 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   };
 
   const openNewItemModal = () => {
+      let defaultGroup = 'Geral';
+      let defaultLoc = 'CD - Central';
+
+      // Preenchimento inteligente baseado no perfil
+      if (currentUser.role === 'WAREHOUSE_BIO') {
+          defaultGroup = 'CropBio';
+          defaultLoc = 'Almoxarifado CropBio';
+      } else if (currentUser.role === 'WAREHOUSE_FERT') {
+          defaultGroup = 'CropFert';
+          defaultLoc = 'Almoxarifado CropFert';
+      }
+
       setNewMaterial({
         status: 'ACTIVE',
         minStock: 10,
         currentStock: 0,
         unitCost: 0,
-        group: 'Geral',
+        group: defaultGroup,
         unit: 'Un',
         description: '', 
-        location: 'CD - Central', 
+        location: defaultLoc, 
         code: generateUniqueSKU()
       });
       setShowModal(true);
@@ -393,24 +408,73 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       XLSX.writeFile(wb, "Modelo_Importacao_Estoque.xlsx");
   };
 
+  // --- FILTRAGEM INTELIGENTE POR PERFIL ---
   const filteredMaterials = useMemo(() => {
-      return materials.filter(m => 
+      // 1. Filtro de Texto
+      const textFiltered = materials.filter(m => 
         m.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
         m.code.toLowerCase().includes(searchTerm.toLowerCase())
       );
-  }, [materials, searchTerm]);
+
+      // 2. Filtro de Perfil (Bio vs Fert)
+      if (currentUser.role === 'WAREHOUSE_BIO') {
+          return textFiltered.filter(m => 
+              (m.group && m.group.toLowerCase().includes('bio')) || 
+              (m.location && m.location.toLowerCase().includes('bio'))
+          );
+      }
+      if (currentUser.role === 'WAREHOUSE_FERT') {
+          return textFiltered.filter(m => 
+              (m.group && m.group.toLowerCase().includes('fert')) || 
+              (m.location && m.location.toLowerCase().includes('fert'))
+          );
+      }
+
+      // Admin e Warehouse Geral veem tudo
+      return textFiltered;
+  }, [materials, searchTerm, currentUser.role]);
+
+  const filteredMovements = useMemo(() => {
+      const sorted = movements.sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
+      
+      if (currentUser.role === 'WAREHOUSE_BIO') {
+          // Filtrar movimentos de itens Bio
+          return sorted.filter(mov => {
+              const mat = materials.find(m => m.id === mov.materialId);
+              return mat && (
+                  (mat.group && mat.group.toLowerCase().includes('bio')) ||
+                  (mat.location && mat.location.toLowerCase().includes('bio'))
+              );
+          });
+      }
+      if (currentUser.role === 'WAREHOUSE_FERT') {
+          // Filtrar movimentos de itens Fert
+          return sorted.filter(mov => {
+              const mat = materials.find(m => m.id === mov.materialId);
+              return mat && (
+                  (mat.group && mat.group.toLowerCase().includes('fert')) ||
+                  (mat.location && mat.location.toLowerCase().includes('fert'))
+              );
+          });
+      }
+      return sorted;
+  }, [movements, materials, currentUser.role]);
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Permissão de Almoxarife para baixa direta
-  const canDirectIssue = currentUser.role === 'ADMIN' || currentUser.role === 'WAREHOUSE';
+  const canDirectIssue = ['ADMIN', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'].includes(currentUser.role);
 
   return (
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
         <div>
           <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Almoxarifado Central</h2>
-          <p className="text-slate-500 text-lg mt-1 font-medium">Controle físico de estoque e auditoria.</p>
+          <div className="flex items-center gap-2">
+            <p className="text-slate-500 text-lg mt-1 font-medium">Controle físico de estoque e auditoria.</p>
+            {currentUser.role === 'WAREHOUSE_BIO' && <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200 uppercase">Unidade Bio</span>}
+            {currentUser.role === 'WAREHOUSE_FERT' && <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded border border-blue-200 uppercase">Unidade Fert</span>}
+          </div>
         </div>
         <div className="flex flex-wrap gap-3">
             <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
@@ -499,6 +563,13 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                            </tr>
                        );
                    })}
+                   {filteredMaterials.length === 0 && (
+                       <tr>
+                           <td colSpan={9} className="px-8 py-12 text-center text-slate-400 italic">
+                               Nenhum material encontrado para o seu perfil de acesso.
+                           </td>
+                       </tr>
+                   )}
                 </tbody>
              </table>
           </div>
@@ -510,7 +581,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                <table className="w-full text-base text-left">
                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider"><tr className="border-b border-slate-200"><th className="p-5">Data</th><th className="p-5">Tipo</th><th className="p-5">Material</th><th className="p-5 text-right">Qtd</th><th className="p-5">Locais (Origem &rarr; Destino)</th><th className="p-5">Responsável</th><th className="p-5">Justificativa</th></tr></thead>
                    <tbody className="divide-y divide-slate-100">
-                       {movements.sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()).map(mov => (
+                       {filteredMovements.map(mov => (
                            <tr key={mov.id} className="hover:bg-slate-50">
                                <td className="p-5 text-slate-500 font-mono font-medium">{new Date(mov.date).toLocaleString()}</td>
                                <td className="p-5"><span className={`font-black text-xs px-3 py-1.5 rounded-lg border uppercase tracking-wide ${mov.type==='IN'?'bg-emerald-50 text-emerald-700 border-emerald-200':mov.type==='OUT'?'bg-amber-50 text-amber-700 border-amber-200':mov.type==='TRANSFER'?'bg-purple-50 text-purple-700 border-purple-200':'bg-blue-50 text-blue-700 border-blue-200'}`}>{mov.type}</span></td>

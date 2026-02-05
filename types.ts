@@ -207,8 +207,10 @@ export interface PurchaseRecord {
 }
 
 // User Role Definitions
-// WAREHOUSE: Almoxarife (Pode fazer baixa direta para projetos)
-export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR' | 'USER' | 'WAREHOUSE';
+// WAREHOUSE: Almoxarife Geral (Supervisor)
+// WAREHOUSE_BIO: Almoxarife Unidade CropBio
+// WAREHOUSE_FERT: Almoxarife Unidade CropFert
+export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR' | 'USER' | 'WAREHOUSE' | 'WAREHOUSE_BIO' | 'WAREHOUSE_FERT';
 
 export interface User {
   id: string;

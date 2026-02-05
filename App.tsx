@@ -26,10 +26,10 @@ const MENU_GROUPS = [
   {
     title: "Estratégico",
     items: [
-      { id: 'dash', icon: 'fa-chart-pie', label: 'Dashboard', allowedRoles: ['ADMIN', 'MANAGER', 'USER', 'WAREHOUSE'] },
-      { id: 'projects', icon: 'fa-folder-tree', label: 'Projetos (Capex)', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE'] },
-      { id: 'reports', icon: 'fa-file-invoice', label: 'Relatórios', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE'] },
-      { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço', allowedRoles: ['ADMIN', 'MANAGER', 'USER', 'WAREHOUSE'] }
+      { id: 'dash', icon: 'fa-chart-pie', label: 'Dashboard', allowedRoles: ['ADMIN', 'MANAGER', 'USER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] },
+      { id: 'projects', icon: 'fa-folder-tree', label: 'Projetos (Capex)', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] },
+      { id: 'reports', icon: 'fa-file-invoice', label: 'Relatórios', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] },
+      { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço', allowedRoles: ['ADMIN', 'MANAGER', 'USER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] }
     ]
   },
   {
@@ -38,16 +38,16 @@ const MENU_GROUPS = [
       { id: 'calendar', icon: 'fa-calendar-days', label: 'Agenda de Serviços', allowedRoles: ['ADMIN', 'MANAGER'] },
       { id: 'buildings', icon: 'fa-building', label: 'Edifícios', allowedRoles: ['ADMIN', 'MANAGER'] },
       { id: 'equipments', icon: 'fa-cogs', label: 'Equipamentos', allowedRoles: ['ADMIN', 'MANAGER'] },
-      { id: 'inventory', icon: 'fa-warehouse', label: 'Almoxarifado', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE'] },
+      { id: 'inventory', icon: 'fa-warehouse', label: 'Almoxarifado', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] },
       { id: 'services', icon: 'fa-users-gear', label: 'Serviços', allowedRoles: ['ADMIN', 'MANAGER'] },
-      { id: 'suppliers', icon: 'fa-handshake', label: 'Fornecedores', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE'] }
+      { id: 'suppliers', icon: 'fa-handshake', label: 'Fornecedores', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] }
     ]
   },
   {
     title: "Sistema",
     items: [
       { id: 'users', icon: 'fa-users', label: 'Usuários', allowedRoles: ['ADMIN'] },
-      { id: 'docs', icon: 'fa-book-open', label: 'Documentação', allowedRoles: ['ADMIN', 'MANAGER', 'EXECUTOR', 'USER', 'WAREHOUSE'] }
+      { id: 'docs', icon: 'fa-book-open', label: 'Documentação', allowedRoles: ['ADMIN', 'MANAGER', 'EXECUTOR', 'USER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] }
     ]
   }
 ] as const;
@@ -445,7 +445,7 @@ const App: React.FC = () => {
             </div>
             <div className="block md:hidden lg:block overflow-hidden">
               <p className="text-sm font-bold text-white truncate">{currentUser.name}</p>
-              <p className="text-xs text-white/70 truncate capitalize">{currentUser.role.toLowerCase()}</p>
+              <p className="text-xs text-white/70 truncate capitalize">{currentUser.role.toLowerCase().replace('warehouse_', 'almox_')}</p>
             </div>
           </div>
           <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors uppercase tracking-wider">
