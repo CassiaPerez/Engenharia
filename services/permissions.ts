@@ -1,0 +1,208 @@
+import { UserRole } from '../types';
+
+export type ModuleId =
+  | 'dashboard'
+  | 'calendar'
+  | 'projects'
+  | 'os'
+  | 'buildings'
+  | 'equipments'
+  | 'inventory'
+  | 'services'
+  | 'suppliers'
+  | 'reports'
+  | 'users'
+  | 'documentation';
+
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'export';
+
+export interface ModulePermissions {
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  delete: boolean;
+  export: boolean;
+}
+
+export const MODULE_LABELS: Record<ModuleId, string> = {
+  dashboard: 'Dashboard',
+  calendar: 'Agenda de Serviços',
+  projects: 'Projetos (Capex)',
+  os: 'Ordens de Serviço',
+  buildings: 'Edifícios',
+  equipments: 'Equipamentos',
+  inventory: 'Almoxarifado',
+  services: 'Catálogo de Serviços',
+  suppliers: 'Fornecedores',
+  reports: 'Relatórios',
+  users: 'Gestão de Usuários',
+  documentation: 'Documentação'
+};
+
+export const PERMISSIONS_MATRIX: Record<UserRole, Record<ModuleId, ModulePermissions>> = {
+  ADMIN: {
+    dashboard: { view: true, create: false, edit: false, delete: false, export: true },
+    calendar: { view: true, create: true, edit: true, delete: true, export: true },
+    projects: { view: true, create: true, edit: true, delete: true, export: true },
+    os: { view: true, create: true, edit: true, delete: true, export: true },
+    buildings: { view: true, create: true, edit: true, delete: true, export: true },
+    equipments: { view: true, create: true, edit: true, delete: true, export: true },
+    inventory: { view: true, create: true, edit: true, delete: true, export: true },
+    services: { view: true, create: true, edit: true, delete: true, export: true },
+    suppliers: { view: true, create: true, edit: true, delete: true, export: true },
+    reports: { view: true, create: false, edit: false, delete: false, export: true },
+    users: { view: true, create: true, edit: true, delete: true, export: false },
+    documentation: { view: true, create: false, edit: false, delete: false, export: false }
+  },
+  MANAGER: {
+    dashboard: { view: true, create: false, edit: false, delete: false, export: true },
+    calendar: { view: true, create: true, edit: true, delete: false, export: true },
+    projects: { view: true, create: true, edit: true, delete: false, export: true },
+    os: { view: true, create: true, edit: true, delete: false, export: true },
+    buildings: { view: true, create: true, edit: true, delete: false, export: true },
+    equipments: { view: true, create: true, edit: true, delete: false, export: true },
+    inventory: { view: true, create: true, edit: true, delete: false, export: true },
+    services: { view: true, create: true, edit: true, delete: false, export: true },
+    suppliers: { view: true, create: true, edit: true, delete: false, export: true },
+    reports: { view: true, create: false, edit: false, delete: false, export: true },
+    users: { view: false, create: false, edit: false, delete: false, export: false },
+    documentation: { view: true, create: false, edit: false, delete: false, export: false }
+  },
+  EXECUTOR: {
+    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
+    calendar: { view: true, create: false, edit: false, delete: false, export: false },
+    projects: { view: true, create: false, edit: false, delete: false, export: false },
+    os: { view: true, create: false, edit: true, delete: false, export: false },
+    buildings: { view: false, create: false, edit: false, delete: false, export: false },
+    equipments: { view: false, create: false, edit: false, delete: false, export: false },
+    inventory: { view: false, create: false, edit: false, delete: false, export: false },
+    services: { view: false, create: false, edit: false, delete: false, export: false },
+    suppliers: { view: false, create: false, edit: false, delete: false, export: false },
+    reports: { view: false, create: false, edit: false, delete: false, export: false },
+    users: { view: false, create: false, edit: false, delete: false, export: false },
+    documentation: { view: true, create: false, edit: false, delete: false, export: false }
+  },
+  USER: {
+    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
+    calendar: { view: false, create: false, edit: false, delete: false, export: false },
+    projects: { view: false, create: false, edit: false, delete: false, export: false },
+    os: { view: true, create: true, edit: false, delete: false, export: false },
+    buildings: { view: false, create: false, edit: false, delete: false, export: false },
+    equipments: { view: false, create: false, edit: false, delete: false, export: false },
+    inventory: { view: false, create: false, edit: false, delete: false, export: false },
+    services: { view: false, create: false, edit: false, delete: false, export: false },
+    suppliers: { view: false, create: false, edit: false, delete: false, export: false },
+    reports: { view: false, create: false, edit: false, delete: false, export: false },
+    users: { view: false, create: false, edit: false, delete: false, export: false },
+    documentation: { view: true, create: false, edit: false, delete: false, export: false }
+  },
+  WAREHOUSE: {
+    dashboard: { view: true, create: false, edit: false, delete: false, export: true },
+    calendar: { view: false, create: false, edit: false, delete: false, export: false },
+    projects: { view: true, create: false, edit: false, delete: false, export: true },
+    os: { view: true, create: false, edit: true, delete: false, export: true },
+    buildings: { view: false, create: false, edit: false, delete: false, export: false },
+    equipments: { view: false, create: false, edit: false, delete: false, export: false },
+    inventory: { view: true, create: true, edit: true, delete: true, export: true },
+    services: { view: false, create: false, edit: false, delete: false, export: false },
+    suppliers: { view: true, create: true, edit: true, delete: false, export: true },
+    reports: { view: true, create: false, edit: false, delete: false, export: true },
+    users: { view: false, create: false, edit: false, delete: false, export: false },
+    documentation: { view: true, create: false, edit: false, delete: false, export: false }
+  },
+  WAREHOUSE_BIO: {
+    dashboard: { view: true, create: false, edit: false, delete: false, export: true },
+    calendar: { view: false, create: false, edit: false, delete: false, export: false },
+    projects: { view: true, create: false, edit: false, delete: false, export: false },
+    os: { view: true, create: false, edit: true, delete: false, export: true },
+    buildings: { view: false, create: false, edit: false, delete: false, export: false },
+    equipments: { view: false, create: false, edit: false, delete: false, export: false },
+    inventory: { view: true, create: true, edit: true, delete: false, export: true },
+    services: { view: false, create: false, edit: false, delete: false, export: false },
+    suppliers: { view: true, create: false, edit: false, delete: false, export: false },
+    reports: { view: true, create: false, edit: false, delete: false, export: true },
+    users: { view: false, create: false, edit: false, delete: false, export: false },
+    documentation: { view: true, create: false, edit: false, delete: false, export: false }
+  },
+  WAREHOUSE_FERT: {
+    dashboard: { view: true, create: false, edit: false, delete: false, export: true },
+    calendar: { view: false, create: false, edit: false, delete: false, export: false },
+    projects: { view: true, create: false, edit: false, delete: false, export: false },
+    os: { view: true, create: false, edit: true, delete: false, export: true },
+    buildings: { view: false, create: false, edit: false, delete: false, export: false },
+    equipments: { view: false, create: false, edit: false, delete: false, export: false },
+    inventory: { view: true, create: true, edit: true, delete: false, export: true },
+    services: { view: false, create: false, edit: false, delete: false, export: false },
+    suppliers: { view: true, create: false, edit: false, delete: false, export: false },
+    reports: { view: true, create: false, edit: false, delete: false, export: true },
+    users: { view: false, create: false, edit: false, delete: false, export: false },
+    documentation: { view: true, create: false, edit: false, delete: false, export: false }
+  }
+};
+
+export function hasPermission(
+  role: UserRole,
+  module: ModuleId,
+  action: PermissionAction
+): boolean {
+  const modulePerms = PERMISSIONS_MATRIX[role]?.[module];
+  if (!modulePerms) return false;
+  return modulePerms[action];
+}
+
+export function canAccessModule(role: UserRole, module: ModuleId): boolean {
+  return hasPermission(role, module, 'view');
+}
+
+export function getModulePermissions(role: UserRole, module: ModuleId): ModulePermissions {
+  return PERMISSIONS_MATRIX[role]?.[module] || {
+    view: false,
+    create: false,
+    edit: false,
+    delete: false,
+    export: false
+  };
+}
+
+export function getAllowedModules(role: UserRole): ModuleId[] {
+  const modules = Object.keys(PERMISSIONS_MATRIX[role]) as ModuleId[];
+  return modules.filter(module => PERMISSIONS_MATRIX[role][module].view);
+}
+
+export const ROLE_DESCRIPTIONS: Record<UserRole, { label: string; description: string; color: string }> = {
+  ADMIN: {
+    label: 'Administrador',
+    description: 'Acesso total ao sistema, incluindo gestão de usuários e configurações críticas.',
+    color: 'purple'
+  },
+  MANAGER: {
+    label: 'Gerente',
+    description: 'Gestão completa de projetos, OS, equipamentos e relatórios. Sem acesso à gestão de usuários.',
+    color: 'blue'
+  },
+  EXECUTOR: {
+    label: 'Prestador de Serviço',
+    description: 'Acesso focado na execução de ordens de serviço. Visualização de projetos e agenda.',
+    color: 'orange'
+  },
+  USER: {
+    label: 'Usuário Comum',
+    description: 'Visualização básica do dashboard e abertura de OS. Sem acesso a módulos gerenciais.',
+    color: 'slate'
+  },
+  WAREHOUSE: {
+    label: 'Almoxarifado Geral',
+    description: 'Supervisão completa de estoque, movimentações e fornecedores de todas as unidades.',
+    color: 'amber'
+  },
+  WAREHOUSE_BIO: {
+    label: 'Almoxarife CropBio',
+    description: 'Gestão de estoque restrita à unidade CropBio. Visualização de OS e relatórios.',
+    color: 'emerald'
+  },
+  WAREHOUSE_FERT: {
+    label: 'Almoxarife CropFert',
+    description: 'Gestão de estoque restrita à unidade CropFert. Visualização de OS e relatórios.',
+    color: 'teal'
+  }
+};

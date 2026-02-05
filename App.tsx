@@ -20,34 +20,35 @@ import BuildingManager from './components/BuildingManager';
 import EquipmentManager from './components/EquipmentManager';
 import Reports from './components/Reports';
 import { supabase, mapFromSupabase, mapToSupabase } from './services/supabase';
+import { canAccessModule, ModuleId } from './services/permissions';
 
-// Definição da estrutura do Menu com Permissões (allowedRoles)
+// Definição da estrutura do Menu
 const MENU_GROUPS = [
   {
     title: "Estratégico",
     items: [
-      { id: 'dash', icon: 'fa-chart-pie', label: 'Dashboard', allowedRoles: ['ADMIN', 'MANAGER', 'USER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] },
-      { id: 'projects', icon: 'fa-folder-tree', label: 'Projetos (Capex)', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] },
-      { id: 'reports', icon: 'fa-file-invoice', label: 'Relatórios', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] },
-      { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço', allowedRoles: ['ADMIN', 'MANAGER', 'USER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] }
+      { id: 'dashboard', icon: 'fa-chart-pie', label: 'Dashboard' },
+      { id: 'projects', icon: 'fa-folder-tree', label: 'Projetos (Capex)' },
+      { id: 'reports', icon: 'fa-file-invoice', label: 'Relatórios' },
+      { id: 'os', icon: 'fa-screwdriver-wrench', label: 'Ordens de Serviço' }
     ]
   },
   {
     title: "Operacional",
     items: [
-      { id: 'calendar', icon: 'fa-calendar-days', label: 'Agenda de Serviços', allowedRoles: ['ADMIN', 'MANAGER'] },
-      { id: 'buildings', icon: 'fa-building', label: 'Edifícios', allowedRoles: ['ADMIN', 'MANAGER'] },
-      { id: 'equipments', icon: 'fa-cogs', label: 'Equipamentos', allowedRoles: ['ADMIN', 'MANAGER'] },
-      { id: 'inventory', icon: 'fa-warehouse', label: 'Almoxarifado', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] },
-      { id: 'services', icon: 'fa-users-gear', label: 'Serviços', allowedRoles: ['ADMIN', 'MANAGER'] },
-      { id: 'suppliers', icon: 'fa-handshake', label: 'Fornecedores', allowedRoles: ['ADMIN', 'MANAGER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] }
+      { id: 'calendar', icon: 'fa-calendar-days', label: 'Agenda de Serviços' },
+      { id: 'buildings', icon: 'fa-building', label: 'Edifícios' },
+      { id: 'equipments', icon: 'fa-cogs', label: 'Equipamentos' },
+      { id: 'inventory', icon: 'fa-warehouse', label: 'Almoxarifado' },
+      { id: 'services', icon: 'fa-users-gear', label: 'Serviços' },
+      { id: 'suppliers', icon: 'fa-handshake', label: 'Fornecedores' }
     ]
   },
   {
     title: "Sistema",
     items: [
-      { id: 'users', icon: 'fa-users', label: 'Usuários', allowedRoles: ['ADMIN'] },
-      { id: 'docs', icon: 'fa-book-open', label: 'Documentação', allowedRoles: ['ADMIN', 'MANAGER', 'EXECUTOR', 'USER', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'] }
+      { id: 'users', icon: 'fa-users', label: 'Usuários' },
+      { id: 'documentation', icon: 'fa-book-open', label: 'Documentação' }
     ]
   }
 ] as const;
@@ -258,7 +259,7 @@ const App: React.FC = () => {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('crop_user_session', JSON.stringify(user));
-    setActiveTab('dash'); // Reset to dashboard on login
+    setActiveTab('dashboard'); // Reset to dashboard on login
   };
 
   const handleLogout = () => {
@@ -289,7 +290,7 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dash': 
+      case 'dashboard':
         return <Dashboard projects={projects} oss={oss} materials={materials} services={services} />;
       case 'projects': 
         return (
@@ -357,7 +358,7 @@ const App: React.FC = () => {
             equipments={equipments}
           />
         );
-      case 'docs':
+      case 'documentation':
         return <Documentation />;
       default:
         return null;
@@ -368,6 +369,12 @@ const App: React.FC = () => {
   const handleTabChange = (id: TabId) => {
     setActiveTab(id);
     setIsMobileMenuOpen(false);
+  };
+
+  // Função para verificar se usuário tem acesso ao módulo
+  const hasModuleAccess = (moduleId: string): boolean => {
+    if (!currentUser) return false;
+    return canAccessModule(currentUser.role, moduleId as ModuleId);
   };
 
   return (
@@ -407,12 +414,10 @@ const App: React.FC = () => {
           </button>
         </div>
 
-        {/* Menu Items (Filtered by Role) */}
+        {/* Menu Items (Filtered by Permissions) */}
         <nav className="flex-1 py-8 overflow-y-auto custom-scrollbar px-3 space-y-8">
           {MENU_GROUPS.map((group, groupIndex) => {
-            const filteredItems = group.items.filter(item => 
-               (item.allowedRoles as readonly string[]).includes(currentUser.role)
-            );
+            const filteredItems = group.items.filter(item => hasModuleAccess(item.id));
 
             if (filteredItems.length === 0) return null;
 
@@ -423,12 +428,12 @@ const App: React.FC = () => {
                 </h3>
                 <div className="space-y-1">
                   {filteredItems.map((item) => (
-                    <SidebarLink 
+                    <SidebarLink
                       key={item.id}
-                      active={activeTab === item.id} 
-                      onClick={() => handleTabChange(item.id as TabId)} 
-                      icon={item.icon} 
-                      label={item.label} 
+                      active={activeTab === item.id}
+                      onClick={() => handleTabChange(item.id as TabId)}
+                      icon={item.icon}
+                      label={item.label}
                     />
                   ))}
                 </div>

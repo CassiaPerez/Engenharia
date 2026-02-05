@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { User, UserRole } from '../types';
 import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
+import PermissionsMatrix from './PermissionsMatrix';
 
 interface Props {
   users: User[];
@@ -13,6 +14,7 @@ interface Props {
 const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [activeView, setActiveView] = useState<'users' | 'permissions'>('users');
   const [formUser, setFormUser] = useState<Partial<User>>({
     active: true,
     role: 'USER',
@@ -144,18 +146,49 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <header className="flex justify-between items-center border-b border-slate-200 pb-6">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-6">
         <div>
             <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Gestão de Usuários</h2>
             <p className="text-slate-500 text-base mt-1">Controle de acesso e permissões (RBAC).</p>
         </div>
-        <button onClick={openNew} className="bg-clean-primary text-white px-6 py-3 rounded-xl text-sm font-bold uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2">
-            <i className="fas fa-user-plus"></i> Novo Usuário
-        </button>
+        <div className="flex gap-3">
+          <div className="flex gap-2 bg-slate-100 rounded-lg p-1">
+            <button
+              onClick={() => setActiveView('users')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                activeView === 'users'
+                  ? 'bg-white text-clean-primary shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              <i className="fas fa-users mr-2"></i>
+              Usuários
+            </button>
+            <button
+              onClick={() => setActiveView('permissions')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                activeView === 'permissions'
+                  ? 'bg-white text-clean-primary shadow-sm'
+                  : 'text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              <i className="fas fa-shield-alt mr-2"></i>
+              Permissões
+            </button>
+          </div>
+          {activeView === 'users' && (
+            <button onClick={openNew} className="bg-clean-primary text-white px-6 py-3 rounded-xl text-sm font-bold uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2">
+              <i className="fas fa-user-plus"></i> Novo Usuário
+            </button>
+          )}
+        </div>
       </header>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full text-base text-left">
+      {activeView === 'permissions' ? (
+        <PermissionsMatrix />
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <table className="w-full text-base text-left">
             <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs">
                 <tr>
                     <th className="px-6 py-4">Usuário</th>
@@ -211,8 +244,9 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                     </tr>
                 ))}
             </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      )}
 
       {showModal && (
           <ModalPortal>
