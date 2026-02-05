@@ -58,11 +58,19 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
 
   const [showExecutorModal, setShowExecutorModal] = useState(false);
   const [newExecutorData, setNewExecutorData] = useState({ name: '', email: '', department: '' });
+  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
 
   const executors = useMemo(() => users.filter(u => u.role === 'EXECUTOR'), [users]);
 
   useEffect(() => { const timer = setTimeout(() => { setSearchTerm(searchInput); }, 300); return () => clearTimeout(timer); }, [searchInput]);
   useEffect(() => { setItemSearchTerm(''); setNewItem({ id: '', qty: '', cost: '' }); }, [activeSubTab]);
+  useEffect(() => {
+    const handleClickOutside = () => setShowPriorityDropdown(false);
+    if (showPriorityDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showPriorityDropdown]);
 
   const handleDelete = async (id: string) => {
       if (currentUser.role !== 'ADMIN') {
@@ -74,7 +82,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
           const previousOss = [...oss];
           setOss(prev => prev.filter(o => o.id !== id));
           if (selectedOS?.id === id) setSelectedOS(null);
-          
+
           try {
               const { error } = await supabase.from('oss').delete().eq('id', id);
               if (error) throw error;
@@ -83,6 +91,36 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
               setOss(previousOss);
               alert(`FALHA AO EXCLUIR:\n${e.message || JSON.stringify(e)}\n\nSOLUÇÃO: Vá em "Sistema > Documentação", copie o novo script "Correção de Permissões" e execute no Supabase.`);
           }
+      }
+  };
+
+  const handlePriorityChange = async (newPriority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL') => {
+      if (!selectedOS) return;
+      if (currentUser.role !== 'ADMIN' && currentUser.role !== 'MANAGER') {
+          alert('Apenas administradores e gerentes podem alterar a prioridade.');
+          return;
+      }
+
+      const updatedOS = { ...selectedOS, priority: newPriority };
+      setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+      setSelectedOS(updatedOS);
+      setShowPriorityDropdown(false);
+
+      try {
+          const { error } = await supabase.from('oss').upsert({
+              id: updatedOS.id,
+              json_content: updatedOS
+          });
+          if (error) throw error;
+
+          const toast = document.createElement('div');
+          toast.className = "fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-[10000] font-bold animate-in slide-in-from-bottom-5";
+          toast.innerText = `Prioridade alterada para ${translatePriority(newPriority)}`;
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 3000);
+      } catch (e) {
+          console.error('Erro ao atualizar prioridade:', e);
+          alert('Erro ao atualizar prioridade no banco de dados.');
       }
   };
 
@@ -470,8 +508,25 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
             const isOverdue = os.status !== OSStatus.COMPLETED && new Date(os.limitDate) < new Date();
             const executor = users.find(u => u.id === os.executorId);
             return (
-              <div key={os.id} className={`bg-white rounded-xl border p-6 shadow-sm hover:shadow-lg transition-all flex flex-col relative group ${isOverdue ? 'border-l-8 border-l-red-500 border-t-slate-200 border-r-slate-200 border-b-slate-200' : 'border-slate-200'}`}>
-                 <div className="flex justify-between items-start mb-4"><span className="font-mono text-base font-bold bg-slate-100 px-3 py-1.5 rounded-lg text-slate-800 border border-slate-300">{os.number}</span><span className={`text-xs font-bold uppercase px-3 py-1.5 rounded-lg border ${os.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : os.priority === 'HIGH' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{translatePriority(os.priority)}</span></div>
+              <div key={os.id} className={`bg-white rounded-xl border p-6 shadow-sm hover:shadow-lg transition-all flex flex-col relative group ${
+                isOverdue ? 'border-l-8 border-l-red-500 border-t-slate-200 border-r-slate-200 border-b-slate-200' :
+                os.priority === 'CRITICAL' ? 'border-l-8 border-l-red-600 border-t-slate-200 border-r-slate-200 border-b-slate-200' :
+                os.priority === 'HIGH' ? 'border-l-4 border-l-orange-500 border-t-slate-200 border-r-slate-200 border-b-slate-200' :
+                'border-slate-200'
+              }`}>
+                 <div className="flex justify-between items-start mb-4">
+                   <span className="font-mono text-base font-bold bg-slate-100 px-3 py-1.5 rounded-lg text-slate-800 border border-slate-300">{os.number}</span>
+                   <span className={`text-xs font-bold uppercase px-3 py-1.5 rounded-lg border flex items-center gap-1.5 ${
+                     os.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200 animate-pulse' :
+                     os.priority === 'HIGH' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                     os.priority === 'MEDIUM' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                     'bg-slate-50 text-slate-600 border-slate-200'
+                   }`}>
+                     {os.priority === 'CRITICAL' && <i className="fas fa-exclamation-triangle"></i>}
+                     {os.priority === 'HIGH' && <i className="fas fa-arrow-up"></i>}
+                     {translatePriority(os.priority)}
+                   </span>
+                 </div>
                  <h4 className="text-xl font-bold text-slate-900 mb-3 leading-tight flex-1 line-clamp-2">{os.description}</h4>
                  <div className="mb-4"><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2 mb-1"><i className={`fas ${context.type === 'PROJECT' ? 'fa-folder' : context.type === 'EQUIPMENT' ? 'fa-cogs' : 'fa-building'} text-slate-400 w-4`}></i> {context.label}</p><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2"><i className="fas fa-user-hard-hat text-slate-400 w-4"></i>{executor ? <span className="text-emerald-600 font-bold">{executor.name}</span> : <span className="text-slate-400 italic">Sem executor</span>}</p></div>
                  <div className="grid grid-cols-2 gap-4 text-base mb-6"><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Materiais</span><span className="font-bold text-slate-800 text-lg">R$ {formatCurrency(costs.materialCost)}</span></div><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Mão de Obra</span><span className="font-bold text-slate-800 text-lg">{os.services.reduce((a,b)=>a+b.quantity,0)} h</span></div></div>
@@ -491,11 +546,25 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
               <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity" onClick={() => setSelectedOS(null)} />
               <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
                 <div className="relative w-full max-w-6xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                    <div className="px-8 py-6 border-b border-slate-100 bg-white rounded-t-2xl flex justify-between items-center shrink-0">
+                    <div className={`px-8 py-6 border-b border-slate-100 rounded-t-2xl flex justify-between items-center shrink-0 ${
+                      selectedOS.priority === 'CRITICAL' ? 'bg-red-50 border-l-8 border-l-red-600' :
+                      selectedOS.priority === 'HIGH' ? 'bg-orange-50 border-l-4 border-l-orange-500' :
+                      'bg-white'
+                    }`}>
                         <div>
                             <div className="flex items-center gap-3 mb-1">
                                 <span className="font-mono font-bold text-lg text-slate-900 bg-slate-100 px-3 py-1 rounded border border-slate-300">{selectedOS.number}</span>
                                 <span className={`text-xs font-bold uppercase px-3 py-1 rounded border ${selectedOS.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>{selectedOS.status}</span>
+                                <span className={`text-xs font-bold uppercase px-3 py-1 rounded border flex items-center gap-1.5 ${
+                                  selectedOS.priority === 'CRITICAL' ? 'bg-red-100 text-red-800 border-red-300' :
+                                  selectedOS.priority === 'HIGH' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                                  selectedOS.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                                  'bg-slate-100 text-slate-700 border-slate-300'
+                                }`}>
+                                  {selectedOS.priority === 'CRITICAL' && <i className="fas fa-exclamation-triangle"></i>}
+                                  {selectedOS.priority === 'HIGH' && <i className="fas fa-arrow-up"></i>}
+                                  {translatePriority(selectedOS.priority)}
+                                </span>
                             </div>
                             <h3 className="text-xl font-bold text-slate-700 tracking-tight">{selectedOS.description}</h3>
                         </div>
@@ -518,7 +587,69 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</p><span className="font-bold text-slate-800">{translatePriority(selectedOS.priority)}</span></div>
+                                    <div>
+                                      <p className="text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</p>
+                                      {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') && isEditable(selectedOS) ? (
+                                        <div className="relative">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setShowPriorityDropdown(!showPriorityDropdown);
+                                            }}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-sm border-2 transition-all hover:scale-105 ${
+                                              selectedOS.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-300' :
+                                              selectedOS.priority === 'HIGH' ? 'bg-orange-50 text-orange-700 border-orange-300' :
+                                              selectedOS.priority === 'MEDIUM' ? 'bg-blue-50 text-blue-700 border-blue-300' :
+                                              'bg-slate-50 text-slate-700 border-slate-300'
+                                            }`}
+                                          >
+                                            {translatePriority(selectedOS.priority)}
+                                            <i className="fas fa-chevron-down text-xs"></i>
+                                          </button>
+                                          {showPriorityDropdown && (
+                                            <div className="absolute top-full left-0 mt-1 bg-white border-2 border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden">
+                                              <button
+                                                onClick={() => handlePriorityChange('CRITICAL')}
+                                                className="w-full px-4 py-2 text-left text-sm font-bold hover:bg-red-50 text-red-700 border-b border-slate-100 flex items-center gap-2"
+                                              >
+                                                <i className="fas fa-exclamation-triangle"></i>
+                                                Crítica
+                                              </button>
+                                              <button
+                                                onClick={() => handlePriorityChange('HIGH')}
+                                                className="w-full px-4 py-2 text-left text-sm font-bold hover:bg-orange-50 text-orange-700 border-b border-slate-100 flex items-center gap-2"
+                                              >
+                                                <i className="fas fa-arrow-up"></i>
+                                                Alta
+                                              </button>
+                                              <button
+                                                onClick={() => handlePriorityChange('MEDIUM')}
+                                                className="w-full px-4 py-2 text-left text-sm font-bold hover:bg-blue-50 text-blue-700 border-b border-slate-100 flex items-center gap-2"
+                                              >
+                                                <i className="fas fa-minus"></i>
+                                                Média
+                                              </button>
+                                              <button
+                                                onClick={() => handlePriorityChange('LOW')}
+                                                className="w-full px-4 py-2 text-left text-sm font-bold hover:bg-slate-50 text-slate-700 flex items-center gap-2"
+                                              >
+                                                <i className="fas fa-arrow-down"></i>
+                                                Baixa
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className={`inline-flex px-3 py-1.5 rounded-lg font-bold text-sm border ${
+                                          selectedOS.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' :
+                                          selectedOS.priority === 'HIGH' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                          selectedOS.priority === 'MEDIUM' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                          'bg-slate-50 text-slate-700 border-slate-200'
+                                        }`}>
+                                          {translatePriority(selectedOS.priority)}
+                                        </span>
+                                      )}
+                                    </div>
                                     <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Tipo</p><span className="font-bold text-slate-800">{selectedOS.type}</span></div>
                                 </div>
                                 <div>
@@ -668,7 +799,27 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição</label><textarea required className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium h-24" value={formOS.description} onChange={e => setFormOS({...formOS, description: e.target.value})} /></div>
                                 <div className="grid grid-cols-2 gap-6">
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tipo</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.type} onChange={e => setFormOS({...formOS, type: e.target.value as any})}>{Object.values(OSType).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                                <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Prioridade</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.priority} onChange={e => setFormOS({...formOS, priority: e.target.value as any})}><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></div>
+                                <div>
+                                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                                    Prioridade
+                                    {(currentUser.role !== 'ADMIN' && currentUser.role !== 'MANAGER') && (
+                                      <span className="text-amber-600" title="Apenas administradores e gerentes podem definir prioridade">
+                                        <i className="fas fa-lock text-xs"></i>
+                                      </span>
+                                    )}
+                                  </label>
+                                  <select
+                                    className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                                    value={formOS.priority}
+                                    onChange={e => setFormOS({...formOS, priority: e.target.value as any})}
+                                    disabled={currentUser.role !== 'ADMIN' && currentUser.role !== 'MANAGER'}
+                                  >
+                                    <option value="LOW">Baixa</option>
+                                    <option value="MEDIUM">Média</option>
+                                    <option value="HIGH">Alta</option>
+                                    <option value="CRITICAL">Crítica</option>
+                                  </select>
+                                </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-6">
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">SLA (Horas)</label><input type="number" min="1" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.slaHours} onChange={e => setFormOS({...formOS, slaHours: Number(e.target.value)})} /></div>
