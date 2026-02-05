@@ -1,4 +1,7 @@
 import { UserRole } from '../types';
+import { supabase } from './supabase';
+
+let customPermissionsCache: Record<string, ModulePermissions> = {};
 
 export type ModuleId =
   | 'dashboard'
@@ -140,12 +143,47 @@ export const PERMISSIONS_MATRIX: Record<UserRole, Record<ModuleId, ModulePermiss
   }
 };
 
+export async function loadCustomPermissions(): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('role_permissions')
+      .select('*');
+
+    if (error) throw error;
+
+    customPermissionsCache = {};
+    (data || []).forEach(item => {
+      const key = `${item.role}-${item.module}`;
+      customPermissionsCache[key] = item.permissions as ModulePermissions;
+    });
+  } catch (e) {
+    console.error('Erro ao carregar permissões customizadas:', e);
+  }
+}
+
+function getEffectivePermissions(role: UserRole, module: ModuleId): ModulePermissions {
+  const key = `${role}-${module}`;
+  const custom = customPermissionsCache[key];
+
+  if (custom) {
+    return custom;
+  }
+
+  return PERMISSIONS_MATRIX[role]?.[module] || {
+    view: false,
+    create: false,
+    edit: false,
+    delete: false,
+    export: false
+  };
+}
+
 export function hasPermission(
   role: UserRole,
   module: ModuleId,
   action: PermissionAction
 ): boolean {
-  const modulePerms = PERMISSIONS_MATRIX[role]?.[module];
+  const modulePerms = getEffectivePermissions(role, module);
   if (!modulePerms) return false;
   return modulePerms[action];
 }
@@ -155,13 +193,7 @@ export function canAccessModule(role: UserRole, module: ModuleId): boolean {
 }
 
 export function getModulePermissions(role: UserRole, module: ModuleId): ModulePermissions {
-  return PERMISSIONS_MATRIX[role]?.[module] || {
-    view: false,
-    create: false,
-    edit: false,
-    delete: false,
-    export: false
-  };
+  return getEffectivePermissions(role, module);
 }
 
 export function getAllowedModules(role: UserRole): ModuleId[] {

@@ -4,6 +4,7 @@ import { User, UserRole } from '../types';
 import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
 import PermissionsMatrix from './PermissionsMatrix';
+import PermissionsEditor from './PermissionsEditor';
 
 interface Props {
   users: User[];
@@ -14,7 +15,7 @@ interface Props {
 const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeView, setActiveView] = useState<'users' | 'permissions'>('users');
+  const [activeView, setActiveView] = useState<'users' | 'permissions' | 'editor'>('users');
   const [formUser, setFormUser] = useState<Partial<User>>({
     active: true,
     role: 'USER',
@@ -173,8 +174,21 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
               }`}
             >
               <i className="fas fa-shield-alt mr-2"></i>
-              Permissões
+              Matriz
             </button>
+            {currentUser.role === 'ADMIN' && (
+              <button
+                onClick={() => setActiveView('editor')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  activeView === 'editor'
+                    ? 'bg-white text-clean-primary shadow-sm'
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                <i className="fas fa-user-shield mr-2"></i>
+                Editor
+              </button>
+            )}
           </div>
           {activeView === 'users' && (
             <button onClick={openNew} className="bg-clean-primary text-white px-6 py-3 rounded-xl text-sm font-bold uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2">
@@ -186,6 +200,8 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
 
       {activeView === 'permissions' ? (
         <PermissionsMatrix />
+      ) : activeView === 'editor' ? (
+        <PermissionsEditor />
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <table className="w-full text-base text-left">
