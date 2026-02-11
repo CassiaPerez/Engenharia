@@ -71,6 +71,20 @@ export const PERMISSIONS_MATRIX: Record<UserRole, Record<ModuleId, ModulePermiss
     users: { view: false, create: false, edit: false, delete: false, export: false },
     documentation: { view: true, create: false, edit: false, delete: false, export: false }
   },
+  COORDINATOR: {
+    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
+    calendar: { view: true, create: true, edit: true, delete: false, export: true },
+    projects: { view: true, create: false, edit: false, delete: false, export: false },
+    os: { view: true, create: true, edit: true, delete: false, export: true },
+    buildings: { view: true, create: true, edit: true, delete: false, export: false },
+    equipments: { view: true, create: true, edit: true, delete: false, export: true },
+    inventory: { view: false, create: false, edit: false, delete: false, export: false },
+    services: { view: true, create: false, edit: false, delete: false, export: false },
+    suppliers: { view: false, create: false, edit: false, delete: false, export: false },
+    reports: { view: true, create: false, edit: false, delete: false, export: true },
+    users: { view: false, create: false, edit: false, delete: false, export: false },
+    documentation: { view: true, create: false, edit: false, delete: false, export: false }
+  },
   EXECUTOR: {
     dashboard: { view: true, create: false, edit: false, delete: false, export: false },
     calendar: { view: true, create: false, edit: false, delete: false, export: false },
@@ -211,6 +225,11 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, { label: string; description: s
     label: 'Gerente',
     description: 'Gestão completa de projetos, OS, equipamentos e relatórios. Sem acesso à gestão de usuários.',
     color: 'blue'
+  },
+  COORDINATOR: {
+    label: 'Coordenador',
+    description: 'Repassa serviços para executores e cadastra equipamentos. Gestão operacional de OS e agenda.',
+    color: 'indigo'
   },
   EXECUTOR: {
     label: 'Prestador de Serviço',

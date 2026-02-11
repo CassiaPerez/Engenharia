@@ -28,7 +28,8 @@ export enum OSType {
   PREVENTIVE = 'Preventiva',
   PREDICTIVE = 'Preditiva',
   LEGAL = 'Legal',
-  IMPROVEMENT = 'Melhoria'
+  IMPROVEMENT = 'Melhoria',
+  OPERATION_SUPPORT = 'Auxiliar de operação'
 }
 
 export enum ServiceCostType {
@@ -128,9 +129,9 @@ export interface Project {
 export interface OS {
   id: string;
   number: string;
-  projectId?: string; 
-  buildingId?: string; 
-  equipmentId?: string; // Novo campo para vincular a Equipamento
+  projectId?: string;
+  buildingId?: string;
+  equipmentId?: string;
   description: string;
   type: OSType;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -138,11 +139,14 @@ export interface OS {
   openDate: string;
   limitDate: string;
   status: OSStatus;
+  executorIds?: string[];
   executorId?: string;
   startTime?: string;
   endTime?: string;
   pauseReason?: string;
-  completionImage?: string; /* Base64 da Foto de Conclusão */
+  pauseHistory?: { timestamp: string; reason: string; userId: string; action: 'PAUSE' | 'RESUME' }[];
+  completionImage?: string;
+  executionDescription?: string;
   materials: OSItem[];
   services: OSService[];
 }
@@ -210,7 +214,8 @@ export interface PurchaseRecord {
 // WAREHOUSE: Almoxarife Geral (Supervisor)
 // WAREHOUSE_BIO: Almoxarife Unidade CropBio
 // WAREHOUSE_FERT: Almoxarife Unidade CropFert
-export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR' | 'USER' | 'WAREHOUSE' | 'WAREHOUSE_BIO' | 'WAREHOUSE_FERT';
+// COORDINATOR: Coordenador (repassa serviços para executores e cadastra equipamentos)
+export type UserRole = 'ADMIN' | 'MANAGER' | 'COORDINATOR' | 'EXECUTOR' | 'USER' | 'WAREHOUSE' | 'WAREHOUSE_BIO' | 'WAREHOUSE_FERT';
 
 export interface User {
   id: string;

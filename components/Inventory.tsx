@@ -45,12 +45,13 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   const [selectedMaterialForLoc, setSelectedMaterialForLoc] = useState<Material | null>(null);
   const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW' | 'PROJECT_OUT'>('VIEW');
-  const [locForm, setLocForm] = useState({ 
-      location: '', 
-      toLocation: '', 
-      quantity: '', 
+  const [locForm, setLocForm] = useState({
+      location: '',
+      toLocation: '',
+      quantity: '',
       reason: '',
-      projectId: '' 
+      projectId: '',
+      osNumber: ''
   });
 
   useEffect(() => {
@@ -131,7 +132,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           setSelectedMaterialForLoc(m);
       }
       setLocAction('VIEW');
-      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '' });
+      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '', osNumber: '' });
   };
 
   const handleLocationSubmit = async (e: React.FormEvent) => {
@@ -203,7 +204,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                   }
 
                    const desc = locAction === 'PROJECT_OUT'
-                      ? `Baixa p/ Projeto: ${projects.find(p => p.id === locForm.projectId)?.code || '---'}`
+                      ? `Baixa p/ Projeto: ${projects.find(p => p.id === locForm.projectId)?.code || '---'}${locForm.osNumber ? ` / OS: ${locForm.osNumber}` : ''}`
                       : (locForm.reason || 'Saque Manual (Baixa)');
 
                    addMovementWithSync({
@@ -215,7 +216,8 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       userId: currentUser.id,
                       description: desc,
                       fromLocation: locForm.location,
-                      projectId: locAction === 'PROJECT_OUT' ? locForm.projectId : undefined
+                      projectId: locAction === 'PROJECT_OUT' ? locForm.projectId : undefined,
+                      osId: locForm.osNumber || undefined
                   });
 
               } else if (locAction === 'TRANSFER') {
@@ -825,15 +827,21 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
                                     {/* SELEÇÃO DE PROJETO PARA BAIXA DIRETA */}
                                     {locAction === 'PROJECT_OUT' && (
-                                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                                            <label className="text-xs font-bold text-orange-700 uppercase block mb-2">Projeto de Destino</label>
-                                            <select required className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800" value={locForm.projectId} onChange={e => setLocForm({...locForm, projectId: e.target.value})}>
-                                                <option value="">Selecione o Projeto...</option>
-                                                {projects.filter(p => p.status !== 'FINISHED').map(p => (
-                                                    <option key={p.id} value={p.id}>{p.code} - {p.description}</option>
-                                                ))}
-                                            </select>
-                                            <p className="text-[10px] text-orange-600 mt-1">O custo será alocado ao projeto selecionado sem abrir OS.</p>
+                                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-orange-700 uppercase block mb-2">Projeto de Destino</label>
+                                                <select required className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800" value={locForm.projectId} onChange={e => setLocForm({...locForm, projectId: e.target.value})}>
+                                                    <option value="">Selecione o Projeto...</option>
+                                                    {projects.filter(p => p.status !== 'FINISHED').map(p => (
+                                                        <option key={p.id} value={p.id}>{p.code} - {p.description}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-orange-700 uppercase block mb-2">Número da OS (Opcional)</label>
+                                                <input className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800" placeholder="Ex: OS-2024-001" value={locForm.osNumber} onChange={e => setLocForm({...locForm, osNumber: e.target.value})} />
+                                            </div>
+                                            <p className="text-[10px] text-orange-600">O custo será alocado ao projeto selecionado. Informe a OS para rastreabilidade.</p>
                                         </div>
                                     )}
 

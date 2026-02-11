@@ -2,6 +2,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { OS, User, OSStatus, Project, Building, ServiceType, Material } from '../types';
 import ModalPortal from './ModalPortal';
+import { supabase, mapToSupabase } from '../services/supabase';
 
 interface Props {
   user: User;
@@ -17,8 +18,9 @@ interface Props {
 const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings, materials = [], services = [], onLogout }) => {
   const [activeTab, setActiveTab] = useState<'TODO' | 'DONE' | 'CALENDAR'>('TODO');
   const [finishingOS, setFinishingOS] = useState<OS | null>(null);
-  const [viewDetailOS, setViewDetailOS] = useState<OS | null>(null); 
+  const [viewDetailOS, setViewDetailOS] = useState<OS | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [executionDescription, setExecutionDescription] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -35,7 +37,11 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
   };
 
   const myOSs = useMemo(() => {
-    return oss.filter(o => o.executorId === user.id || o.executorId === user.email);
+    return oss.filter(o => {
+      const hasLegacyExecutor = o.executorId === user.id || o.executorId === user.email;
+      const hasMultiExecutor = o.executorIds?.includes(user.id) || o.executorIds?.includes(user.email);
+      return hasLegacyExecutor || hasMultiExecutor;
+    });
   }, [oss, user]);
   
   const todoList = myOSs.filter(o => o.status !== OSStatus.COMPLETED && o.status !== OSStatus.CANCELED);
@@ -143,10 +149,11 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       try {
           const os = oss.find(o => o.id === osId);
           if (os) {
-              const { error } = await supabase.from('oss').upsert({
+              const { error } = await supabase.from('oss').upsert(mapToSupabase({
                   id: osId,
-                  json_content: { ...os, ...updated }
-              });
+                  ...os,
+                  ...updated
+              }));
               if (error) throw error;
           }
       } catch (e) {
@@ -154,10 +161,79 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       }
   };
 
+  const handlePause = async (e: React.MouseEvent, osId: string) => {
+      e.stopPropagation();
+      const reason = prompt('Motivo da pausa:');
+      if (!reason) return;
+
+      const os = oss.find(o => o.id === osId);
+      if (!os) return;
+
+      const pauseEntry = {
+          timestamp: new Date().toISOString(),
+          reason,
+          userId: user.id,
+          action: 'PAUSE' as const
+      };
+
+      const updated = {
+          status: OSStatus.PAUSED,
+          pauseReason: reason,
+          pauseHistory: [...(os.pauseHistory || []), pauseEntry]
+      };
+
+      setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
+
+      try {
+          const { error } = await supabase.from('oss').upsert(mapToSupabase({
+              id: osId,
+              ...os,
+              ...updated
+          }));
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao pausar OS:', e);
+      }
+  };
+
+  const handleResume = async (e: React.MouseEvent, osId: string) => {
+      e.stopPropagation();
+
+      const os = oss.find(o => o.id === osId);
+      if (!os) return;
+
+      const resumeEntry = {
+          timestamp: new Date().toISOString(),
+          reason: 'Retomada',
+          userId: user.id,
+          action: 'RESUME' as const
+      };
+
+      const updated = {
+          status: OSStatus.IN_PROGRESS,
+          pauseReason: undefined,
+          pauseHistory: [...(os.pauseHistory || []), resumeEntry]
+      };
+
+      setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
+
+      try {
+          const { error } = await supabase.from('oss').upsert(mapToSupabase({
+              id: osId,
+              ...os,
+              ...updated
+          }));
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao retomar OS:', e);
+      }
+  };
+
   const openFinishModal = (e: React.MouseEvent, os: OS) => {
       e.stopPropagation();
       setFinishingOS(os);
       setPhotoPreview(null);
+      setExecutionDescription('');
   };
 
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,15 +251,16 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
           ...finishingOS,
           status: OSStatus.COMPLETED,
           endTime: new Date().toISOString(),
-          completionImage: photoPreview
+          completionImage: photoPreview,
+          executionDescription: executionDescription || undefined
       };
       setOss(prev => prev.map(o => o.id === finishingOS.id ? updated : o));
 
       try {
-          const { error } = await supabase.from('oss').upsert({
+          const { error } = await supabase.from('oss').upsert(mapToSupabase({
               id: finishingOS.id,
-              json_content: updated
-          });
+              ...updated
+          }));
           if (error) throw error;
       } catch (e) {
           console.error('Erro ao finalizar OS:', e);
@@ -191,6 +268,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
 
       setFinishingOS(null);
       setPhotoPreview(null);
+      setExecutionDescription('');
   };
 
   const handlePriorityChange = async (osId: string, newPriority: string) => {
@@ -256,10 +334,19 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                             <button onClick={(e) => handleStart(e, os.id)} className="flex-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
                                 <i className="fas fa-play"></i> Iniciar
                             </button>
+                        ) : os.status === OSStatus.PAUSED ? (
+                            <button onClick={(e) => handleResume(e, os.id)} className="flex-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                                <i className="fas fa-play"></i> Retomar
+                            </button>
                         ) : (
-                             <button onClick={(e) => openFinishModal(e, os)} className="flex-1 bg-clean-primary hover:bg-green-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
-                                  <i className="fas fa-camera"></i> Finalizar
-                             </button>
+                             <>
+                                <button onClick={(e) => handlePause(e, os.id)} className="flex-1 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                                    <i className="fas fa-pause"></i> Pausar
+                                </button>
+                                <button onClick={(e) => openFinishModal(e, os)} className="flex-1 bg-clean-primary hover:bg-green-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                                    <i className="fas fa-camera"></i> Finalizar
+                                </button>
+                             </>
                         )}
                        </>
                    )}
@@ -607,8 +694,18 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                           </div>
 
                           <div>
+                              <label className="block text-sm font-bold text-slate-900 mb-3">Descrição dos Serviços Executados</label>
+                              <textarea
+                                  value={executionDescription}
+                                  onChange={(e) => setExecutionDescription(e.target.value)}
+                                  placeholder="Descreva detalhadamente os serviços realizados..."
+                                  className="w-full h-32 px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-clean-primary focus:border-clean-primary resize-none text-sm"
+                              />
+                          </div>
+
+                          <div>
                               <label className="block text-sm font-bold text-slate-900 mb-3">Evidência Fotográfica (Obrigatório)</label>
-                              
+
                               {!photoPreview ? (
                                   <button onClick={() => fileInputRef.current?.click()} className="w-full h-48 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center gap-3 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:border-clean-primary hover:text-clean-primary transition-all group">
                                       <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-2xl mb-1 group-hover:scale-110 transition-transform">
@@ -622,13 +719,13 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                                       <button onClick={() => setPhotoPreview(null)} className="absolute top-3 right-3 bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform"><i className="fas fa-trash"></i></button>
                                   </div>
                               )}
-                              <input 
-                                  type="file" 
-                                  accept="image/*" 
-                                  capture="environment" 
-                                  ref={fileInputRef} 
-                                  className="hidden" 
-                                  onChange={handlePhotoCapture} 
+                              <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  ref={fileInputRef}
+                                  className="hidden"
+                                  onChange={handlePhotoCapture}
                               />
                           </div>
 
