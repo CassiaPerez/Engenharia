@@ -34,8 +34,9 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
   const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
   
-  const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
+  const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE, executorIds: [] });
   const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING' | 'EQUIPMENT'>('PROJECT');
+  const [selectedExecutors, setSelectedExecutors] = useState<string[]>([]);
   
   const [allocMatId, setAllocMatId] = useState('');
   const [allocMatSearch, setAllocMatSearch] = useState(''); 
@@ -251,7 +252,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
           projectId: formOS.projectId,
           buildingId: formOS.buildingId,
           equipmentId: formOS.equipmentId,
-          executorId: formOS.executorId,
+          executorIds: selectedExecutors.length > 0 ? selectedExecutors : undefined,
           description: formOS.description || '',
           type: formOS.type || OSType.PREVENTIVE,
           priority: formOS.priority as any,
@@ -284,17 +285,18 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
   };
 
   const openNewOS = () => {
-      setFormOS({ 
-          priority: 'MEDIUM', 
-          status: OSStatus.OPEN, 
-          slaHours: 24, 
+      setFormOS({
+          priority: 'MEDIUM',
+          status: OSStatus.OPEN,
+          slaHours: 24,
           type: OSType.PREVENTIVE,
           description: '',
           projectId: '',
           buildingId: '',
           equipmentId: '',
-          executorId: ''
+          executorIds: []
       });
+      setSelectedExecutors([]);
       setPlannedMaterials([]);
       setPlannedServices([]);
       setAllocMatSearch(''); setAllocMatId('');
@@ -324,25 +326,25 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       setAllocSrvId(''); setAllocSrvSearch(''); setAllocSrvQty('');
   };
 
-  const handleCreateExecutor = (e: React.FormEvent) => { 
-      e.preventDefault(); 
-      if (!newExecutorData.name || !newExecutorData.email) return; 
-      
-      const newUser: User = { 
-          id: Math.random().toString(36).substr(2, 9), 
-          name: newExecutorData.name, 
-          email: newExecutorData.email, 
-          password: '123', 
-          role: 'EXECUTOR', 
-          department: newExecutorData.department || 'Manutenção', 
-          active: true, 
-          avatar: newExecutorData.name.substr(0, 2).toUpperCase() 
-      }; 
-      
-      setUsers(prev => [...prev, newUser]); 
-      setFormOS(prev => ({ ...prev, executorId: newUser.id })); 
-      setShowExecutorModal(false); 
-      setNewExecutorData({ name: '', email: '', department: '' }); 
+  const handleCreateExecutor = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newExecutorData.name || !newExecutorData.email) return;
+
+      const newUser: User = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: newExecutorData.name,
+          email: newExecutorData.email,
+          password: '123',
+          role: 'EXECUTOR',
+          department: newExecutorData.department || 'Manutenção',
+          active: true,
+          avatar: newExecutorData.name.substr(0, 2).toUpperCase()
+      };
+
+      setUsers(prev => [...prev, newUser]);
+      setSelectedExecutors(prev => [...prev, newUser.id]);
+      setShowExecutorModal(false);
+      setNewExecutorData({ name: '', email: '', department: '' });
   };
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -357,7 +359,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
   const generateOSDetailPDF = (os: OS) => {
     const doc = new jsPDF();
     const context = getContextInfo(os);
-    const executor = users.find(u => u.id === os.executorId);
+    const osExecutors = os.executorIds ? users.filter(u => os.executorIds?.includes(u.id)) : (os.executorId ? [users.find(u => u.id === os.executorId)].filter(Boolean) : []);
+    const executorNames = osExecutors.length > 0 ? osExecutors.map(e => e?.name).join(', ') : 'Não Atribuído';
     const costs = calculateOSCosts(os, materials, services);
 
     doc.setFillColor(71, 122, 127);
@@ -387,7 +390,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
         ["Status", os.status],
         ["Prioridade", translatePriority(os.priority)],
         ["Tipo", os.type],
-        ["Executor", executor ? executor.name : 'Não Atribuído'],
+        ["Executor(es)", executorNames],
         ["Abertura", new Date(os.openDate).toLocaleString()],
         ["Prazo Limite", new Date(os.limitDate).toLocaleString()]
     ];
@@ -506,7 +509,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
             const context = getContextInfo(os);
             const costs = calculateOSCosts(os, materials, services);
             const isOverdue = os.status !== OSStatus.COMPLETED && new Date(os.limitDate) < new Date();
-            const executor = users.find(u => u.id === os.executorId);
+            const osExecutors = os.executorIds ? users.filter(u => os.executorIds?.includes(u.id)) : (os.executorId ? [users.find(u => u.id === os.executorId)].filter(Boolean) : []);
             return (
               <div key={os.id} className={`bg-white rounded-xl border p-6 shadow-sm hover:shadow-lg transition-all flex flex-col relative group ${
                 isOverdue ? 'border-l-8 border-l-red-500 border-t-slate-200 border-r-slate-200 border-b-slate-200' :
@@ -528,7 +531,21 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                    </span>
                  </div>
                  <h4 className="text-xl font-bold text-slate-900 mb-3 leading-tight flex-1 line-clamp-2">{os.description}</h4>
-                 <div className="mb-4"><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2 mb-1"><i className={`fas ${context.type === 'PROJECT' ? 'fa-folder' : context.type === 'EQUIPMENT' ? 'fa-cogs' : 'fa-building'} text-slate-400 w-4`}></i> {context.label}</p><p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2"><i className="fas fa-user-hard-hat text-slate-400 w-4"></i>{executor ? <span className="text-emerald-600 font-bold">{executor.name}</span> : <span className="text-slate-400 italic">Sem executor</span>}</p></div>
+                 <div className="mb-4">
+                   <p className="text-sm text-slate-600 truncate font-medium flex items-center gap-2 mb-1">
+                     <i className={`fas ${context.type === 'PROJECT' ? 'fa-folder' : context.type === 'EQUIPMENT' ? 'fa-cogs' : 'fa-building'} text-slate-400 w-4`}></i> {context.label}
+                   </p>
+                   <p className="text-sm text-slate-600 font-medium flex items-center gap-2">
+                     <i className="fas fa-user-hard-hat text-slate-400 w-4"></i>
+                     {osExecutors.length > 0 ? (
+                       <span className="text-emerald-600 font-bold">
+                         {osExecutors.length === 1 ? osExecutors[0]?.name : `${osExecutors.length} Executores`}
+                       </span>
+                     ) : (
+                       <span className="text-slate-400 italic">Sem executor</span>
+                     )}
+                   </p>
+                 </div>
                  <div className="grid grid-cols-2 gap-4 text-base mb-6"><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Materiais</span><span className="font-bold text-slate-800 text-lg">R$ {formatCurrency(costs.materialCost)}</span></div><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Mão de Obra</span><span className="font-bold text-slate-800 text-lg">{os.services.reduce((a,b)=>a+b.quantity,0)} h</span></div></div>
                  <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto"><span title={getStatusTooltip(os.status)} className={`text-sm font-bold uppercase px-3 py-1.5 rounded cursor-help ${os.status === 'COMPLETED' ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' : os.status === 'IN_PROGRESS' ? 'text-blue-800 bg-blue-100 border border-blue-200' : 'text-slate-700 bg-slate-100 border border-slate-200'}`}>{os.status.replace('_', ' ')}</span><button onClick={() => setSelectedOS(os)} className="text-base font-bold text-slate-700 hover:text-white hover:bg-clean-primary px-5 py-2.5 rounded-lg transition-all border border-slate-300 hover:border-clean-primary hover:shadow-md"><i className="fas fa-pen-to-square mr-2"></i> {os.status === OSStatus.COMPLETED ? 'Visualizar' : 'Gerenciar'}</button></div>
                  {currentUser.role === 'ADMIN' && ( <button onClick={() => handleDelete(os.id)} className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-red-200 text-red-500 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 shadow-sm z-20" title="Excluir OS"><i className="fas fa-trash text-xs"></i></button> )}
@@ -653,33 +670,65 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Tipo</p><span className="font-bold text-slate-800">{selectedOS.type}</span></div>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executor {currentUser.role !== 'ADMIN' && <i className="fas fa-lock text-amber-600 ml-1" title="Apenas administradores podem alterar"></i>}</p>
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executores {currentUser.role !== 'ADMIN' && <i className="fas fa-lock text-amber-600 ml-1" title="Apenas administradores podem alterar"></i>}</p>
                                     {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
-                                        <select
-                                            className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-bold focus:border-clean-primary"
-                                            value={selectedOS.executorId || ''}
-                                            onChange={async (e) => {
-                                                const updatedOS = { ...selectedOS, executorId: e.target.value };
-                                                setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-                                                setSelectedOS(updatedOS);
-                                                try {
-                                                    const { error } = await supabase.from('oss').upsert({
-                                                        id: updatedOS.id,
-                                                        json_content: updatedOS
-                                                    });
-                                                    if (error) throw error;
-                                                } catch (e) {
-                                                    console.error('Erro ao atualizar executor:', e);
-                                                }
-                                            }}
-                                        >
-                                            <option value="">-- Não Atribuído --</option>
-                                            {executors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                                        </select>
+                                        <div className="space-y-2">
+                                            <div className="max-h-32 overflow-y-auto custom-scrollbar bg-slate-50 border border-slate-200 rounded-lg p-2">
+                                                {executors.map(executor => {
+                                                    const currentExecutorIds = selectedOS.executorIds || (selectedOS.executorId ? [selectedOS.executorId] : []);
+                                                    const isSelected = currentExecutorIds.includes(executor.id);
+                                                    return (
+                                                        <label key={executor.id} className="flex items-center gap-2 p-2 hover:bg-white rounded cursor-pointer transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="w-4 h-4 text-clean-primary focus:ring-clean-primary rounded"
+                                                                checked={isSelected}
+                                                                onChange={async (e) => {
+                                                                    let newExecutorIds: string[];
+                                                                    if (e.target.checked) {
+                                                                        newExecutorIds = [...currentExecutorIds, executor.id];
+                                                                    } else {
+                                                                        newExecutorIds = currentExecutorIds.filter(id => id !== executor.id);
+                                                                    }
+                                                                    const updatedOS = { ...selectedOS, executorIds: newExecutorIds.length > 0 ? newExecutorIds : undefined, executorId: undefined };
+                                                                    setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+                                                                    setSelectedOS(updatedOS);
+                                                                    try {
+                                                                        const { error } = await supabase.from('oss').upsert({
+                                                                            id: updatedOS.id,
+                                                                            json_content: updatedOS
+                                                                        });
+                                                                        if (error) throw error;
+                                                                    } catch (e) {
+                                                                        console.error('Erro ao atualizar executores:', e);
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <span className="text-sm font-bold text-slate-700">{executor.name}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                                {executors.length === 0 && (
+                                                    <p className="text-xs text-slate-400 italic text-center py-2">Nenhum executor cadastrado</p>
+                                                )}
+                                            </div>
+                                        </div>
                                     ) : (
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs">{users.find(u=>u.id===selectedOS.executorId)?.avatar || 'U'}</div>
-                                            <span className="font-bold text-slate-800">{users.find(u=>u.id===selectedOS.executorId)?.name || 'Não Atribuído'}</span>
+                                        <div className="space-y-1">
+                                            {(() => {
+                                                const currentExecutorIds = selectedOS.executorIds || (selectedOS.executorId ? [selectedOS.executorId] : []);
+                                                const selectedExecs = users.filter(u => currentExecutorIds.includes(u.id));
+                                                return selectedExecs.length > 0 ? (
+                                                    selectedExecs.map(exec => (
+                                                        <div key={exec.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                            <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs">{exec.avatar}</div>
+                                                            <span className="font-bold text-slate-800 text-sm">{exec.name}</span>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-slate-400 italic text-sm">Não Atribuído</span>
+                                                );
+                                            })()}
                                         </div>
                                     )}
                                 </div>
@@ -865,10 +914,47 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                   />
                                 </div>
                                 {currentUser.role === 'ADMIN' && (
-                                <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Executor</label><div className="flex gap-2"><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.executorId || ''} onChange={e => setFormOS({...formOS, executorId: e.target.value})}><option value="">-- Pendente --</option>{executors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select><button type="button" onClick={() => setShowExecutorModal(true)} className="w-12 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center"><i className="fas fa-user-plus"></i></button></div></div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center justify-between">
+                                        <span>Executores</span>
+                                        <button type="button" onClick={() => setShowExecutorModal(true)} className="text-clean-primary hover:text-clean-primary/80 text-xs flex items-center gap-1">
+                                            <i className="fas fa-user-plus"></i> Novo
+                                        </button>
+                                    </label>
+                                    <div className="bg-white border border-slate-200 rounded-xl p-3 max-h-32 overflow-y-auto custom-scrollbar">
+                                        {executors.length > 0 ? (
+                                            <div className="space-y-1.5">
+                                                {executors.map(executor => (
+                                                    <label key={executor.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-4 h-4 text-clean-primary focus:ring-clean-primary rounded"
+                                                            checked={selectedExecutors.includes(executor.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setSelectedExecutors([...selectedExecutors, executor.id]);
+                                                                } else {
+                                                                    setSelectedExecutors(selectedExecutors.filter(id => id !== executor.id));
+                                                                }
+                                                            }}
+                                                        />
+                                                        <span className="text-sm font-bold text-slate-700">{executor.name}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-400 italic text-center py-2">Nenhum executor cadastrado</p>
+                                        )}
+                                    </div>
+                                    {selectedExecutors.length > 0 && (
+                                        <p className="text-xs text-emerald-600 font-bold mt-1.5 ml-1">
+                                            {selectedExecutors.length} executor(es) selecionado(s)
+                                        </p>
+                                    )}
+                                </div>
                                 )}
                                 {currentUser.role !== 'ADMIN' && (
-                                <div className="col-span-1 flex items-center justify-center bg-amber-50 border border-amber-200 rounded-xl p-4"><p className="text-xs text-amber-700 font-bold flex items-center gap-2"><i className="fas fa-info-circle"></i> Executor será definido pelo administrador</p></div>
+                                <div className="col-span-1 flex items-center justify-center bg-amber-50 border border-amber-200 rounded-xl p-4"><p className="text-xs text-amber-700 font-bold flex items-center gap-2"><i className="fas fa-info-circle"></i> Executores serão definidos pelo administrador</p></div>
                                 )}
                                 </div>
                             </div>
