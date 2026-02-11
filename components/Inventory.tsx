@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Material, StockMovement, StockLocation, User, Project } from '../types';
+import { Material, StockMovement, StockLocation, User, Project, OS } from '../types';
 import * as XLSX from 'xlsx';
 import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
@@ -11,11 +11,12 @@ interface Props {
   setMaterials: React.Dispatch<React.SetStateAction<Material[]>>;
   onAddMovement: (mov: StockMovement) => void;
   currentUser: User;
-  projects?: Project[]; // Opcional, passado do App.tsx
+  projects?: Project[];
 }
 
 const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser, projects = [] }) => {
   const [view, setView] = useState<'stock' | 'history'>('stock');
+  const [allOS, setAllOS] = useState<OS[]>([]);
 
   const addMovementWithSync = async (mov: StockMovement) => {
     addMovementWithSync(mov);
@@ -61,6 +62,23 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchInput]);
+
+  useEffect(() => {
+    loadOS();
+  }, []);
+
+  const loadOS = async () => {
+    try {
+      const { data, error } = await supabase.from('os').select('*');
+      if (error) throw error;
+      if (data) {
+        const osList = data.map(item => item.json_content);
+        setAllOS(osList);
+      }
+    } catch (e) {
+      console.error('Erro ao carregar OS:', e);
+    }
+  };
 
   const globalLocations = useMemo(() => {
     const locs = new Set<string>();
@@ -500,6 +518,11 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  const filteredOSByProject = useMemo(() => {
+    if (!locForm.projectId) return [];
+    return allOS.filter(os => os.projectId === locForm.projectId && os.status !== 'COMPLETED' && os.status !== 'CANCELED');
+  }, [allOS, locForm.projectId]);
+
   // Permissão de Almoxarife para baixa direta
   const canDirectIssue = ['ADMIN', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'].includes(currentUser.role);
 
@@ -830,16 +853,40 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                         <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-4">
                                             <div>
                                                 <label className="text-xs font-bold text-orange-700 uppercase block mb-2">Projeto de Destino</label>
-                                                <select required className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800" value={locForm.projectId} onChange={e => setLocForm({...locForm, projectId: e.target.value})}>
+                                                <select required className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800" value={locForm.projectId} onChange={e => setLocForm({...locForm, projectId: e.target.value, osNumber: ''})}>
                                                     <option value="">Selecione o Projeto...</option>
-                                                    {projects.filter(p => p.status !== 'FINISHED').map(p => (
+                                                    {projects.filter(p => p.status !== 'FINISHED' && p.status !== 'CANCELED').map(p => (
                                                         <option key={p.id} value={p.id}>{p.code} - {p.description}</option>
                                                     ))}
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="text-xs font-bold text-orange-700 uppercase block mb-2">Número da OS (Opcional)</label>
-                                                <input className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800" placeholder="Ex: OS-2024-001" value={locForm.osNumber} onChange={e => setLocForm({...locForm, osNumber: e.target.value})} />
+                                                <label className="text-xs font-bold text-orange-700 uppercase block mb-2">
+                                                    Ordem de Serviço (Opcional)
+                                                    {filteredOSByProject.length > 0 && (
+                                                        <span className="ml-2 text-[10px] bg-orange-100 px-2 py-0.5 rounded border border-orange-200">
+                                                            {filteredOSByProject.length} OS disponíveis
+                                                        </span>
+                                                    )}
+                                                </label>
+                                                {filteredOSByProject.length > 0 ? (
+                                                    <select
+                                                        className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800"
+                                                        value={locForm.osNumber}
+                                                        onChange={e => setLocForm({...locForm, osNumber: e.target.value})}
+                                                    >
+                                                        <option value="">Selecione uma OS (opcional)...</option>
+                                                        {filteredOSByProject.map(os => (
+                                                            <option key={os.id} value={os.number}>
+                                                                {os.number} - {os.description} ({os.status})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <div className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-orange-50 shadow-sm flex items-center text-orange-600 text-sm italic">
+                                                        {locForm.projectId ? 'Nenhuma OS ativa neste projeto' : 'Selecione um projeto primeiro'}
+                                                    </div>
+                                                )}
                                             </div>
                                             <p className="text-[10px] text-orange-600">O custo será alocado ao projeto selecionado. Informe a OS para rastreabilidade.</p>
                                         </div>
