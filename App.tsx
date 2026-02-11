@@ -210,7 +210,8 @@ const App: React.FC = () => {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('crop_user_session', JSON.stringify(user));
-    setActiveTab('dashboard'); // Reset to dashboard on login
+    const defaultTab = user.role === 'USER' ? 'calendar' : 'dashboard';
+    setActiveTab(defaultTab);
   };
 
   const handleLogout = () => {

@@ -86,12 +86,12 @@ export const PERMISSIONS_MATRIX: Record<UserRole, Record<ModuleId, ModulePermiss
     documentation: { view: true, create: false, edit: false, delete: false, export: false }
   },
   USER: {
-    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
-    calendar: { view: false, create: false, edit: false, delete: false, export: false },
+    dashboard: { view: false, create: false, edit: false, delete: false, export: false },
+    calendar: { view: true, create: false, edit: false, delete: false, export: false },
     projects: { view: false, create: false, edit: false, delete: false, export: false },
     os: { view: true, create: true, edit: false, delete: false, export: false },
     buildings: { view: false, create: false, edit: false, delete: false, export: false },
-    equipments: { view: false, create: false, edit: false, delete: false, export: false },
+    equipments: { view: true, create: true, edit: false, delete: false, export: false },
     inventory: { view: false, create: false, edit: false, delete: false, export: false },
     services: { view: false, create: false, edit: false, delete: false, export: false },
     suppliers: { view: false, create: false, edit: false, delete: false, export: false },
@@ -219,7 +219,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, { label: string; description: s
   },
   USER: {
     label: 'Usuário Comum',
-    description: 'Visualização básica do dashboard e abertura de OS. Sem acesso a módulos gerenciais.',
+    description: 'Abertura de OS e cadastro de equipamentos. Acesso à agenda de serviços. Sem acesso a módulos gerenciais.',
     color: 'slate'
   },
   WAREHOUSE: {
