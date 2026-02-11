@@ -653,11 +653,35 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Tipo</p><span className="font-bold text-slate-800">{selectedOS.type}</span></div>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executor</p>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs">{users.find(u=>u.id===selectedOS.executorId)?.avatar || 'U'}</div>
-                                        <span className="font-bold text-slate-800">{users.find(u=>u.id===selectedOS.executorId)?.name || 'Não Atribuído'}</span>
-                                    </div>
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executor {currentUser.role !== 'ADMIN' && <i className="fas fa-lock text-amber-600 ml-1" title="Apenas administradores podem alterar"></i>}</p>
+                                    {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
+                                        <select
+                                            className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-bold focus:border-clean-primary"
+                                            value={selectedOS.executorId || ''}
+                                            onChange={async (e) => {
+                                                const updatedOS = { ...selectedOS, executorId: e.target.value };
+                                                setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+                                                setSelectedOS(updatedOS);
+                                                try {
+                                                    const { error } = await supabase.from('oss').upsert({
+                                                        id: updatedOS.id,
+                                                        json_content: updatedOS
+                                                    });
+                                                    if (error) throw error;
+                                                } catch (e) {
+                                                    console.error('Erro ao atualizar executor:', e);
+                                                }
+                                            }}
+                                        >
+                                            <option value="">-- Não Atribuído --</option>
+                                            {executors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                        </select>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs">{users.find(u=>u.id===selectedOS.executorId)?.avatar || 'U'}</div>
+                                            <span className="font-bold text-slate-800">{users.find(u=>u.id===selectedOS.executorId)?.name || 'Não Atribuído'}</span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="pt-6 border-t border-slate-100">
                                     <p className="text-xs font-bold text-slate-500 uppercase mb-3">Cronograma</p>
@@ -823,7 +847,12 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 </div>
                                 <div className="grid grid-cols-2 gap-6">
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">SLA (Horas)</label><input type="number" min="1" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.slaHours} onChange={e => setFormOS({...formOS, slaHours: Number(e.target.value)})} /></div>
+                                {currentUser.role === 'ADMIN' && (
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Executor</label><div className="flex gap-2"><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.executorId || ''} onChange={e => setFormOS({...formOS, executorId: e.target.value})}><option value="">-- Pendente --</option>{executors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select><button type="button" onClick={() => setShowExecutorModal(true)} className="w-12 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center"><i className="fas fa-user-plus"></i></button></div></div>
+                                )}
+                                {currentUser.role !== 'ADMIN' && (
+                                <div className="col-span-1 flex items-center justify-center bg-amber-50 border border-amber-200 rounded-xl p-4"><p className="text-xs text-amber-700 font-bold flex items-center gap-2"><i className="fas fa-info-circle"></i> Executor será definido pelo administrador</p></div>
+                                )}
                                 </div>
                             </div>
 
