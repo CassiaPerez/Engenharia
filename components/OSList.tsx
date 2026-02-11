@@ -846,7 +846,24 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-6">
-                                <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">SLA (Horas)</label><input type="number" min="1" className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.slaHours} onChange={e => setFormOS({...formOS, slaHours: Number(e.target.value)})} /></div>
+                                <div>
+                                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                                    SLA (Horas)
+                                    {currentUser.role !== 'ADMIN' && (
+                                      <span className="text-amber-600" title="Apenas administradores podem definir o SLA">
+                                        <i className="fas fa-lock text-xs"></i>
+                                      </span>
+                                    )}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                                    value={formOS.slaHours}
+                                    onChange={e => setFormOS({...formOS, slaHours: Number(e.target.value)})}
+                                    disabled={currentUser.role !== 'ADMIN'}
+                                  />
+                                </div>
                                 {currentUser.role === 'ADMIN' && (
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Executor</label><div className="flex gap-2"><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.executorId || ''} onChange={e => setFormOS({...formOS, executorId: e.target.value})}><option value="">-- Pendente --</option>{executors.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select><button type="button" onClick={() => setShowExecutorModal(true)} className="w-12 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center"><i className="fas fa-user-plus"></i></button></div></div>
                                 )}
