@@ -137,7 +137,10 @@ const App: React.FC = () => {
 
   // Função para gerenciar baixa de estoque via OS
   // Agora suporta múltiplos locais (FIFO de locais: consome do primeiro com saldo)
-  const handleStockChange = (mId: string, qty: number, osNumber: string) => {
+  const handleStockChange = async (mId: string, qty: number, osNumber: string) => {
+    let updatedMaterial: Material | null = null;
+    let newMovement: StockMovement | null = null;
+
     setMaterials(prev => prev.map(m => {
       if (m.id === mId) {
         let remainingToDeduct = qty;
@@ -146,7 +149,7 @@ const App: React.FC = () => {
         // Lógica de consumo inteligente de locais
         newLocations = newLocations.map(loc => {
             if (remainingToDeduct <= 0) return loc;
-            
+
             if (loc.quantity >= remainingToDeduct) {
                 loc.quantity -= remainingToDeduct;
                 remainingToDeduct = 0;
@@ -164,16 +167,17 @@ const App: React.FC = () => {
 
         const newTotal = newLocations.reduce((acc, l) => acc + l.quantity, 0);
 
-        return { 
-            ...m, 
+        updatedMaterial = {
+            ...m,
             currentStock: newTotal,
             stockLocations: newLocations
         };
+        return updatedMaterial;
       }
       return m;
     }));
-    
-    setMovements(prev => [...prev, {
+
+    newMovement = {
       id: Math.random().toString(36).substr(2, 9),
       type: 'OUT',
       materialId: mId,
@@ -183,7 +187,24 @@ const App: React.FC = () => {
       osId: osNumber,
       description: `Baixa via ${osNumber} (Automático)`,
       fromLocation: 'Automático'
-    }]);
+    };
+
+    setMovements(prev => [...prev, newMovement!]);
+
+    // Salvar no Supabase
+    try {
+      if (updatedMaterial) {
+        const { error: matError } = await supabase.from('materials').upsert(mapToSupabase(updatedMaterial));
+        if (matError) throw matError;
+      }
+
+      if (newMovement) {
+        const { error: movError } = await supabase.from('stock_movements').insert(mapToSupabase(newMovement));
+        if (movError) throw movError;
+      }
+    } catch (e) {
+      console.error('Erro ao salvar movimento de estoque:', e);
+    }
   };
 
   const handleLogin = (user: User) => {

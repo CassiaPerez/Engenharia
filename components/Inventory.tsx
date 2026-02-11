@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Material, StockMovement, StockLocation, User, Project } from '../types';
 import * as XLSX from 'xlsx';
-import { supabase } from '../services/supabase';
+import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
 
 interface Props {
@@ -16,6 +16,16 @@ interface Props {
 
 const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser, projects = [] }) => {
   const [view, setView] = useState<'stock' | 'history'>('stock');
+
+  const addMovementWithSync = async (mov: StockMovement) => {
+    addMovementWithSync(mov);
+    try {
+      const { error } = await supabase.from('stock_movements').insert(mapToSupabase(mov));
+      if (error) throw error;
+    } catch (e) {
+      console.error('Erro ao salvar movimento:', e);
+    }
+  };
   
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState('');   
@@ -152,7 +162,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                   newLocations.push({ name: locForm.location, quantity: initialQty });
 
                   if (initialQty > 0) {
-                      onAddMovement({
+                      addMovementWithSync({
                           id: Math.random().toString(36).substr(2, 9),
                           type: 'IN',
                           materialId: m.id,
@@ -172,7 +182,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       newLocations.push({ name: locForm.location, quantity: qty });
                   }
 
-                  onAddMovement({
+                  addMovementWithSync({
                       id: Math.random().toString(36).substr(2, 9),
                       type: 'IN',
                       materialId: m.id,
@@ -196,7 +206,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       ? `Baixa p/ Projeto: ${projects.find(p => p.id === locForm.projectId)?.code || '---'}`
                       : (locForm.reason || 'Saque Manual (Baixa)');
 
-                   onAddMovement({
+                   addMovementWithSync({
                       id: Math.random().toString(36).substr(2, 9),
                       type: 'OUT',
                       materialId: m.id,
@@ -220,7 +230,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                           newLocations.push({ name: locForm.toLocation, quantity: qty });
                       }
 
-                       onAddMovement({
+                       addMovementWithSync({
                           id: Math.random().toString(36).substr(2, 9),
                           type: 'TRANSFER',
                           materialId: m.id,
@@ -307,7 +317,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     }
 
     if (material.currentStock > 0) {
-        onAddMovement({
+        addMovementWithSync({
             id: Math.random().toString(36).substr(2, 9),
             type: 'IN',
             materialId: id,
@@ -374,7 +384,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
             importedMaterials.push(newMat);
 
             if (newMat.currentStock > 0) {
-                onAddMovement({
+                addMovementWithSync({
                     id: Math.random().toString(36).substr(2, 9),
                     type: 'IN',
                     materialId: newMat.id,

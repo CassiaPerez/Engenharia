@@ -15,27 +15,46 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
   const [formData, setFormData] = useState<Partial<Equipment>>({ status: 'ACTIVE' });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-        setEquipments(prev => prev.map(eq => eq.id === editingId ? { ...eq, ...formData } as Equipment : eq));
-    } else {
-        setEquipments(prev => [...prev, { 
-          id: Math.random().toString(36).substr(2, 9), 
-          code: formData.code || '',
-          name: formData.name || '',
-          description: formData.description || '',
-          location: formData.location || '',
-          model: formData.model || '',
-          serialNumber: formData.serialNumber || '',
-          manufacturer: formData.manufacturer || '',
-          status: formData.status || 'ACTIVE',
-          notes: formData.notes || ''
-        }]);
+    try {
+        if (editingId) {
+            const updated = { ...formData, id: editingId } as Equipment;
+            setEquipments(prev => prev.map(eq => eq.id === editingId ? updated : eq));
+
+            const { error } = await supabase.from('equipments').upsert({
+                id: editingId,
+                json_content: updated
+            });
+            if (error) throw error;
+        } else {
+            const newEquipment: Equipment = {
+              id: Math.random().toString(36).substr(2, 9),
+              code: formData.code || '',
+              name: formData.name || '',
+              description: formData.description || '',
+              location: formData.location || '',
+              model: formData.model || '',
+              serialNumber: formData.serialNumber || '',
+              manufacturer: formData.manufacturer || '',
+              status: formData.status || 'ACTIVE',
+              notes: formData.notes || ''
+            };
+            setEquipments(prev => [...prev, newEquipment]);
+
+            const { error } = await supabase.from('equipments').insert({
+                id: newEquipment.id,
+                json_content: newEquipment
+            });
+            if (error) throw error;
+        }
+        setShowModal(false);
+        setFormData({ status: 'ACTIVE' });
+        setEditingId(null);
+    } catch (e) {
+        console.error('Erro ao salvar:', e);
+        alert('Erro ao salvar no banco de dados.');
     }
-    setShowModal(false);
-    setFormData({ status: 'ACTIVE' });
-    setEditingId(null);
   };
 
   const handleEdit = (eq: Equipment) => {
