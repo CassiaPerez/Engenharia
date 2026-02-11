@@ -14,6 +14,10 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState<Partial<Equipment>>({ status: 'ACTIVE' });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterLocation, setFilterLocation] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterManufacturer, setFilterManufacturer] = useState('');
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +91,31 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
       setShowModal(true);
   };
 
+  const uniqueLocations = Array.from(new Set(equipments.map(eq => eq.location).filter(Boolean)));
+  const uniqueManufacturers = Array.from(new Set(equipments.map(eq => eq.manufacturer).filter(Boolean)));
+
+  const filteredEquipments = equipments.filter(eq => {
+    const matchesSearch = !searchTerm ||
+      eq.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      eq.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesLocation = !filterLocation || eq.location === filterLocation;
+    const matchesStatus = !filterStatus || eq.status === filterStatus;
+    const matchesManufacturer = !filterManufacturer || eq.manufacturer === filterManufacturer;
+
+    return matchesSearch && matchesLocation && matchesStatus && matchesManufacturer;
+  });
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterLocation('');
+    setFilterStatus('');
+    setFilterManufacturer('');
+  };
+
+  const hasActiveFilters = searchTerm || filterLocation || filterStatus || filterManufacturer;
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex justify-between items-center border-b border-slate-200 pb-6">
@@ -98,10 +127,106 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
             <i className="fas fa-plus"></i> Novo Equipamento
         </button>
       </header>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {equipments.map(eq => (
-           <div key={eq.id} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all flex flex-col group relative">
+
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <i className="fas fa-filter text-clean-primary"></i>
+            <h3 className="text-sm font-bold text-slate-700 uppercase">Filtros</h3>
+          </div>
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="text-xs font-bold text-slate-500 hover:text-clean-primary transition-colors flex items-center gap-1">
+              <i className="fas fa-times"></i> Limpar filtros
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Buscar</label>
+            <div className="relative">
+              <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+              <input
+                type="text"
+                placeholder="TAG, nome ou descrição..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full h-11 pl-11 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-clean-primary focus:outline-none focus:ring-2 focus:ring-clean-primary/20 transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Localização</label>
+            <select
+              value={filterLocation}
+              onChange={e => setFilterLocation(e.target.value)}
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:border-clean-primary focus:outline-none focus:ring-2 focus:ring-clean-primary/20 transition-all"
+            >
+              <option value="">Todas</option>
+              {uniqueLocations.map(loc => (
+                <option key={loc} value={loc}>{loc}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Status</label>
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:border-clean-primary focus:outline-none focus:ring-2 focus:ring-clean-primary/20 transition-all"
+            >
+              <option value="">Todos</option>
+              <option value="ACTIVE">Ativo</option>
+              <option value="MAINTENANCE">Manutenção</option>
+              <option value="INACTIVE">Inativo</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Fabricante</label>
+            <select
+              value={filterManufacturer}
+              onChange={e => setFilterManufacturer(e.target.value)}
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:border-clean-primary focus:outline-none focus:ring-2 focus:ring-clean-primary/20 transition-all"
+            >
+              <option value="">Todos</option>
+              {uniqueManufacturers.map(mfr => (
+                <option key={mfr} value={mfr}>{mfr}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+          <p className="text-sm text-slate-600">
+            Exibindo <span className="font-bold text-clean-primary">{filteredEquipments.length}</span> de <span className="font-bold">{equipments.length}</span> equipamentos
+          </p>
+        </div>
+      </div>
+
+      {filteredEquipments.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <i className="fas fa-search text-2xl text-slate-400"></i>
+          </div>
+          <h3 className="text-lg font-bold text-slate-700 mb-2">Nenhum equipamento encontrado</h3>
+          <p className="text-slate-500 text-sm mb-4">
+            {hasActiveFilters
+              ? 'Tente ajustar os filtros ou limpar a busca.'
+              : 'Cadastre o primeiro equipamento para começar.'}
+          </p>
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-bold transition-colors">
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredEquipments.map(eq => (
+            <div key={eq.id} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all flex flex-col group relative">
                <div className="flex justify-between items-start mb-4">
                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm text-xl bg-slate-50 text-slate-600">
                        <i className="fas fa-cogs"></i>
@@ -132,9 +257,10 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
                        </button>
                    )}
                </div>
-           </div>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {showModal && (
           <ModalPortal>
