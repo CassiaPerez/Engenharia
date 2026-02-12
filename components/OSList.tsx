@@ -60,6 +60,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
   const [showExecutorModal, setShowExecutorModal] = useState(false);
   const [newExecutorData, setNewExecutorData] = useState({ name: '', email: '', department: '' });
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [isEditingSLA, setIsEditingSLA] = useState(false);
+  const [editingSLAValue, setEditingSLAValue] = useState<number>(24);
 
   const executors = useMemo(() => users.filter(u => u.role === 'EXECUTOR'), [users]);
 
@@ -97,8 +99,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
 
   const handlePriorityChange = async (newPriority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL') => {
       if (!selectedOS) return;
-      if (currentUser.role !== 'ADMIN' && currentUser.role !== 'MANAGER') {
-          alert('Apenas administradores e gerentes podem alterar a prioridade.');
+      if (currentUser.role !== 'ADMIN') {
+          alert('Apenas administradores podem alterar a prioridade.');
           return;
       }
 
@@ -122,6 +124,43 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       } catch (e) {
           console.error('Erro ao atualizar prioridade:', e);
           alert('Erro ao atualizar prioridade no banco de dados.');
+      }
+  };
+
+  const handleSLAChange = async () => {
+      if (!selectedOS) return;
+      if (currentUser.role !== 'ADMIN') {
+          alert('Apenas administradores podem alterar o SLA.');
+          return;
+      }
+
+      if (editingSLAValue <= 0) {
+          alert('O SLA deve ser maior que zero.');
+          return;
+      }
+
+      const newLimitDate = new Date(new Date(selectedOS.openDate).getTime() + editingSLAValue * 3600000).toISOString();
+      const updatedOS = { ...selectedOS, slaHours: editingSLAValue, limitDate: newLimitDate };
+
+      setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+      setSelectedOS(updatedOS);
+      setIsEditingSLA(false);
+
+      try {
+          const { error } = await supabase.from('oss').upsert({
+              id: updatedOS.id,
+              json_content: updatedOS
+          });
+          if (error) throw error;
+
+          const toast = document.createElement('div');
+          toast.className = "fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-[10000] font-bold animate-in slide-in-from-bottom-5";
+          toast.innerText = `SLA atualizado para ${editingSLAValue} horas`;
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 3000);
+      } catch (e) {
+          console.error('Erro ao atualizar SLA:', e);
+          alert('Erro ao atualizar SLA no banco de dados.');
       }
   };
 
@@ -631,7 +670,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</p>
-                                      {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') && isEditable(selectedOS) ? (
+                                      {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
                                         <div className="relative">
                                           <button
                                             onClick={(e) => {
@@ -761,7 +800,50 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     <p className="text-xs font-bold text-slate-500 uppercase mb-3">Cronograma</p>
                                     <div className="space-y-3 text-sm">
                                         <div className="flex justify-between"><span className="text-slate-500">Abertura:</span><span className="font-mono font-bold text-slate-700">{new Date(selectedOS.openDate).toLocaleDateString()}</span></div>
-                                        <div className="flex justify-between"><span className="text-slate-500">Prazo (SLA):</span><span className="font-mono font-bold text-red-600">{new Date(selectedOS.limitDate).toLocaleDateString()}</span></div>
+
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-500">SLA (Horas):</span>
+                                            {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
+                                                isEditingSLA ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            className="w-20 h-8 px-2 border-2 border-blue-300 rounded-lg text-sm font-bold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                                            value={editingSLAValue}
+                                                            onChange={e => setEditingSLAValue(Number(e.target.value))}
+                                                            autoFocus
+                                                        />
+                                                        <button
+                                                            onClick={handleSLAChange}
+                                                            className="w-7 h-7 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center justify-center"
+                                                        >
+                                                            <i className="fas fa-check text-xs"></i>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsEditingSLA(false)}
+                                                            className="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-all flex items-center justify-center"
+                                                        >
+                                                            <i className="fas fa-times text-xs"></i>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingSLAValue(selectedOS.slaHours);
+                                                            setIsEditingSLA(true);
+                                                        }}
+                                                        className="font-mono font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-all border-2 border-transparent hover:border-blue-300"
+                                                    >
+                                                        {selectedOS.slaHours}h <i className="fas fa-edit text-xs ml-1"></i>
+                                                    </button>
+                                                )
+                                            ) : (
+                                                <span className="font-mono font-bold text-blue-600">{selectedOS.slaHours}h</span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex justify-between"><span className="text-slate-500">Prazo Limite:</span><span className="font-mono font-bold text-red-600">{new Date(selectedOS.limitDate).toLocaleDateString()}</span></div>
                                         {selectedOS.startTime && <div className="flex justify-between"><span className="text-slate-500">Início Real:</span><span className="font-mono font-bold text-blue-600">{new Date(selectedOS.startTime).toLocaleString()}</span></div>}
                                         {selectedOS.endTime && <div className="flex justify-between"><span className="text-slate-500">Conclusão:</span><span className="font-mono font-bold text-emerald-600">{new Date(selectedOS.endTime).toLocaleString()}</span></div>}
                                     </div>
@@ -907,8 +989,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 <div>
                                   <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
                                     Prioridade
-                                    {(currentUser.role !== 'ADMIN' && currentUser.role !== 'MANAGER') && (
-                                      <span className="text-amber-600" title="Apenas administradores e gerentes podem definir prioridade">
+                                    {currentUser.role !== 'ADMIN' && (
+                                      <span className="text-amber-600" title="Apenas administradores podem definir prioridade">
                                         <i className="fas fa-lock text-xs"></i>
                                       </span>
                                     )}
@@ -917,7 +999,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                                     value={formOS.priority}
                                     onChange={e => setFormOS({...formOS, priority: e.target.value as any})}
-                                    disabled={currentUser.role !== 'ADMIN' && currentUser.role !== 'MANAGER'}
+                                    disabled={currentUser.role !== 'ADMIN'}
                                   >
                                     <option value="LOW">Baixa</option>
                                     <option value="MEDIUM">Média</option>
