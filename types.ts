@@ -139,6 +139,7 @@ export interface OS {
   openDate: string;
   limitDate: string;
   status: OSStatus;
+  costCenter?: string;
   executorIds?: string[];
   executorId?: string;
   startTime?: string;

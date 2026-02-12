@@ -252,6 +252,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
           projectId: formOS.projectId,
           buildingId: formOS.buildingId,
           equipmentId: formOS.equipmentId,
+          costCenter: formOS.costCenter,
           executorIds: selectedExecutors.length > 0 ? selectedExecutors : undefined,
           description: formOS.description || '',
           type: formOS.type || OSType.PREVENTIVE,
@@ -385,8 +386,17 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
     doc.line(14, y + 2, 196, y + 2);
     y += 8;
 
+    const costCenter = (() => {
+      if (os.projectId) {
+        const project = projects.find(p => p.id === os.projectId);
+        return project?.costCenter ? `${project.costCenter} (Projeto)` : 'Não definido';
+      }
+      return os.costCenter || 'Não definido';
+    })();
+
     const infoData = [
         [`Vínculo: ${context.type}`, `${context.label} - ${context.sub}`],
+        ["Centro de Custo", costCenter],
         ["Status", os.status],
         ["Prioridade", translatePriority(os.priority)],
         ["Tipo", os.type],
@@ -601,6 +611,21 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
                                         <p className="font-bold text-slate-800">{getContextInfo(selectedOS).label}</p>
                                         <p className="text-xs text-slate-500">{getContextInfo(selectedOS).sub}</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Centro de Custo</p>
+                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                        <p className="font-bold text-slate-800">
+                                            {(() => {
+                                                if (selectedOS.projectId) {
+                                                    const project = projects.find(p => p.id === selectedOS.projectId);
+                                                    return project?.costCenter || 'Não definido';
+                                                }
+                                                return selectedOS.costCenter || 'Não definido';
+                                            })()}
+                                        </p>
+                                        {selectedOS.projectId && <p className="text-xs text-slate-500">Herdado do Projeto</p>}
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -867,6 +892,13 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.buildingId || ''} onChange={e => setFormOS({...formOS, buildingId: e.target.value, projectId: undefined, equipmentId: undefined})}><option value="">Selecione o Edifício...</option>{buildings.map(b => <option key={b.id} value={b.id}>{b.name} ({b.city})</option>)}</select>
                                 ) : (
                                     <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.equipmentId || ''} onChange={e => setFormOS({...formOS, equipmentId: e.target.value, projectId: undefined, buildingId: undefined})}><option value="">Selecione o Equipamento...</option>{equipments.map(e => <option key={e.id} value={e.id}>{e.name} - {e.code}</option>)}</select>
+                                )}
+                                {creationContext !== 'PROJECT' && (
+                                    <div className="mt-3">
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Centro de Custo</label>
+                                        <input required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" placeholder="Ex: CC-001, MANUT-2024" value={formOS.costCenter || ''} onChange={e => setFormOS({...formOS, costCenter: e.target.value})} />
+                                        <p className="text-xs text-slate-500 mt-1.5 ml-1">Quando vinculado a Projeto, o centro de custo é herdado do Projeto.</p>
+                                    </div>
                                 )}
                                 </div>
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição</label><textarea required className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium h-24" value={formOS.description} onChange={e => setFormOS({...formOS, description: e.target.value})} /></div>
