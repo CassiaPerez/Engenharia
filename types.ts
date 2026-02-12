@@ -52,7 +52,7 @@ export interface Equipment {
   code: string;     // TAG do equipamento
   name: string;
   description: string;
-  location: string; // Onde está instalado
+  location: string; // Empresa proprietária
   model: string;
   serialNumber: string;
   manufacturer: string;

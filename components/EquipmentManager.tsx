@@ -15,7 +15,7 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
   const [formData, setFormData] = useState<Partial<Equipment>>({ status: 'ACTIVE' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterLocation, setFilterLocation] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterManufacturer, setFilterManufacturer] = useState('');
 
@@ -91,7 +91,7 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
       setShowModal(true);
   };
 
-  const uniqueLocations = Array.from(new Set(equipments.map(eq => eq.location).filter(Boolean)));
+  const uniqueCompanies = Array.from(new Set(equipments.map(eq => eq.location).filter(Boolean)));
   const uniqueManufacturers = Array.from(new Set(equipments.map(eq => eq.manufacturer).filter(Boolean)));
 
   const filteredEquipments = equipments.filter(eq => {
@@ -100,21 +100,21 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
       eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       eq.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesLocation = !filterLocation || eq.location === filterLocation;
+    const matchesCompany = !filterCompany || eq.location === filterCompany;
     const matchesStatus = !filterStatus || eq.status === filterStatus;
     const matchesManufacturer = !filterManufacturer || eq.manufacturer === filterManufacturer;
 
-    return matchesSearch && matchesLocation && matchesStatus && matchesManufacturer;
+    return matchesSearch && matchesCompany && matchesStatus && matchesManufacturer;
   });
 
   const clearFilters = () => {
     setSearchTerm('');
-    setFilterLocation('');
+    setFilterCompany('');
     setFilterStatus('');
     setFilterManufacturer('');
   };
 
-  const hasActiveFilters = searchTerm || filterLocation || filterStatus || filterManufacturer;
+  const hasActiveFilters = searchTerm || filterCompany || filterStatus || filterManufacturer;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -157,15 +157,15 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Localização</label>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Empresa</label>
             <select
-              value={filterLocation}
-              onChange={e => setFilterLocation(e.target.value)}
+              value={filterCompany}
+              onChange={e => setFilterCompany(e.target.value)}
               className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:border-clean-primary focus:outline-none focus:ring-2 focus:ring-clean-primary/20 transition-all"
             >
               <option value="">Todas</option>
-              {uniqueLocations.map(loc => (
-                <option key={loc} value={loc}>{loc}</option>
+              {uniqueCompanies.map(company => (
+                <option key={company} value={company}>{company}</option>
               ))}
             </select>
           </div>
@@ -243,7 +243,7 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
                <p className="text-sm text-slate-500 mb-4 h-10 line-clamp-2">{eq.description}</p>
                
                <div className="space-y-2 mb-4 text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                   <p><span className="font-bold text-slate-400 text-xs uppercase block">Local:</span> {eq.location}</p>
+                   <p><span className="font-bold text-slate-400 text-xs uppercase block">Empresa:</span> {eq.location}</p>
                    <p><span className="font-bold text-slate-400 text-xs uppercase block">Modelo/Série:</span> {eq.model} / {eq.serialNumber}</p>
                </div>
 
@@ -289,7 +289,7 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
                               </div>
                               <div className="grid grid-cols-2 gap-6">
                                   <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Fabricante</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.manufacturer || ''} onChange={e=>setFormData({...formData, manufacturer:e.target.value})} /></div>
-                                  <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Localização</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.location || ''} onChange={e=>setFormData({...formData, location:e.target.value})} /></div>
+                                  <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Empresa</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.location || ''} onChange={e=>setFormData({...formData, location:e.target.value})} /></div>
                               </div>
                               <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Obs</label><textarea className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 shadow-sm h-24 transition-all" value={formData.notes || ''} onChange={e=>setFormData({...formData, notes:e.target.value})} /></div>
                           </form>
