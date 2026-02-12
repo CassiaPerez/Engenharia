@@ -141,6 +141,8 @@ const App: React.FC = () => {
     let updatedMaterial: Material | null = null;
     let newMovement: StockMovement | null = null;
 
+    const relatedOS = oss.find(os => os.number === osNumber);
+
     setMaterials(prev => prev.map(m => {
       if (m.id === mId) {
         let remainingToDeduct = qty;
@@ -177,6 +179,27 @@ const App: React.FC = () => {
       return m;
     }));
 
+    let description = `Baixa via ${osNumber}`;
+    let costCenter: string | undefined;
+    let projectId: string | undefined;
+
+    if (relatedOS) {
+      if (relatedOS.projectId) {
+        const project = projects.find(p => p.id === relatedOS.projectId);
+        description = `Baixa p/ Projeto: ${project?.code || 'N/A'} / OS: ${osNumber}`;
+        costCenter = project?.costCenter;
+        projectId = relatedOS.projectId;
+      } else if (relatedOS.buildingId) {
+        const building = buildings.find(b => b.id === relatedOS.buildingId);
+        description = `Baixa p/ Edifício: ${building?.name || 'N/A'} / OS: ${osNumber}`;
+        costCenter = relatedOS.costCenter;
+      } else if (relatedOS.equipmentId) {
+        const equipment = equipments.find(e => e.id === relatedOS.equipmentId);
+        description = `Baixa p/ Equipamento: ${equipment?.name || 'N/A'} / OS: ${osNumber}`;
+        costCenter = relatedOS.costCenter;
+      }
+    }
+
     newMovement = {
       id: Math.random().toString(36).substr(2, 9),
       type: 'OUT',
@@ -185,8 +208,10 @@ const App: React.FC = () => {
       date: new Date().toISOString(),
       userId: currentUser?.id || 'SYSTEM',
       osId: osNumber,
-      description: `Baixa via ${osNumber} (Automático)`,
-      fromLocation: 'Automático'
+      description: description,
+      fromLocation: 'Automático',
+      projectId: projectId,
+      costCenter: costCenter
     };
 
     setMovements(prev => [...prev, newMovement!]);
