@@ -45,13 +45,12 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   });
 
   const [selectedMaterialForLoc, setSelectedMaterialForLoc] = useState<Material | null>(null);
-  const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW' | 'PROJECT_OUT'>('VIEW');
+  const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW'>('VIEW');
   const [locForm, setLocForm] = useState({
       location: '',
       toLocation: '',
       quantity: '',
       reason: '',
-      projectId: '',
       osNumber: ''
   });
 
@@ -212,7 +211,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       toLocation: locForm.location
                   });
 
-              } else if (locAction === 'OUT' || locAction === 'PROJECT_OUT') {
+              } else if (locAction === 'OUT') {
                   const targetLocIndex = newLocations.findIndex(l => l.name === locForm.location);
                   if (targetLocIndex >= 0 && newLocations[targetLocIndex].quantity >= qty) {
                       newLocations[targetLocIndex].quantity -= qty;
@@ -221,25 +220,26 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       return m;
                   }
 
-                   const desc = locAction === 'PROJECT_OUT'
-                      ? `Baixa p/ Projeto: ${projects.find(p => p.id === locForm.projectId)?.code || '---'}${locForm.osNumber ? ` / OS: ${locForm.osNumber}` : ''}`
-                      : (locForm.reason || 'Saque Manual (Baixa)');
-
+                   let desc = locForm.reason || 'Baixa Manual';
                    let costCenter: string | undefined;
-                   if (locAction === 'PROJECT_OUT') {
-                       if (locForm.osNumber) {
-                           const selectedOS = allOS.find(os => os.number === locForm.osNumber);
-                           if (selectedOS) {
-                               if (selectedOS.costCenter) {
-                                   costCenter = selectedOS.costCenter;
-                               } else if (selectedOS.projectId) {
-                                   const project = projects.find(p => p.id === selectedOS.projectId);
-                                   costCenter = project?.costCenter;
-                               }
+                   let projectId: string | undefined;
+
+                   if (locForm.osNumber) {
+                       const selectedOS = allOS.find(os => os.number === locForm.osNumber);
+                       if (selectedOS) {
+                           if (selectedOS.projectId) {
+                               const project = projects.find(p => p.id === selectedOS.projectId);
+                               desc = `Baixa p/ Projeto: ${project?.code || 'N/A'} / OS: ${locForm.osNumber}`;
+                               costCenter = project?.costCenter;
+                               projectId = selectedOS.projectId;
+                           } else if (selectedOS.buildingId) {
+                               const building = projects.find(p => p.id === selectedOS.buildingId);
+                               desc = `Baixa p/ Edifício: ${building?.code || 'N/A'} / OS: ${locForm.osNumber}`;
+                               costCenter = selectedOS.costCenter;
+                           } else if (selectedOS.equipmentId) {
+                               desc = `Baixa p/ Equipamento / OS: ${locForm.osNumber}`;
+                               costCenter = selectedOS.costCenter;
                            }
-                       } else if (locForm.projectId) {
-                           const project = projects.find(p => p.id === locForm.projectId);
-                           costCenter = project?.costCenter;
                        }
                    }
 
@@ -252,7 +252,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       userId: currentUser.id,
                       description: desc,
                       fromLocation: locForm.location,
-                      projectId: locAction === 'PROJECT_OUT' ? locForm.projectId : undefined,
+                      projectId: projectId,
                       osId: locForm.osNumber || undefined,
                       costCenter: costCenter
                   });
@@ -310,7 +310,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           }
       }
 
-      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '' });
+      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', osNumber: '' });
       setLocAction('VIEW');
   };
 
@@ -536,14 +536,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   }, [movements, materials, currentUser.role]);
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  const filteredOSByProject = useMemo(() => {
-    if (!locForm.projectId) return [];
-    return allOS.filter(os => os.projectId === locForm.projectId && os.status !== 'COMPLETED' && os.status !== 'CANCELED');
-  }, [allOS, locForm.projectId]);
-
-  // Permissão de Almoxarife para baixa direta
-  const canDirectIssue = ['ADMIN', 'WAREHOUSE', 'WAREHOUSE_BIO', 'WAREHOUSE_FERT'].includes(currentUser.role);
 
   return (
     <div className="space-y-8">
@@ -826,14 +818,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                         {/* Ações */}
                         <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
                             <div className="flex flex-wrap bg-white p-1 rounded-xl border border-slate-200 mb-6 shadow-sm">
-                                <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
-                                <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
-                                <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
-                                <button onClick={() => { setLocAction('OUT'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa</button>
-                                
-                                {canDirectIssue && (
-                                    <button onClick={() => { setLocAction('PROJECT_OUT'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'PROJECT_OUT' ? 'bg-orange-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Proj.</button>
-                                )}
+                                <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
+                                <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
+                                <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
+                                <button onClick={() => { setLocAction('OUT'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa p/ OS</button>
                             </div>
 
                             {locAction !== 'VIEW' && (
@@ -861,7 +849,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                     ) : (
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Local Alvo</label>
-                                            {(locAction === 'OUT' || locAction === 'PROJECT_OUT') ? (
+                                            {locAction === 'OUT' ? (
                                                 <select required className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})}>
                                                     <option value="">Selecione...</option>
                                                     {selectedMaterialForLoc.stockLocations?.map((l, i) => <option key={i} value={l.name}>{l.name} ({l.quantity})</option>)}
@@ -874,75 +862,81 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                         </div>
                                     )}
 
-                                    {/* SELEÇÃO DE PROJETO PARA BAIXA DIRETA */}
-                                    {locAction === 'PROJECT_OUT' && (
-                                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 space-y-4">
+                                    {/* SELEÇÃO DE OS PARA BAIXA */}
+                                    {locAction === 'OUT' && (
+                                        <div className="bg-red-50 p-4 rounded-xl border border-red-100 space-y-4">
                                             <div>
-                                                <label className="text-xs font-bold text-orange-700 uppercase block mb-2">Projeto de Destino</label>
-                                                <select required className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800" value={locForm.projectId} onChange={e => setLocForm({...locForm, projectId: e.target.value, osNumber: ''})}>
-                                                    <option value="">Selecione o Projeto...</option>
-                                                    {projects.filter(p => p.status !== 'FINISHED' && p.status !== 'CANCELED').map(p => (
-                                                        <option key={p.id} value={p.id}>{p.code} - {p.description}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs font-bold text-orange-700 uppercase block mb-2">
-                                                    Ordem de Serviço (Opcional)
-                                                    {filteredOSByProject.length > 0 && (
-                                                        <span className="ml-2 text-[10px] bg-orange-100 px-2 py-0.5 rounded border border-orange-200">
-                                                            {filteredOSByProject.length} OS disponíveis
+                                                <label className="text-xs font-bold text-red-700 uppercase block mb-2">
+                                                    Ordem de Serviço <span className="text-red-600">*</span>
+                                                    {allOS.filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED').length > 0 && (
+                                                        <span className="ml-2 text-[10px] bg-red-100 px-2 py-0.5 rounded border border-red-200">
+                                                            {allOS.filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED').length} OS disponíveis
                                                         </span>
                                                     )}
                                                 </label>
-                                                {filteredOSByProject.length > 0 ? (
-                                                    <select
-                                                        className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-white shadow-sm focus:border-orange-400 focus:ring-0 transition-all text-slate-800"
-                                                        value={locForm.osNumber}
-                                                        onChange={e => setLocForm({...locForm, osNumber: e.target.value})}
-                                                    >
-                                                        <option value="">Selecione uma OS (opcional)...</option>
-                                                        {filteredOSByProject.map(os => (
-                                                            <option key={os.id} value={os.number}>
-                                                                {os.number} - {os.description} ({os.status})
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    <div className="w-full h-12 px-4 rounded-xl border border-orange-200 bg-orange-50 shadow-sm flex items-center text-orange-600 text-sm italic">
-                                                        {locForm.projectId ? 'Nenhuma OS ativa neste projeto' : 'Selecione um projeto primeiro'}
-                                                    </div>
-                                                )}
+                                                <select
+                                                    required
+                                                    className="w-full h-12 px-4 rounded-xl border border-red-200 bg-white shadow-sm focus:border-red-400 focus:ring-0 transition-all text-slate-800"
+                                                    value={locForm.osNumber}
+                                                    onChange={e => setLocForm({...locForm, osNumber: e.target.value})}
+                                                >
+                                                    <option value="">Selecione a OS de destino...</option>
+                                                    {allOS
+                                                        .filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED')
+                                                        .map(os => {
+                                                            let context = '';
+                                                            if (os.projectId) {
+                                                                const proj = projects.find(p => p.id === os.projectId);
+                                                                context = proj ? ` | Projeto: ${proj.code}` : ' | Projeto';
+                                                            } else if (os.buildingId) {
+                                                                context = ' | Edifício';
+                                                            } else if (os.equipmentId) {
+                                                                context = ' | Equipamento';
+                                                            }
+                                                            return (
+                                                                <option key={os.id} value={os.number}>
+                                                                    {os.number} - {os.description}{context} ({os.status})
+                                                                </option>
+                                                            );
+                                                        })
+                                                    }
+                                                </select>
                                             </div>
-                                            <p className="text-[10px] text-orange-600">O custo será alocado ao projeto selecionado. Informe a OS para rastreabilidade.</p>
+                                            <p className="text-[10px] text-red-600">A baixa será vinculada à OS selecionada e o custo alocado ao centro de custo correspondente.</p>
                                             {(() => {
-                                                let displayCostCenter = '';
                                                 if (locForm.osNumber) {
                                                     const selectedOS = allOS.find(os => os.number === locForm.osNumber);
                                                     if (selectedOS) {
-                                                        if (selectedOS.costCenter) {
-                                                            displayCostCenter = selectedOS.costCenter;
-                                                        } else if (selectedOS.projectId) {
-                                                            const project = projects.find(p => p.id === selectedOS.projectId);
-                                                            if (project?.costCenter) {
-                                                                displayCostCenter = `${project.costCenter} (Projeto)`;
-                                                            }
-                                                        }
-                                                    }
-                                                } else if (locForm.projectId) {
-                                                    const project = projects.find(p => p.id === locForm.projectId);
-                                                    if (project?.costCenter) {
-                                                        displayCostCenter = project.costCenter;
-                                                    }
-                                                }
+                                                        let displayCostCenter = '';
+                                                        let osContext = '';
 
-                                                if (displayCostCenter) {
-                                                    return (
-                                                        <div className="mt-3 p-3 bg-white rounded-lg border border-orange-200">
-                                                            <p className="text-[10px] font-bold text-orange-800 uppercase mb-1">Centro de Custo</p>
-                                                            <p className="text-sm font-bold text-orange-900">{displayCostCenter}</p>
-                                                        </div>
-                                                    );
+                                                        if (selectedOS.projectId) {
+                                                            const project = projects.find(p => p.id === selectedOS.projectId);
+                                                            displayCostCenter = project?.costCenter || 'N/A';
+                                                            osContext = `Projeto: ${project?.code || 'N/A'}`;
+                                                        } else if (selectedOS.buildingId) {
+                                                            displayCostCenter = selectedOS.costCenter || 'N/A';
+                                                            osContext = 'Vinculada a Edifício';
+                                                        } else if (selectedOS.equipmentId) {
+                                                            displayCostCenter = selectedOS.costCenter || 'N/A';
+                                                            osContext = 'Vinculada a Equipamento';
+                                                        }
+
+                                                        return (
+                                                            <div className="mt-3 p-3 bg-white rounded-lg border border-red-200 space-y-2">
+                                                                <div>
+                                                                    <p className="text-[10px] font-bold text-red-800 uppercase mb-1">Contexto da OS</p>
+                                                                    <p className="text-sm font-bold text-red-900">{osContext}</p>
+                                                                </div>
+                                                                {displayCostCenter && (
+                                                                    <div>
+                                                                        <p className="text-[10px] font-bold text-red-800 uppercase mb-1">Centro de Custo</p>
+                                                                        <p className="text-sm font-bold text-red-900">{displayCostCenter}</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
                                                 }
                                                 return null;
                                             })()}
@@ -961,8 +955,8 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Justificativa</label>
-                                            {locAction === 'PROJECT_OUT' ? (
-                                                <input disabled className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-100 shadow-sm text-slate-400 italic cursor-not-allowed" value="Baixa para Projeto (Automático)" />
+                                            {locAction === 'OUT' && locForm.osNumber ? (
+                                                <input disabled className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-100 shadow-sm text-slate-400 italic cursor-not-allowed" value="Baixa vinculada à OS (Automático)" />
                                             ) : (
                                                 <input className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.reason} onChange={e => setLocForm({...locForm, reason: e.target.value})} placeholder="Motivo da operação..." />
                                             )}
