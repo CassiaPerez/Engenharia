@@ -225,6 +225,24 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       ? `Baixa p/ Projeto: ${projects.find(p => p.id === locForm.projectId)?.code || '---'}${locForm.osNumber ? ` / OS: ${locForm.osNumber}` : ''}`
                       : (locForm.reason || 'Saque Manual (Baixa)');
 
+                   let costCenter: string | undefined;
+                   if (locAction === 'PROJECT_OUT') {
+                       if (locForm.osNumber) {
+                           const selectedOS = allOS.find(os => os.number === locForm.osNumber);
+                           if (selectedOS) {
+                               if (selectedOS.costCenter) {
+                                   costCenter = selectedOS.costCenter;
+                               } else if (selectedOS.projectId) {
+                                   const project = projects.find(p => p.id === selectedOS.projectId);
+                                   costCenter = project?.costCenter;
+                               }
+                           }
+                       } else if (locForm.projectId) {
+                           const project = projects.find(p => p.id === locForm.projectId);
+                           costCenter = project?.costCenter;
+                       }
+                   }
+
                    addMovementWithSync({
                       id: Math.random().toString(36).substr(2, 9),
                       type: 'OUT',
@@ -235,7 +253,8 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       description: desc,
                       fromLocation: locForm.location,
                       projectId: locAction === 'PROJECT_OUT' ? locForm.projectId : undefined,
-                      osId: locForm.osNumber || undefined
+                      osId: locForm.osNumber || undefined,
+                      costCenter: costCenter
                   });
 
               } else if (locAction === 'TRANSFER') {
@@ -640,7 +659,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
            <h3 className="font-bold text-xl text-slate-800 mb-6 flex items-center gap-2"><i className="fas fa-history text-clean-primary"></i> Histórico de Movimentação (Kardex)</h3>
            <div className="overflow-x-auto">
                <table className="w-full text-base text-left">
-                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider"><tr className="border-b border-slate-200"><th className="p-5">Data</th><th className="p-5">Tipo</th><th className="p-5">Material</th><th className="p-5 text-right">Qtd</th><th className="p-5">Locais (Origem &rarr; Destino)</th><th className="p-5">Responsável</th><th className="p-5">Justificativa</th></tr></thead>
+                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider"><tr className="border-b border-slate-200"><th className="p-5">Data</th><th className="p-5">Tipo</th><th className="p-5">Material</th><th className="p-5 text-right">Qtd</th><th className="p-5">Locais (Origem &rarr; Destino)</th><th className="p-5">Responsável</th><th className="p-5">Justificativa / Centro de Custo</th></tr></thead>
                    <tbody className="divide-y divide-slate-100">
                        {filteredMovements.map(mov => (
                            <tr key={mov.id} className="hover:bg-slate-50">
@@ -662,11 +681,18 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                <td className="p-5 text-slate-700 font-medium">{mov.userId}</td>
                                <td className="p-5 text-slate-500 font-medium">
                                    {mov.description}
-                                   {mov.projectId && (
-                                       <span className="block text-[10px] font-bold text-slate-400 bg-slate-100 rounded px-1 mt-1 w-fit">
-                                           Proj: {projects.find(p => p.id === mov.projectId)?.code || '---'}
-                                       </span>
-                                   )}
+                                   <div className="flex gap-2 mt-1">
+                                       {mov.projectId && (
+                                           <span className="text-[10px] font-bold text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 w-fit">
+                                               Proj: {projects.find(p => p.id === mov.projectId)?.code || '---'}
+                                           </span>
+                                       )}
+                                       {mov.costCenter && (
+                                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 rounded px-1.5 py-0.5 w-fit border border-emerald-200">
+                                               CC: {mov.costCenter}
+                                           </span>
+                                       )}
+                                   </div>
                                </td>
                            </tr>
                        ))}
@@ -889,6 +915,37 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                                 )}
                                             </div>
                                             <p className="text-[10px] text-orange-600">O custo será alocado ao projeto selecionado. Informe a OS para rastreabilidade.</p>
+                                            {(() => {
+                                                let displayCostCenter = '';
+                                                if (locForm.osNumber) {
+                                                    const selectedOS = allOS.find(os => os.number === locForm.osNumber);
+                                                    if (selectedOS) {
+                                                        if (selectedOS.costCenter) {
+                                                            displayCostCenter = selectedOS.costCenter;
+                                                        } else if (selectedOS.projectId) {
+                                                            const project = projects.find(p => p.id === selectedOS.projectId);
+                                                            if (project?.costCenter) {
+                                                                displayCostCenter = `${project.costCenter} (Projeto)`;
+                                                            }
+                                                        }
+                                                    }
+                                                } else if (locForm.projectId) {
+                                                    const project = projects.find(p => p.id === locForm.projectId);
+                                                    if (project?.costCenter) {
+                                                        displayCostCenter = project.costCenter;
+                                                    }
+                                                }
+
+                                                if (displayCostCenter) {
+                                                    return (
+                                                        <div className="mt-3 p-3 bg-white rounded-lg border border-orange-200">
+                                                            <p className="text-[10px] font-bold text-orange-800 uppercase mb-1">Centro de Custo</p>
+                                                            <p className="text-sm font-bold text-orange-900">{displayCostCenter}</p>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                         </div>
                                     )}
 

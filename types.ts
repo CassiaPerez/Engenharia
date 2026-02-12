@@ -175,6 +175,7 @@ export interface StockMovement {
   userId: string;
   osId?: string;
   projectId?: string; // Para baixa direta em projeto
+  costCenter?: string; // Centro de custo da OS ou Projeto
   description: string;
   fromLocation?: string; // Para transferências e saídas
   toLocation?: string;   // Para transferências e entradas
