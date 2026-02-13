@@ -1,0 +1,5909 @@
+{
+  "source_file": "inventário (1).xlsx",
+  "generated_at": "2026-02-13T20:33:16Z",
+  "sheets": {
+    "Planilha1": [
+      {
+        "ID do item": 1001,
+        "Nome do item": "joelho 90° esgoto 300mm",
+        "Quantidade": 3.0,
+        "Preço UN": 248.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 1002,
+        "Nome do item": "joelho 90° esgoto 250mm",
+        "Quantidade": 5.0,
+        "Preço UN": 199.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 1003,
+        "Nome do item": "joelho 90° esgoto 200mm",
+        "Quantidade": 3.0,
+        "Preço UN": 118.51,
+        "Notas": null
+      },
+      {
+        "ID do item": 1004,
+        "Nome do item": "joelho 90° esgoto 150mm",
+        "Quantidade": 4.0,
+        "Preço UN": 70.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 1005,
+        "Nome do item": "joelho 90° esgoto 100 mm",
+        "Quantidade": 13.0,
+        "Preço UN": 8.61,
+        "Notas": null
+      },
+      {
+        "ID do item": 1006,
+        "Nome do item": "joelho 90° esgoto 75mm",
+        "Quantidade": 10.0,
+        "Preço UN": 3.29,
+        "Notas": null
+      },
+      {
+        "ID do item": 1007,
+        "Nome do item": "joelho 90° esgoto 50mm",
+        "Quantidade": 16.0,
+        "Preço UN": 3.21,
+        "Notas": null
+      },
+      {
+        "ID do item": 1008,
+        "Nome do item": "joelho 90° esgoto 40mm",
+        "Quantidade": 8.0,
+        "Preço UN": 1.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 2001,
+        "Nome do item": "joelho 45° esgoto 300mm",
+        "Quantidade": 2.0,
+        "Preço UN": 248.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 2002,
+        "Nome do item": "joelho 45° esgoto 250mm",
+        "Quantidade": 2.0,
+        "Preço UN": 199.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 2003,
+        "Nome do item": "joelho 45° esgoto 200mm",
+        "Quantidade": 4.0,
+        "Preço UN": 118.51,
+        "Notas": null
+      },
+      {
+        "ID do item": 2004,
+        "Nome do item": "joelho 45° esgoto 150mm",
+        "Quantidade": 15.0,
+        "Preço UN": 70.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 2005,
+        "Nome do item": "joelho 45° esgoto 100mm",
+        "Quantidade": 11.0,
+        "Preço UN": 10.31,
+        "Notas": null
+      },
+      {
+        "ID do item": 2006,
+        "Nome do item": "joelho 45° esgoto 75mm",
+        "Quantidade": 17.0,
+        "Preço UN": 3.29,
+        "Notas": null
+      },
+      {
+        "ID do item": 2007,
+        "Nome do item": "joelho 45° esgoto 50mm",
+        "Quantidade": 18.0,
+        "Preço UN": 3.58,
+        "Notas": null
+      },
+      {
+        "ID do item": 2008,
+        "Nome do item": "joelho 45° esgoto 40mm",
+        "Quantidade": 15.0,
+        "Preço UN": 2.72,
+        "Notas": null
+      },
+      {
+        "ID do item": 3001,
+        "Nome do item": "te esgoto 200mm",
+        "Quantidade": 1.0,
+        "Preço UN": 112.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 3002,
+        "Nome do item": "te esgoto 150mm",
+        "Quantidade": 1.0,
+        "Preço UN": 39.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 3003,
+        "Nome do item": "te esgoto 100mm",
+        "Quantidade": 6.0,
+        "Preço UN": 11.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 3004,
+        "Nome do item": "te esgoto 75mm",
+        "Quantidade": 10.0,
+        "Preço UN": 13.59,
+        "Notas": null
+      },
+      {
+        "ID do item": 3005,
+        "Nome do item": "te esgoto 50mm",
+        "Quantidade": 10.0,
+        "Preço UN": 7.78,
+        "Notas": null
+      },
+      {
+        "ID do item": 3006,
+        "Nome do item": "te esgoto 40mm",
+        "Quantidade": 10.0,
+        "Preço UN": 3.62,
+        "Notas": null
+      },
+      {
+        "ID do item": 4001,
+        "Nome do item": "junção 250mm",
+        "Quantidade": 2.0,
+        "Preço UN": 153.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 4002,
+        "Nome do item": "junção 250X100mm",
+        "Quantidade": 4.0,
+        "Preço UN": 141.33,
+        "Notas": null
+      },
+      {
+        "ID do item": 4003,
+        "Nome do item": "junção 100mm",
+        "Quantidade": 7.0,
+        "Preço UN": 21.33,
+        "Notas": null
+      },
+      {
+        "ID do item": 4004,
+        "Nome do item": "junção 100X75mm",
+        "Quantidade": 16.0,
+        "Preço UN": 8.09,
+        "Notas": null
+      },
+      {
+        "ID do item": 4005,
+        "Nome do item": "junção 100X50mm",
+        "Quantidade": 9.0,
+        "Preço UN": 6.95,
+        "Notas": null
+      },
+      {
+        "ID do item": 4006,
+        "Nome do item": "junção 50mm",
+        "Quantidade": 9.0,
+        "Preço UN": 8.46,
+        "Notas": null
+      },
+      {
+        "ID do item": 4007,
+        "Nome do item": "junção 40mm",
+        "Quantidade": 10.0,
+        "Preço UN": 3.17,
+        "Notas": null
+      },
+      {
+        "ID do item": 5001,
+        "Nome do item": "redução 300X250mm",
+        "Quantidade": 1.0,
+        "Preço UN": 146.42,
+        "Notas": null
+      },
+      {
+        "ID do item": 5002,
+        "Nome do item": "redução 200X150mm",
+        "Quantidade": 4.0,
+        "Preço UN": 32.76,
+        "Notas": null
+      },
+      {
+        "ID do item": 5003,
+        "Nome do item": "redução 150X100mm",
+        "Quantidade": 1.0,
+        "Preço UN": 43.91,
+        "Notas": null
+      },
+      {
+        "ID do item": 5004,
+        "Nome do item": "redução 100X75mm",
+        "Quantidade": 6.0,
+        "Preço UN": 8.09,
+        "Notas": null
+      },
+      {
+        "ID do item": 5005,
+        "Nome do item": "redução 100X50mm",
+        "Quantidade": 8.0,
+        "Preço UN": 6.95,
+        "Notas": null
+      },
+      {
+        "ID do item": 5006,
+        "Nome do item": "redução 75X50mm",
+        "Quantidade": 10.0,
+        "Preço UN": 5.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 5007,
+        "Nome do item": "redução 50X40mm",
+        "Quantidade": 5.0,
+        "Preço UN": 2.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 6001,
+        "Nome do item": "cap 150mm",
+        "Quantidade": 10.0,
+        "Preço UN": 14.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 6002,
+        "Nome do item": "cap 100mm",
+        "Quantidade": 10.0,
+        "Preço UN": 5.39,
+        "Notas": null
+      },
+      {
+        "ID do item": 6003,
+        "Nome do item": "cap 50mm",
+        "Quantidade": 10.0,
+        "Preço UN": 4.16,
+        "Notas": null
+      },
+      {
+        "ID do item": 6004,
+        "Nome do item": "cap 40mm",
+        "Quantidade": 8.0,
+        "Preço UN": 3.06,
+        "Notas": null
+      },
+      {
+        "ID do item": 7001,
+        "Nome do item": "curva curta 90° 150mm",
+        "Quantidade": 2.0,
+        "Preço UN": 78.71,
+        "Notas": null
+      },
+      {
+        "ID do item": 7002,
+        "Nome do item": "curva curta 90° 50mm",
+        "Quantidade": 2.0,
+        "Preço UN": 9.26,
+        "Notas": null
+      },
+      {
+        "ID do item": 7003,
+        "Nome do item": "curva curta 90° 40mm",
+        "Quantidade": 6.0,
+        "Preço UN": 5.79,
+        "Notas": null
+      },
+      {
+        "ID do item": 8001,
+        "Nome do item": "curva longa 90° 150mm",
+        "Quantidade": 2.0,
+        "Preço UN": 98.72,
+        "Notas": null
+      },
+      {
+        "ID do item": 8002,
+        "Nome do item": "curva longa 90° 50mm",
+        "Quantidade": 10.0,
+        "Preço UN": 11.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 8003,
+        "Nome do item": "curva longa 90° 40mm",
+        "Quantidade": 5.0,
+        "Preço UN": 7.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 9001,
+        "Nome do item": "luva esgoto 250mm",
+        "Quantidade": 3.0,
+        "Preço UN": 36.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 9002,
+        "Nome do item": "luva esgoto 150mm",
+        "Quantidade": 3.0,
+        "Preço UN": 25.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 9003,
+        "Nome do item": "luva esgoto 100mm",
+        "Quantidade": 5.0,
+        "Preço UN": 6.96,
+        "Notas": null
+      },
+      {
+        "ID do item": 9004,
+        "Nome do item": "luva esgoto 75mm",
+        "Quantidade": 20.0,
+        "Preço UN": 6.85,
+        "Notas": null
+      },
+      {
+        "ID do item": 9005,
+        "Nome do item": "luva esgoto 50mm",
+        "Quantidade": 6.0,
+        "Preço UN": 3.37,
+        "Notas": null
+      },
+      {
+        "ID do item": 9006,
+        "Nome do item": "luva esgoto 40mm",
+        "Quantidade": 12.0,
+        "Preço UN": 2.43,
+        "Notas": null
+      },
+      {
+        "ID do item": 10001,
+        "Nome do item": "valvula de retenção 100mm",
+        "Quantidade": 2.0,
+        "Preço UN": 22.75,
+        "Notas": null
+      },
+      {
+        "ID do item": 11001,
+        "Nome do item": "caixa sifonada 100X100X50mm",
+        "Quantidade": 2.0,
+        "Preço UN": 9.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 12001,
+        "Nome do item": "anel de vedação 200mm",
+        "Quantidade": 61.0,
+        "Preço UN": 5.84,
+        "Notas": null
+      },
+      {
+        "ID do item": 12002,
+        "Nome do item": "anel de vedação 150mm",
+        "Quantidade": 7.0,
+        "Preço UN": 4.04,
+        "Notas": null
+      },
+      {
+        "ID do item": 12003,
+        "Nome do item": "anel de vedação 100mm",
+        "Quantidade": 92.0,
+        "Preço UN": 2.44,
+        "Notas": null
+      },
+      {
+        "ID do item": 12004,
+        "Nome do item": "anel de vedação 75mm",
+        "Quantidade": 21.0,
+        "Preço UN": 1.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 12005,
+        "Nome do item": "anel de vedação 50mm",
+        "Quantidade": 135.0,
+        "Preço UN": 1.39,
+        "Notas": null
+      },
+      {
+        "ID do item": 12006,
+        "Nome do item": "anel de vedação branco 100mm",
+        "Quantidade": 22.0,
+        "Preço UN": 1.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 14001,
+        "Nome do item": "tampa de caixa de gordura",
+        "Quantidade": 2.0,
+        "Preço UN": 128.47,
+        "Notas": null
+      },
+      {
+        "ID do item": 15001,
+        "Nome do item": "pasta lubrificante 1000g",
+        "Quantidade": 0.0,
+        "Preço UN": 50.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 15002,
+        "Nome do item": "pasta lubrificante 400/300g",
+        "Quantidade": 2.0,
+        "Preço UN": 21.73,
+        "Notas": null
+      },
+      {
+        "ID do item": 15003,
+        "Nome do item": "pasta lubrificante 80g",
+        "Quantidade": 1.0,
+        "Preço UN": 7.87,
+        "Notas": null
+      },
+      {
+        "ID do item": 16001,
+        "Nome do item": "joelho soldável 90° 60mm",
+        "Quantidade": 8.0,
+        "Preço UN": 22.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 16002,
+        "Nome do item": "joelho soldável 90° 50mm",
+        "Quantidade": 14.0,
+        "Preço UN": 6.17,
+        "Notas": null
+      },
+      {
+        "ID do item": 16003,
+        "Nome do item": "joelho soldável 90° 40mm",
+        "Quantidade": 13.0,
+        "Preço UN": 5.36,
+        "Notas": null
+      },
+      {
+        "ID do item": 16004,
+        "Nome do item": "joelho soldável 90° 32mm",
+        "Quantidade": 27.0,
+        "Preço UN": 3.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 16005,
+        "Nome do item": "joelho soldável 90° 25mm",
+        "Quantidade": 32.0,
+        "Preço UN": 0.82,
+        "Notas": null
+      },
+      {
+        "ID do item": 16006,
+        "Nome do item": "joelho soldável 90° 20mm",
+        "Quantidade": 13.0,
+        "Preço UN": 0.48,
+        "Notas": null
+      },
+      {
+        "ID do item": 17001,
+        "Nome do item": "joelho soldável 45° 60mm",
+        "Quantidade": 14.0,
+        "Preço UN": 25.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 17002,
+        "Nome do item": "joelho soldável 45° 50mm",
+        "Quantidade": 11.0,
+        "Preço UN": 10.34,
+        "Notas": null
+      },
+      {
+        "ID do item": 17003,
+        "Nome do item": "joelho soldável 45° 40mm",
+        "Quantidade": 13.0,
+        "Preço UN": 3.79,
+        "Notas": null
+      },
+      {
+        "ID do item": 17004,
+        "Nome do item": "joelho soldável 45° 32mm",
+        "Quantidade": 31.0,
+        "Preço UN": 6.21,
+        "Notas": null
+      },
+      {
+        "ID do item": 17005,
+        "Nome do item": "joelho soldável 45° 25mm",
+        "Quantidade": 63.0,
+        "Preço UN": 1.71,
+        "Notas": null
+      },
+      {
+        "ID do item": 18001,
+        "Nome do item": "curva soldável 90° 60mm",
+        "Quantidade": 3.0,
+        "Preço UN": 33.83,
+        "Notas": null
+      },
+      {
+        "ID do item": 18002,
+        "Nome do item": "curva soldável 90° 50mm",
+        "Quantidade": 9.0,
+        "Preço UN": 12.91,
+        "Notas": null
+      },
+      {
+        "ID do item": 18003,
+        "Nome do item": "curva soldável 90° 32mm",
+        "Quantidade": 16.0,
+        "Preço UN": 9.54,
+        "Notas": null
+      },
+      {
+        "ID do item": 18004,
+        "Nome do item": "curva soldável 90° 25mm",
+        "Quantidade": 8.0,
+        "Preço UN": 6.14,
+        "Notas": null
+      },
+      {
+        "ID do item": 19001,
+        "Nome do item": "curva 45° 60mm",
+        "Quantidade": 7.0,
+        "Preço UN": 19.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 20001,
+        "Nome do item": "curva de trasposição 25mm",
+        "Quantidade": 5.0,
+        "Preço UN": 9.07,
+        "Notas": null
+      },
+      {
+        "ID do item": 21001,
+        "Nome do item": "te soldável 50mm",
+        "Quantidade": 5.0,
+        "Preço UN": 8.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 21002,
+        "Nome do item": "te soldável 40mm",
+        "Quantidade": 5.0,
+        "Preço UN": 10.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 21003,
+        "Nome do item": "te soldável 32mm",
+        "Quantidade": 17.0,
+        "Preço UN": 3.46,
+        "Notas": null
+      },
+      {
+        "ID do item": 21004,
+        "Nome do item": "te soldável 25mm",
+        "Quantidade": 18.0,
+        "Preço UN": 1.42,
+        "Notas": null
+      },
+      {
+        "ID do item": 21005,
+        "Nome do item": "te soldável 40X32mm",
+        "Quantidade": 1.0,
+        "Preço UN": 11.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 21006,
+        "Nome do item": "te soldável 32 X 3/4\"",
+        "Quantidade": 3.0,
+        "Preço UN": 8.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 21007,
+        "Nome do item": "te soldável 32 X 25mm",
+        "Quantidade": 3.0,
+        "Preço UN": 9.09,
+        "Notas": null
+      },
+      {
+        "ID do item": 21008,
+        "Nome do item": "te soldável 25 X 20mm",
+        "Quantidade": 1.0,
+        "Preço UN": 3.43,
+        "Notas": null
+      },
+      {
+        "ID do item": 22001,
+        "Nome do item": "luva soldável de correr 60mm",
+        "Quantidade": 1.0,
+        "Preço UN": 86.16,
+        "Notas": null
+      },
+      {
+        "ID do item": 22002,
+        "Nome do item": "luva soldável de correr 25mm",
+        "Quantidade": 1.0,
+        "Preço UN": 14.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 23001,
+        "Nome do item": "luva soldavel 60mm",
+        "Quantidade": 2.0,
+        "Preço UN": 17.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 23002,
+        "Nome do item": "luva soldavel 50mm",
+        "Quantidade": 6.0,
+        "Preço UN": 5.75,
+        "Notas": null
+      },
+      {
+        "ID do item": 23003,
+        "Nome do item": "luva soldavel 40mm",
+        "Quantidade": 14.0,
+        "Preço UN": 7.53,
+        "Notas": null
+      },
+      {
+        "ID do item": 23004,
+        "Nome do item": "luva soldavel 32mm",
+        "Quantidade": 10.0,
+        "Preço UN": 2.15,
+        "Notas": null
+      },
+      {
+        "ID do item": 23005,
+        "Nome do item": "luva soldavel 25mm",
+        "Quantidade": 11.0,
+        "Preço UN": 0.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 24001,
+        "Nome do item": "união soldável 50mm",
+        "Quantidade": 3.0,
+        "Preço UN": 40.64,
+        "Notas": null
+      },
+      {
+        "ID do item": 24002,
+        "Nome do item": "união soldável 32mm",
+        "Quantidade": 1.0,
+        "Preço UN": 23.52,
+        "Notas": null
+      },
+      {
+        "ID do item": 24003,
+        "Nome do item": "união soldável 25mm",
+        "Quantidade": 1.0,
+        "Preço UN": 9.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 25001,
+        "Nome do item": "adaptador soldável 60 x 2\"",
+        "Quantidade": 6.0,
+        "Preço UN": 14.52,
+        "Notas": null
+      },
+      {
+        "ID do item": 25002,
+        "Nome do item": "adaptador soldável 50 x 1.1/2\"",
+        "Quantidade": 5.0,
+        "Preço UN": 4.08,
+        "Notas": null
+      },
+      {
+        "ID do item": 25003,
+        "Nome do item": "adaptador soldável 40 x 1.1/2\"",
+        "Quantidade": 4.0,
+        "Preço UN": 16.4,
+        "Notas": null
+      },
+      {
+        "ID do item": 25004,
+        "Nome do item": "adaptador soldável 50 x 1.1/4\"",
+        "Quantidade": 2.0,
+        "Preço UN": 16.64,
+        "Notas": null
+      },
+      {
+        "ID do item": 25005,
+        "Nome do item": "adaptador soldável 40 x 1.1/4\"",
+        "Quantidade": 2.0,
+        "Preço UN": 4.43,
+        "Notas": null
+      },
+      {
+        "ID do item": 25006,
+        "Nome do item": "adaptador soldável 32 x 1\"",
+        "Quantidade": 8.0,
+        "Preço UN": 2.72,
+        "Notas": null
+      },
+      {
+        "ID do item": 25007,
+        "Nome do item": "adaptador soldável 25 x 3/4\"",
+        "Quantidade": 9.0,
+        "Preço UN": 0.78,
+        "Notas": null
+      },
+      {
+        "ID do item": 26001,
+        "Nome do item": "bucha de redução 75 x 50mm",
+        "Quantidade": 1.0,
+        "Preço UN": 26.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 26002,
+        "Nome do item": "bucha de redução 60 x 40mm",
+        "Quantidade": 0.0,
+        "Preço UN": 18.62,
+        "Notas": null
+      },
+      {
+        "ID do item": 26003,
+        "Nome do item": "bucha de redução 60 x 32mm",
+        "Quantidade": 1.0,
+        "Preço UN": 11.15,
+        "Notas": null
+      },
+      {
+        "ID do item": 26004,
+        "Nome do item": "bucha de redução 60 x 50mm",
+        "Quantidade": 6.0,
+        "Preço UN": 8.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 26005,
+        "Nome do item": "bucha de redução 50 x 40mm",
+        "Quantidade": 5.0,
+        "Preço UN": 5.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 26006,
+        "Nome do item": "bucha de redução 32 x 25mm",
+        "Quantidade": 5.0,
+        "Preço UN": 1.19,
+        "Notas": null
+      },
+      {
+        "ID do item": 26007,
+        "Nome do item": "bucha de redução 25 x 20mm",
+        "Quantidade": 7.0,
+        "Preço UN": 0.58,
+        "Notas": null
+      },
+      {
+        "ID do item": 26008,
+        "Nome do item": "bucha de redução 50 x 25mm",
+        "Quantidade": 4.0,
+        "Preço UN": 2.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 27001,
+        "Nome do item": "cap soldável 40mm",
+        "Quantidade": 10.0,
+        "Preço UN": 11.05,
+        "Notas": null
+      },
+      {
+        "ID do item": 27002,
+        "Nome do item": "cap soldável 32mm",
+        "Quantidade": 8.0,
+        "Preço UN": 3.36,
+        "Notas": null
+      },
+      {
+        "ID do item": 27003,
+        "Nome do item": "cap soldável 25mm",
+        "Quantidade": 9.0,
+        "Preço UN": 3.01,
+        "Notas": null
+      },
+      {
+        "ID do item": 27004,
+        "Nome do item": "cap soldável 20mm",
+        "Quantidade": 10.0,
+        "Preço UN": 3.01,
+        "Notas": null
+      },
+      {
+        "ID do item": 28001,
+        "Nome do item": "valvula de retenção 32mm",
+        "Quantidade": 3.0,
+        "Preço UN": 105.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 29001,
+        "Nome do item": "união flange soldável rosca 50 x 1.1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 23.85,
+        "Notas": null
+      },
+      {
+        "ID do item": 29002,
+        "Nome do item": "união flange soldável rosca 32 x 1\"",
+        "Quantidade": 3.0,
+        "Preço UN": 27.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 30001,
+        "Nome do item": "união flange rosca 1\"",
+        "Quantidade": 0.0,
+        "Preço UN": 14.4,
+        "Notas": null
+      },
+      {
+        "ID do item": 31001,
+        "Nome do item": "plug 1\"",
+        "Quantidade": 8.0,
+        "Preço UN": 2.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 31002,
+        "Nome do item": "plug 3/4\"",
+        "Quantidade": 11.0,
+        "Preço UN": 2.58,
+        "Notas": null
+      },
+      {
+        "ID do item": 31003,
+        "Nome do item": "plug 1/2\"",
+        "Quantidade": 12.0,
+        "Preço UN": 0.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 32001,
+        "Nome do item": "niple 2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 13.83,
+        "Notas": null
+      },
+      {
+        "ID do item": 32002,
+        "Nome do item": "niple 3/4\"",
+        "Quantidade": 4.0,
+        "Preço UN": 1.98,
+        "Notas": null
+      },
+      {
+        "ID do item": 32003,
+        "Nome do item": "niple 1/2\"",
+        "Quantidade": 7.0,
+        "Preço UN": 0.82,
+        "Notas": null
+      },
+      {
+        "ID do item": 33001,
+        "Nome do item": "cap rosca 3/4\"",
+        "Quantidade": 4.0,
+        "Preço UN": 2.89,
+        "Notas": null
+      },
+      {
+        "ID do item": 34001,
+        "Nome do item": "bucha de redução 1 x 3/4\"",
+        "Quantidade": 2.0,
+        "Preço UN": 2.89,
+        "Notas": null
+      },
+      {
+        "ID do item": 34002,
+        "Nome do item": "bucha de redução 3/4\" x 1/2\"",
+        "Quantidade": 6.0,
+        "Preço UN": 1.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 34003,
+        "Nome do item": "bucha de redução 1.1/2\" x 3/4\"",
+        "Quantidade": 0.0,
+        "Preço UN": 24.56,
+        "Notas": null
+      },
+      {
+        "ID do item": 34004,
+        "Nome do item": "bucha de redução 2\" x 1.1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 20.61,
+        "Notas": null
+      },
+      {
+        "ID do item": 35001,
+        "Nome do item": "luva azul 25mm x 3/4\"",
+        "Quantidade": 9.0,
+        "Preço UN": 13.24,
+        "Notas": null
+      },
+      {
+        "ID do item": 35002,
+        "Nome do item": "luva azul 25mm x 1/2\"",
+        "Quantidade": 7.0,
+        "Preço UN": 6.57,
+        "Notas": null
+      },
+      {
+        "ID do item": 36001,
+        "Nome do item": "joelho 90° azul 25mm x 3/4\"",
+        "Quantidade": 15.0,
+        "Preço UN": 9.19,
+        "Notas": null
+      },
+      {
+        "ID do item": 36002,
+        "Nome do item": "joelho 90° azul 25mm x 1/2\"",
+        "Quantidade": 12.0,
+        "Preço UN": 2.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 36003,
+        "Nome do item": "joelho 90° azul 20mm x 1/2\"",
+        "Quantidade": 13.0,
+        "Preço UN": 7.13,
+        "Notas": null
+      },
+      {
+        "ID do item": 37001,
+        "Nome do item": "luva c/ rosca 2\"",
+        "Quantidade": 3.0,
+        "Preço UN": 4.84,
+        "Notas": null
+      },
+      {
+        "ID do item": 37002,
+        "Nome do item": "luva c/ rosca 32mm x 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 8.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 37003,
+        "Nome do item": "luva c/ rosca 3/4\"",
+        "Quantidade": 1.0,
+        "Preço UN": 3.58,
+        "Notas": null
+      },
+      {
+        "ID do item": 38001,
+        "Nome do item": "registro esferico 60mm",
+        "Quantidade": 1.0,
+        "Preço UN": 86.89,
+        "Notas": null
+      },
+      {
+        "ID do item": 38002,
+        "Nome do item": "registro esferico 50mm",
+        "Quantidade": 2.0,
+        "Preço UN": 29.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 38003,
+        "Nome do item": "registro esferico 32mm",
+        "Quantidade": 2.0,
+        "Preço UN": 67.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 38004,
+        "Nome do item": "registro esferico 25mm",
+        "Quantidade": 1.0,
+        "Preço UN": 7.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 39001,
+        "Nome do item": "joelho 45° cinza 1\"",
+        "Quantidade": 2.0,
+        "Preço UN": 16.43,
+        "Notas": null
+      },
+      {
+        "ID do item": 40001,
+        "Nome do item": "joelho 90° cinza 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 10.26,
+        "Notas": null
+      },
+      {
+        "ID do item": 41001,
+        "Nome do item": "te cinza 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 21.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 42001,
+        "Nome do item": "união cinza 1\"",
+        "Quantidade": 2.0,
+        "Preço UN": 41.23,
+        "Notas": null
+      },
+      {
+        "ID do item": 43001,
+        "Nome do item": "registro esfera cinza 1\"",
+        "Quantidade": 2.0,
+        "Preço UN": 49.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 44001,
+        "Nome do item": "luva cinza 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 2.4,
+        "Notas": null
+      },
+      {
+        "ID do item": 45002,
+        "Nome do item": "luva cinza sold.Xrosca macho cinza",
+        "Quantidade": 2.0,
+        "Preço UN": 3.21,
+        "Notas": null
+      },
+      {
+        "ID do item": 47001,
+        "Nome do item": "adesivo plástico 175g",
+        "Quantidade": 2.0,
+        "Preço UN": 20.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 48001,
+        "Nome do item": "solução preparadora 1000g",
+        "Quantidade": 1.0,
+        "Preço UN": 51.91,
+        "Notas": null
+      },
+      {
+        "ID do item": 49001,
+        "Nome do item": "fita veda rosca",
+        "Quantidade": 9.0,
+        "Preço UN": 19.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 50001,
+        "Nome do item": "cap acquaterm 28mm",
+        "Quantidade": 5.0,
+        "Preço UN": 5.74,
+        "Notas": null
+      },
+      {
+        "ID do item": 51001,
+        "Nome do item": "bucha acquaterm 28 x 22mm",
+        "Quantidade": 2.0,
+        "Preço UN": 3.28,
+        "Notas": null
+      },
+      {
+        "ID do item": 52001,
+        "Nome do item": "luva de correr acquaterm 22mm",
+        "Quantidade": 2.0,
+        "Preço UN": 14.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 53001,
+        "Nome do item": "luva soldavel acquaterm 22mm",
+        "Quantidade": 7.0,
+        "Preço UN": 3.63,
+        "Notas": null
+      },
+      {
+        "ID do item": 53002,
+        "Nome do item": "luva soldavel acquaterm 28mm",
+        "Quantidade": 1.0,
+        "Preço UN": 8.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 54001,
+        "Nome do item": "luva acquaterm 54mm",
+        "Quantidade": 1.0,
+        "Preço UN": 28.13,
+        "Notas": null
+      },
+      {
+        "ID do item": 54002,
+        "Nome do item": "luva acquaterm 28mm x 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 30.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 54003,
+        "Nome do item": "luva acquaterm 28mm x 3/4\"",
+        "Quantidade": 1.0,
+        "Preço UN": 33.93,
+        "Notas": null
+      },
+      {
+        "ID do item": 55001,
+        "Nome do item": "te acquaterm 54mm",
+        "Quantidade": 1.0,
+        "Preço UN": 68.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 55002,
+        "Nome do item": "te acquaterm 28mm",
+        "Quantidade": 1.0,
+        "Preço UN": 13.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 56001,
+        "Nome do item": "conector acquaterm 28mm x 1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 35.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 57001,
+        "Nome do item": "joelho acquaterm 45° 22mm",
+        "Quantidade": 7.0,
+        "Preço UN": 9.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 57002,
+        "Nome do item": "joelho acquaterm 45° 28mm",
+        "Quantidade": 3.0,
+        "Preço UN": 13.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 58001,
+        "Nome do item": "joelho acquaterm 90° 22mm x 1/2\"",
+        "Quantidade": 2.0,
+        "Preço UN": 12.83,
+        "Notas": null
+      },
+      {
+        "ID do item": 58002,
+        "Nome do item": "joelho acquaterm 90° 22mm x 3/4\"",
+        "Quantidade": 4.0,
+        "Preço UN": 25.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 58003,
+        "Nome do item": "joelho acquaterm 90° 22mm",
+        "Quantidade": 10.0,
+        "Preço UN": 6.82,
+        "Notas": null
+      },
+      {
+        "ID do item": 58004,
+        "Nome do item": "joelho acquaterm 90° 28mm",
+        "Quantidade": 7.0,
+        "Preço UN": 8.18,
+        "Notas": null
+      },
+      {
+        "ID do item": 58005,
+        "Nome do item": "joelho acquaterm 90° 54mm",
+        "Quantidade": 2.0,
+        "Preço UN": 80.35,
+        "Notas": null
+      },
+      {
+        "ID do item": 59001,
+        "Nome do item": "joelho acquaterm 45° 54mm",
+        "Quantidade": 1.0,
+        "Preço UN": 80.35,
+        "Notas": null
+      },
+      {
+        "ID do item": 60001,
+        "Nome do item": "joelho acquaterm 90° 1.1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 80.35,
+        "Notas": null
+      },
+      {
+        "ID do item": 61001,
+        "Nome do item": "mictório",
+        "Quantidade": 3.0,
+        "Preço UN": 306.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 61002,
+        "Nome do item": "bacia convencional",
+        "Quantidade": 2.0,
+        "Preço UN": 199.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 61003,
+        "Nome do item": "bacia p/ caixa acoplada",
+        "Quantidade": 0.0,
+        "Preço UN": 130.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 61004,
+        "Nome do item": "caixa de descarga",
+        "Quantidade": 0.0,
+        "Preço UN": 251.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 61005,
+        "Nome do item": "cuba embutida",
+        "Quantidade": 2.0,
+        "Preço UN": 122.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 61006,
+        "Nome do item": "lavatório",
+        "Quantidade": 0.0,
+        "Preço UN": 270.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 61007,
+        "Nome do item": "coluna",
+        "Quantidade": 2.0,
+        "Preço UN": 113.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 61008,
+        "Nome do item": "assento sanitário",
+        "Quantidade": 3.0,
+        "Preço UN": 78.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 62001,
+        "Nome do item": "te inox 1\"",
+        "Quantidade": 0.0,
+        "Preço UN": 38.62,
+        "Notas": null
+      },
+      {
+        "ID do item": 62002,
+        "Nome do item": "te inox 1.1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 62.57,
+        "Notas": null
+      },
+      {
+        "ID do item": 62003,
+        "Nome do item": "te inox 2\"",
+        "Quantidade": 14.0,
+        "Preço UN": 249.18,
+        "Notas": null
+      },
+      {
+        "ID do item": 62004,
+        "Nome do item": "te inox 3\"",
+        "Quantidade": 2.0,
+        "Preço UN": 220.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 63001,
+        "Nome do item": "curva inox 90° 1\"",
+        "Quantidade": 9.0,
+        "Preço UN": 34.89,
+        "Notas": null
+      },
+      {
+        "ID do item": 63002,
+        "Nome do item": "curva inox 90° 2\"",
+        "Quantidade": 22.0,
+        "Preço UN": 195.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 63003,
+        "Nome do item": "curva inox 90° 3\"",
+        "Quantidade": 5.0,
+        "Preço UN": 220.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 64001,
+        "Nome do item": "curva inox 45° 2\"",
+        "Quantidade": 6.0,
+        "Preço UN": 75.23,
+        "Notas": null
+      },
+      {
+        "ID do item": 64002,
+        "Nome do item": "curva inox 45° 3\"",
+        "Quantidade": 3.0,
+        "Preço UN": 332.81,
+        "Notas": null
+      },
+      {
+        "ID do item": 65001,
+        "Nome do item": "engate rápido fêmea mangote plástico 2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 129.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 65002,
+        "Nome do item": "engate rápido fêmea mangote plástico 3\"",
+        "Quantidade": 1.0,
+        "Preço UN": 206.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 66001,
+        "Nome do item": "engate rápido macho mangote 3\"",
+        "Quantidade": 1.0,
+        "Preço UN": 65.42,
+        "Notas": null
+      },
+      {
+        "ID do item": 67001,
+        "Nome do item": "valvula esférica trip inox 3\"",
+        "Quantidade": 0.0,
+        "Preço UN": 829.88,
+        "Notas": null
+      },
+      {
+        "ID do item": 67002,
+        "Nome do item": "valvula esférica trip inox 2\"",
+        "Quantidade": 3.0,
+        "Preço UN": 284.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 68001,
+        "Nome do item": "flange liso inox 3\" cega",
+        "Quantidade": 3.0,
+        "Preço UN": 530.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 68002,
+        "Nome do item": "flange liso inox 3\"",
+        "Quantidade": 7.0,
+        "Preço UN": 428.53,
+        "Notas": null
+      },
+      {
+        "ID do item": 68003,
+        "Nome do item": "flange liso inox 2\"",
+        "Quantidade": 0.0,
+        "Preço UN": 233.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 68004,
+        "Nome do item": "flange liso inox 1\"",
+        "Quantidade": 4.0,
+        "Preço UN": 115.45,
+        "Notas": null
+      },
+      {
+        "ID do item": 69001,
+        "Nome do item": "redução inox 3\" X 2\"",
+        "Quantidade": 2.0,
+        "Preço UN": 55.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 69002,
+        "Nome do item": "redução inox 2'' X 1.1/2\"",
+        "Quantidade": 2.0,
+        "Preço UN": 65.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 70001,
+        "Nome do item": "ponta rosca inox 1\"",
+        "Quantidade": 4.0,
+        "Preço UN": 32.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 70002,
+        "Nome do item": "ponta rosca inox 1.1/2\"",
+        "Quantidade": 2.0,
+        "Preço UN": 36.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 70003,
+        "Nome do item": "ponta rosca inox 2\"",
+        "Quantidade": 38.0,
+        "Preço UN": 49.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 70004,
+        "Nome do item": "ponta rosca inox 3\"",
+        "Quantidade": 0.0,
+        "Preço UN": 111.72,
+        "Notas": null
+      },
+      {
+        "ID do item": 71001,
+        "Nome do item": "luva inox rosca 1\"",
+        "Quantidade": 5.0,
+        "Preço UN": 15.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 71002,
+        "Nome do item": "luva inox rosca 2\"",
+        "Quantidade": 4.0,
+        "Preço UN": 38.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 71003,
+        "Nome do item": "luva rosca 2.1/2\"",
+        "Quantidade": 11.0,
+        "Preço UN": 138.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 72001,
+        "Nome do item": "joelho galvanizado rosca 90° 1.1/4\"",
+        "Quantidade": 1.0,
+        "Preço UN": 17.41,
+        "Notas": null
+      },
+      {
+        "ID do item": 72002,
+        "Nome do item": "joelho galvanizado rosca 90° 1\"",
+        "Quantidade": 5.0,
+        "Preço UN": 10.95,
+        "Notas": null
+      },
+      {
+        "ID do item": 72003,
+        "Nome do item": "joelho galvanizado rosca 90° 3/4\"",
+        "Quantidade": 2.0,
+        "Preço UN": 6.78,
+        "Notas": null
+      },
+      {
+        "ID do item": 72004,
+        "Nome do item": "joelho galvanizado rosca 90° 1/2\"",
+        "Quantidade": 9.0,
+        "Preço UN": 4.66,
+        "Notas": null
+      },
+      {
+        "ID do item": 72005,
+        "Nome do item": "luva galvanizada 1/2\"",
+        "Quantidade": 10.0,
+        "Preço UN": 3.48,
+        "Notas": null
+      },
+      {
+        "ID do item": 73001,
+        "Nome do item": "te inox rosca 1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 19.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 73002,
+        "Nome do item": "te inox rosca 3/4\"",
+        "Quantidade": 2.0,
+        "Preço UN": 22.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 73003,
+        "Nome do item": "te inox rosca 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 30.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 73004,
+        "Nome do item": "te inox rosca 2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 75.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 73005,
+        "Nome do item": "te inox rosca 2.1/2\"",
+        "Quantidade": 2.0,
+        "Preço UN": 245.64,
+        "Notas": null
+      },
+      {
+        "ID do item": 74001,
+        "Nome do item": "registro gaveta 2.1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 271.34,
+        "Notas": null
+      },
+      {
+        "ID do item": 75001,
+        "Nome do item": "registro hidrante rosca 2.1/2\"",
+        "Quantidade": 0.0,
+        "Preço UN": 91.51,
+        "Notas": null
+      },
+      {
+        "ID do item": 76001,
+        "Nome do item": "bucha redução inox 3/4\" X 1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 191.55,
+        "Notas": null
+      },
+      {
+        "ID do item": 76002,
+        "Nome do item": "bucha redução inox 1\" X 1/2\"",
+        "Quantidade": 7.0,
+        "Preço UN": 17.1,
+        "Notas": null
+      },
+      {
+        "ID do item": 76003,
+        "Nome do item": "bucha redução inox 1.1/2\" X 1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 56.85,
+        "Notas": null
+      },
+      {
+        "ID do item": 76004,
+        "Nome do item": "bucha redução inox 2\" X 1\"",
+        "Quantidade": 0.0,
+        "Preço UN": 128.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 76005,
+        "Nome do item": "bucha redução inox 2.1/2\" X 1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 171.83,
+        "Notas": null
+      },
+      {
+        "ID do item": 77001,
+        "Nome do item": "niple inox 1/2\"",
+        "Quantidade": 6.0,
+        "Preço UN": 4.89,
+        "Notas": null
+      },
+      {
+        "ID do item": 77002,
+        "Nome do item": "niple inox 3/4\"",
+        "Quantidade": 7.0,
+        "Preço UN": 19.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 77003,
+        "Nome do item": "niple inox 1\"",
+        "Quantidade": 10.0,
+        "Preço UN": 18.77,
+        "Notas": null
+      },
+      {
+        "ID do item": 77004,
+        "Nome do item": "niple inox 1.1/4\"",
+        "Quantidade": 2.0,
+        "Preço UN": 25.55,
+        "Notas": null
+      },
+      {
+        "ID do item": 77005,
+        "Nome do item": "niple inox 2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 39.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 77006,
+        "Nome do item": "niple inox 2.1/2\"",
+        "Quantidade": 2.0,
+        "Preço UN": 81.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 77007,
+        "Nome do item": "niple inox 3\" X 2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 202.94,
+        "Notas": null
+      },
+      {
+        "ID do item": 78001,
+        "Nome do item": "adaptador rosca inox para mangote 2\"",
+        "Quantidade": 5.0,
+        "Preço UN": 177.62,
+        "Notas": null
+      },
+      {
+        "ID do item": 78002,
+        "Nome do item": "adaptador rosca para mangote 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 45.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 79001,
+        "Nome do item": "adaptador de plástico mangote 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 2.07,
+        "Notas": null
+      },
+      {
+        "ID do item": 79002,
+        "Nome do item": "adaptador de plástico mangote 1.1/4\"",
+        "Quantidade": 7.0,
+        "Preço UN": 3.59,
+        "Notas": null
+      },
+      {
+        "ID do item": 80001,
+        "Nome do item": "cap hexagonal 2\"",
+        "Quantidade": 4.0,
+        "Preço UN": 32.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 80002,
+        "Nome do item": "cap redondo 3\"",
+        "Quantidade": 1.0,
+        "Preço UN": 95.43,
+        "Notas": null
+      },
+      {
+        "ID do item": 81001,
+        "Nome do item": "união inox 2\"",
+        "Quantidade": 10.0,
+        "Preço UN": 77.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 81002,
+        "Nome do item": "união inox 1.1/4\"",
+        "Quantidade": 2.0,
+        "Preço UN": 49.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 81003,
+        "Nome do item": "união inox 1\"",
+        "Quantidade": 4.0,
+        "Preço UN": 39.01,
+        "Notas": null
+      },
+      {
+        "ID do item": 81004,
+        "Nome do item": "união inox 1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 24.05,
+        "Notas": null
+      },
+      {
+        "ID do item": 82001,
+        "Nome do item": "valvula esférica trip rosca 2\" pneumática",
+        "Quantidade": 1.0,
+        "Preço UN": 1114.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 82002,
+        "Nome do item": "valvula esférica trip rosca 2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 284.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 82003,
+        "Nome do item": "valvula esférica trip rosca 1\"",
+        "Quantidade": 0.0,
+        "Preço UN": 98.75,
+        "Notas": null
+      },
+      {
+        "ID do item": 82004,
+        "Nome do item": "valvula esférica trip rosca 3/4\"",
+        "Quantidade": 1.0,
+        "Preço UN": 157.84,
+        "Notas": null
+      },
+      {
+        "ID do item": 83001,
+        "Nome do item": "valvula esférica comum 1.1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 88.78,
+        "Notas": null
+      },
+      {
+        "ID do item": 83002,
+        "Nome do item": "valvula esférica comum 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 63.02,
+        "Notas": null
+      },
+      {
+        "ID do item": 83003,
+        "Nome do item": "valvula esférica comum 3/4\"",
+        "Quantidade": 0.0,
+        "Preço UN": 25.79,
+        "Notas": null
+      },
+      {
+        "ID do item": 83004,
+        "Nome do item": "valvula esférica comum 1/2\"",
+        "Quantidade": 7.0,
+        "Preço UN": 23.45,
+        "Notas": null
+      },
+      {
+        "ID do item": 83005,
+        "Nome do item": "valvula esférica comum 3/8\"",
+        "Quantidade": 2.0,
+        "Preço UN": 1.79,
+        "Notas": null
+      },
+      {
+        "ID do item": 83006,
+        "Nome do item": "valvula esférica comum 1/4\"",
+        "Quantidade": 1.0,
+        "Preço UN": 1.71,
+        "Notas": null
+      },
+      {
+        "ID do item": 84001,
+        "Nome do item": "valvula de retenção inox 2\"",
+        "Quantidade": 4.0,
+        "Preço UN": 504.56,
+        "Notas": null
+      },
+      {
+        "ID do item": 85001,
+        "Nome do item": "engate rápido fêmea 3\"",
+        "Quantidade": 0.0,
+        "Preço UN": 115.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 85002,
+        "Nome do item": "engate rápido fêmea 2\"",
+        "Quantidade": 5.0,
+        "Preço UN": 62.91,
+        "Notas": null
+      },
+      {
+        "ID do item": 86001,
+        "Nome do item": "engate rápido macho 3\"",
+        "Quantidade": 1.0,
+        "Preço UN": 44.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 87001,
+        "Nome do item": "Chumbador parabolt 3/4\" X 10\"",
+        "Quantidade": 11.0,
+        "Preço UN": 16.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 87002,
+        "Nome do item": "Chumbador parabolt 5/8\" X 8\"",
+        "Quantidade": 74.0,
+        "Preço UN": 4.67,
+        "Notas": null
+      },
+      {
+        "ID do item": 87003,
+        "Nome do item": "Chumbador parabolt 5/8\" X 5\"",
+        "Quantidade": 80.0,
+        "Preço UN": 4.08,
+        "Notas": null
+      },
+      {
+        "ID do item": 87004,
+        "Nome do item": "Chumbador parabolt 1/2\" X 5.1/2\"",
+        "Quantidade": 46.0,
+        "Preço UN": 2.78,
+        "Notas": null
+      },
+      {
+        "ID do item": 87005,
+        "Nome do item": "Chumbador parabolt 1/2\" X 7\"",
+        "Quantidade": 54.0,
+        "Preço UN": 3.68,
+        "Notas": null
+      },
+      {
+        "ID do item": 87006,
+        "Nome do item": "Chumbador parabolt 1/2\" X 4\"",
+        "Quantidade": 253.0,
+        "Preço UN": 3.03,
+        "Notas": null
+      },
+      {
+        "ID do item": 87007,
+        "Nome do item": "Chumbador parabolt 3/8\" X 3\"",
+        "Quantidade": 186.0,
+        "Preço UN": 1.21,
+        "Notas": null
+      },
+      {
+        "ID do item": 87008,
+        "Nome do item": "Chumbador parabolt 5/16\" X 3.1/4\"",
+        "Quantidade": 205.0,
+        "Preço UN": 1.43,
+        "Notas": null
+      },
+      {
+        "ID do item": 87009,
+        "Nome do item": "Chumbador parabolt 3/8\" X 5\"",
+        "Quantidade": 21.0,
+        "Preço UN": 2.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 87010,
+        "Nome do item": "Chumbador parabolt 5/16\" X 4.1/4\"",
+        "Quantidade": 17.0,
+        "Preço UN": 1.45,
+        "Notas": null
+      },
+      {
+        "ID do item": 87011,
+        "Nome do item": "Chumbador parabolt 5/16\" X 2.1/4\"",
+        "Quantidade": 5.0,
+        "Preço UN": 1.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 87012,
+        "Nome do item": "Chumbador parabolt 1/2\" X 4.1/4\"",
+        "Quantidade": 0.0,
+        "Preço UN": 2.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 88002,
+        "Nome do item": "arame mig 1,0 mm",
+        "Quantidade": 1.0,
+        "Preço UN": 199.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 88003,
+        "Nome do item": "gonzo 5/8\"",
+        "Quantidade": 34.0,
+        "Preço UN": 5.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 88004,
+        "Nome do item": "gonzo 1/2\"",
+        "Quantidade": 42.0,
+        "Preço UN": 2.95,
+        "Notas": null
+      },
+      {
+        "ID do item": 88005,
+        "Nome do item": "pasta para estanho",
+        "Quantidade": 0.0,
+        "Preço UN": 12.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 88007,
+        "Nome do item": "eletrodo inox 2,5mm vonder",
+        "Quantidade": 6.0,
+        "Preço UN": 25.3,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88008,
+        "Nome do item": "eletrodo 6130 1,6mm",
+        "Quantidade": 2.0,
+        "Preço UN": 119.87,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88009,
+        "Nome do item": "eletrodo 6130 2,5mm",
+        "Quantidade": 26.0,
+        "Preço UN": 150.8,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88010,
+        "Nome do item": "eletrodo 6130 3,25mm",
+        "Quantidade": 8.0,
+        "Preço UN": 151.0,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88011,
+        "Nome do item": "eletrodo inox 2,5mm serralheiro",
+        "Quantidade": 20.0,
+        "Preço UN": 33.0,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88012,
+        "Nome do item": "eletrodo 6010 3,25mm",
+        "Quantidade": 20.0,
+        "Preço UN": 83.0,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88039,
+        "Nome do item": "eletrodo 6013 2,50mm",
+        "Quantidade": 5.0,
+        "Preço UN": 27.22,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88013,
+        "Nome do item": "eletrodo 6013 3,25mm",
+        "Quantidade": 15.0,
+        "Preço UN": 24.01,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88014,
+        "Nome do item": "eletrodo 7018 2,5mm",
+        "Quantidade": 18.0,
+        "Preço UN": 78.5,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88015,
+        "Nome do item": "eletrodo 7018 3,25mm",
+        "Quantidade": 18.0,
+        "Preço UN": 54.12,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88016,
+        "Nome do item": "vareta TIG",
+        "Quantidade": 10.0,
+        "Preço UN": 77.73,
+        "Notas": "quantidade e preço por quilos"
+      },
+      {
+        "ID do item": 88017,
+        "Nome do item": "eletrodo tungstênio",
+        "Quantidade": 1.0,
+        "Preço UN": 69.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 88018,
+        "Nome do item": "lente interna mig",
+        "Quantidade": 13.0,
+        "Preço UN": 1.92,
+        "Notas": null
+      },
+      {
+        "ID do item": 88019,
+        "Nome do item": "lente externa mig",
+        "Quantidade": 9.0,
+        "Preço UN": 8.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 88020,
+        "Nome do item": "micro pistola para tocha",
+        "Quantidade": 2.0,
+        "Preço UN": 55.96,
+        "Notas": null
+      },
+      {
+        "ID do item": 88021,
+        "Nome do item": "isolador da micro pistola",
+        "Quantidade": 2.0,
+        "Preço UN": 32.63,
+        "Notas": null
+      },
+      {
+        "ID do item": 88022,
+        "Nome do item": "pasta antirrespingo",
+        "Quantidade": 18.0,
+        "Preço UN": 35.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 88023,
+        "Nome do item": "riscador tipo caneta",
+        "Quantidade": 4.0,
+        "Preço UN": 29.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 88024,
+        "Nome do item": "bico plasma p-80",
+        "Quantidade": 8.0,
+        "Preço UN": 14.74,
+        "Notas": null
+      },
+      {
+        "ID do item": 88025,
+        "Nome do item": "bico plasma ag-60",
+        "Quantidade": 10.0,
+        "Preço UN": 14.79,
+        "Notas": null
+      },
+      {
+        "ID do item": 88026,
+        "Nome do item": "ferro de solda",
+        "Quantidade": 1.0,
+        "Preço UN": 36.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 88027,
+        "Nome do item": "estanho",
+        "Quantidade": 0.0,
+        "Preço UN": 12.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 88028,
+        "Nome do item": "garra de bronze",
+        "Quantidade": 5.0,
+        "Preço UN": 64.42,
+        "Notas": null
+      },
+      {
+        "ID do item": 88029,
+        "Nome do item": "porta eletrodo",
+        "Quantidade": 4.0,
+        "Preço UN": 86.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 88030,
+        "Nome do item": "porta bico tocha mig",
+        "Quantidade": 9.0,
+        "Preço UN": 6.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 88031,
+        "Nome do item": "agulheiro para limpeza de bico",
+        "Quantidade": 1.0,
+        "Preço UN": 18.46,
+        "Notas": null
+      },
+      {
+        "ID do item": 88032,
+        "Nome do item": "bico mig 1mm",
+        "Quantidade": 2.0,
+        "Preço UN": 9.73,
+        "Notas": null
+      },
+      {
+        "ID do item": 88033,
+        "Nome do item": "bico mig 0,8mm",
+        "Quantidade": 11.0,
+        "Preço UN": 9.73,
+        "Notas": null
+      },
+      {
+        "ID do item": 88034,
+        "Nome do item": "bocal tocha 66mm",
+        "Quantidade": 14.0,
+        "Preço UN": 58.66,
+        "Notas": null
+      },
+      {
+        "ID do item": 88035,
+        "Nome do item": "bocal tocha 96mm",
+        "Quantidade": 2.0,
+        "Preço UN": 89.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 88036,
+        "Nome do item": "bico de corte a gás N° 4",
+        "Quantidade": 2.0,
+        "Preço UN": 38.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 88037,
+        "Nome do item": "bico de corte a gás N° 6",
+        "Quantidade": 3.0,
+        "Preço UN": 61.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 88038,
+        "Nome do item": "bico de corte a gás N° 8",
+        "Quantidade": 1.0,
+        "Preço UN": 31.33,
+        "Notas": null
+      },
+      {
+        "ID do item": 88039,
+        "Nome do item": "escova de aço manual",
+        "Quantidade": 13.0,
+        "Preço UN": 9.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 88040,
+        "Nome do item": "escova de aço circular cônica",
+        "Quantidade": 10.0,
+        "Preço UN": 39.11,
+        "Notas": null
+      },
+      {
+        "ID do item": 88041,
+        "Nome do item": "escova de aço circular tipo copo",
+        "Quantidade": 2.0,
+        "Preço UN": 10.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 90001,
+        "Nome do item": "talha de elevação",
+        "Quantidade": 1.0,
+        "Preço UN": 2069.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 90002,
+        "Nome do item": "talhadeira com ponta",
+        "Quantidade": 4.0,
+        "Preço UN": 32.19,
+        "Notas": null
+      },
+      {
+        "ID do item": 90003,
+        "Nome do item": "talhadeira com ponta larga",
+        "Quantidade": 4.0,
+        "Preço UN": 32.19,
+        "Notas": null
+      },
+      {
+        "ID do item": 90005,
+        "Nome do item": "vira-macho tipo \"T\"",
+        "Quantidade": 1.0,
+        "Preço UN": 40.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 90006,
+        "Nome do item": "1° macho manual",
+        "Quantidade": 4.0,
+        "Preço UN": 18.31,
+        "Notas": null
+      },
+      {
+        "ID do item": 90007,
+        "Nome do item": "2° macho manual",
+        "Quantidade": 2.0,
+        "Preço UN": 32.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 90008,
+        "Nome do item": "3° macho manual",
+        "Quantidade": 6.0,
+        "Preço UN": 45.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 90009,
+        "Nome do item": "lima rotativa abaulada",
+        "Quantidade": 6.0,
+        "Preço UN": 47.61,
+        "Notas": null
+      },
+      {
+        "ID do item": 90010,
+        "Nome do item": "lima rotativa conica",
+        "Quantidade": 1.0,
+        "Preço UN": 45.24,
+        "Notas": null
+      },
+      {
+        "ID do item": 90011,
+        "Nome do item": "rodél cortador de cerâmicas",
+        "Quantidade": 1.0,
+        "Preço UN": 11.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 90012,
+        "Nome do item": "alicate p/ nivelador de piso",
+        "Quantidade": 1.0,
+        "Preço UN": 29.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 90013,
+        "Nome do item": "alicate de encanador",
+        "Quantidade": 1.0,
+        "Preço UN": 30.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 90014,
+        "Nome do item": "cortador de canos",
+        "Quantidade": 1.0,
+        "Preço UN": 29.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 90015,
+        "Nome do item": "tesoura para chapas de zinco",
+        "Quantidade": 1.0,
+        "Preço UN": 68.72,
+        "Notas": null
+      },
+      {
+        "ID do item": 90018,
+        "Nome do item": "esquadro",
+        "Quantidade": 2.0,
+        "Preço UN": 68.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 90020,
+        "Nome do item": "nível magnético",
+        "Quantidade": 2.0,
+        "Preço UN": 29.88,
+        "Notas": null
+      },
+      {
+        "ID do item": 90021,
+        "Nome do item": "nível 80cm",
+        "Quantidade": 1.0,
+        "Preço UN": 75.05,
+        "Notas": null
+      },
+      {
+        "ID do item": 90022,
+        "Nome do item": "estilete",
+        "Quantidade": 7.0,
+        "Preço UN": 28.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 90023,
+        "Nome do item": "ponteira phillips",
+        "Quantidade": 10.0,
+        "Preço UN": 5.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 91001,
+        "Nome do item": "chave combinada 32",
+        "Quantidade": 2.0,
+        "Preço UN": 44.81,
+        "Notas": null
+      },
+      {
+        "ID do item": 91002,
+        "Nome do item": "chave combinada 30",
+        "Quantidade": 2.0,
+        "Preço UN": 62.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 91003,
+        "Nome do item": "chave combinada 28",
+        "Quantidade": 2.0,
+        "Preço UN": 36.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 91004,
+        "Nome do item": "chave combinada 27",
+        "Quantidade": 2.0,
+        "Preço UN": 22.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 91005,
+        "Nome do item": "chave combinada 24",
+        "Quantidade": 2.0,
+        "Preço UN": 21.74,
+        "Notas": null
+      },
+      {
+        "ID do item": 91006,
+        "Nome do item": "chave combinada 22",
+        "Quantidade": 2.0,
+        "Preço UN": 17.94,
+        "Notas": null
+      },
+      {
+        "ID do item": 91007,
+        "Nome do item": "chave combinada 19",
+        "Quantidade": 1.0,
+        "Preço UN": 19.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 91008,
+        "Nome do item": "chave combinada 17",
+        "Quantidade": 2.0,
+        "Preço UN": 11.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 91009,
+        "Nome do item": "chave combinada 15",
+        "Quantidade": 2.0,
+        "Preço UN": 16.43,
+        "Notas": null
+      },
+      {
+        "ID do item": 91010,
+        "Nome do item": "chave combinada 14",
+        "Quantidade": 2.0,
+        "Preço UN": 19.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 91011,
+        "Nome do item": "chave combinada 13",
+        "Quantidade": 2.0,
+        "Preço UN": 13.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 91012,
+        "Nome do item": "chave combinada 12",
+        "Quantidade": 2.0,
+        "Preço UN": 16.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 91013,
+        "Nome do item": "chave combinada 11",
+        "Quantidade": 2.0,
+        "Preço UN": 13.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 91014,
+        "Nome do item": "chave combinada 10",
+        "Quantidade": 2.0,
+        "Preço UN": 11.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 91015,
+        "Nome do item": "chave combinada 9",
+        "Quantidade": 2.0,
+        "Preço UN": 11.22,
+        "Notas": null
+      },
+      {
+        "ID do item": 91016,
+        "Nome do item": "chave combinada 8",
+        "Quantidade": 2.0,
+        "Preço UN": 10.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 91017,
+        "Nome do item": "chave combinada 7",
+        "Quantidade": 2.0,
+        "Preço UN": 10.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 91018,
+        "Nome do item": "chave combinada 6",
+        "Quantidade": 2.0,
+        "Preço UN": 9.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 91019,
+        "Nome do item": "chave inglesa 12\"",
+        "Quantidade": 2.0,
+        "Preço UN": 42.69,
+        "Notas": null
+      },
+      {
+        "ID do item": 91020,
+        "Nome do item": "chave inglesa 24\"",
+        "Quantidade": 1.0,
+        "Preço UN": 231.57,
+        "Notas": null
+      },
+      {
+        "ID do item": 91021,
+        "Nome do item": "chave grifo 36\"",
+        "Quantidade": 3.0,
+        "Preço UN": 151.23,
+        "Notas": null
+      },
+      {
+        "ID do item": 92001,
+        "Nome do item": "disco de desbaste 7\"",
+        "Quantidade": 74.0,
+        "Preço UN": 8.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 92002,
+        "Nome do item": "disco de desbaste 4.1/2\"",
+        "Quantidade": 5.0,
+        "Preço UN": 7.12,
+        "Notas": null
+      },
+      {
+        "ID do item": 92004,
+        "Nome do item": "disco de corte 7\"",
+        "Quantidade": 154.0,
+        "Preço UN": 5.1,
+        "Notas": null
+      },
+      {
+        "ID do item": 92007,
+        "Nome do item": "disco de corte 4.1/2\"",
+        "Quantidade": 342.0,
+        "Preço UN": 2.1,
+        "Notas": null
+      },
+      {
+        "ID do item": 92008,
+        "Nome do item": "disco flap 7\"",
+        "Quantidade": 124.0,
+        "Preço UN": null,
+        "Notas": null
+      },
+      {
+        "ID do item": 92009,
+        "Nome do item": "disco flap 4.1/2\"",
+        "Quantidade": 311.0,
+        "Preço UN": 6.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 92010,
+        "Nome do item": "disco de policorte",
+        "Quantidade": 16.0,
+        "Preço UN": 30.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 92011,
+        "Nome do item": "disco abrasivo 4.1/2\"",
+        "Quantidade": 46.0,
+        "Preço UN": 22.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 92012,
+        "Nome do item": "disco de desbaste diamantado 180mm",
+        "Quantidade": 1.0,
+        "Preço UN": 112.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 92013,
+        "Nome do item": "disco diamantado para polimento",
+        "Quantidade": 1.0,
+        "Preço UN": 49.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 92014,
+        "Nome do item": "disco para concreto e granito 9\"",
+        "Quantidade": 2.0,
+        "Preço UN": 110.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 92015,
+        "Nome do item": "lamina circular 80 dentes",
+        "Quantidade": 1.0,
+        "Preço UN": 338.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 93108,
+        "Nome do item": "serra copo 108mm perfuratriz",
+        "Quantidade": 2.0,
+        "Preço UN": 273.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 93109,
+        "Nome do item": "serra copo 76mm perfuratriz",
+        "Quantidade": 2.0,
+        "Preço UN": 252.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 93110,
+        "Nome do item": "serra copo 56mm perfuratriz",
+        "Quantidade": 1.0,
+        "Preço UN": 168.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 93111,
+        "Nome do item": "serra copo 36mm perfuratriz",
+        "Quantidade": 1.0,
+        "Preço UN": 229.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 94080,
+        "Nome do item": "serra copo cerâmica 80mm",
+        "Quantidade": 4.0,
+        "Preço UN": 104.33,
+        "Notas": null
+      },
+      {
+        "ID do item": 94081,
+        "Nome do item": "serra copo cerâmica 60mm",
+        "Quantidade": 5.0,
+        "Preço UN": 49.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 94082,
+        "Nome do item": "serra copo cerâmica 50mm",
+        "Quantidade": 5.0,
+        "Preço UN": 74.64,
+        "Notas": null
+      },
+      {
+        "ID do item": 94083,
+        "Nome do item": "serra copo cerâmica 30mm",
+        "Quantidade": 4.0,
+        "Preço UN": 54.14,
+        "Notas": null
+      },
+      {
+        "ID do item": 94084,
+        "Nome do item": "serra copo cerâmica 20mm",
+        "Quantidade": 3.0,
+        "Preço UN": 36.51,
+        "Notas": null
+      },
+      {
+        "ID do item": 95016,
+        "Nome do item": "serra copo madeiras/metais 16mm",
+        "Quantidade": 5.0,
+        "Preço UN": 43.23,
+        "Notas": null
+      },
+      {
+        "ID do item": 95017,
+        "Nome do item": "serra copo madeiras/metais 19mm",
+        "Quantidade": 12.0,
+        "Preço UN": 34.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 95018,
+        "Nome do item": "serra copo madeiras/metais 20mm",
+        "Quantidade": 0.0,
+        "Preço UN": 37.39,
+        "Notas": null
+      },
+      {
+        "ID do item": 95019,
+        "Nome do item": "serra copo madeiras/metais 22mm",
+        "Quantidade": 2.0,
+        "Preço UN": 46.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 95020,
+        "Nome do item": "serra copo madeiras/metais 25mm",
+        "Quantidade": 13.0,
+        "Preço UN": 41.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 95021,
+        "Nome do item": "serra copo madeiras/metais 32mm",
+        "Quantidade": 3.0,
+        "Preço UN": 71.03,
+        "Notas": null
+      },
+      {
+        "ID do item": 95022,
+        "Nome do item": "serra copo madeiras/metais 38mm",
+        "Quantidade": 7.0,
+        "Preço UN": 83.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 95023,
+        "Nome do item": "serra copo madeiras/metais 42mm",
+        "Quantidade": 2.0,
+        "Preço UN": 54.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 95024,
+        "Nome do item": "serra copo madeiras/metais 44mm",
+        "Quantidade": 2.0,
+        "Preço UN": 83.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 95031,
+        "Nome do item": "serra copo madeiras/metais 48mm",
+        "Quantidade": null,
+        "Preço UN": 96.64,
+        "Notas": null
+      },
+      {
+        "ID do item": 95025,
+        "Nome do item": "serra copo madeiras/metais 51mm",
+        "Quantidade": 3.0,
+        "Preço UN": 74.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 95026,
+        "Nome do item": "serra copo madeiras/metais 64mm",
+        "Quantidade": 3.0,
+        "Preço UN": 92.37,
+        "Notas": null
+      },
+      {
+        "ID do item": 95027,
+        "Nome do item": "serra copo madeiras/metais 72mm",
+        "Quantidade": 1.0,
+        "Preço UN": 107.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 95028,
+        "Nome do item": "serra copo madeiras/metais 111mm",
+        "Quantidade": 1.0,
+        "Preço UN": 149.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 95029,
+        "Nome do item": "suporte para serra copo com fixador",
+        "Quantidade": 2.0,
+        "Preço UN": 72.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 95030,
+        "Nome do item": "suporte para serra copo sem fixador",
+        "Quantidade": 5.0,
+        "Preço UN": 75.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 96001,
+        "Nome do item": "talhadeira encaixe hexa com ponta",
+        "Quantidade": 1.0,
+        "Preço UN": 109.71,
+        "Notas": null
+      },
+      {
+        "ID do item": 96002,
+        "Nome do item": "talhadeira encaixe hexa com ponta larga 35mm",
+        "Quantidade": 2.0,
+        "Preço UN": 290.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 96003,
+        "Nome do item": "talhadeira encaixe SDS com ponta",
+        "Quantidade": 5.0,
+        "Preço UN": 20.06,
+        "Notas": null
+      },
+      {
+        "ID do item": 97001,
+        "Nome do item": "trena 5m",
+        "Quantidade": 2.0,
+        "Preço UN": 20.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 97002,
+        "Nome do item": "trena 8m",
+        "Quantidade": 0.0,
+        "Preço UN": 39.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 97003,
+        "Nome do item": "transferidor de ângulos",
+        "Quantidade": 1.0,
+        "Preço UN": 33.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 97004,
+        "Nome do item": "paquímetro",
+        "Quantidade": 1.0,
+        "Preço UN": 210.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 98001,
+        "Nome do item": "mandril com adaptador para SDS",
+        "Quantidade": 1.0,
+        "Preço UN": 124.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 98002,
+        "Nome do item": "mandril furadeira de bancada",
+        "Quantidade": 1.0,
+        "Preço UN": 39.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 99001,
+        "Nome do item": "escova de carvão esmerilhadeira bosch",
+        "Quantidade": 10.0,
+        "Preço UN": 20.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 99002,
+        "Nome do item": "escova de carvão martelo rompedor vonder",
+        "Quantidade": 5.0,
+        "Preço UN": 39.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 100001,
+        "Nome do item": "broca martelete 6mm",
+        "Quantidade": 9.0,
+        "Preço UN": 26.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 100002,
+        "Nome do item": "broca martelete 8mm",
+        "Quantidade": 5.0,
+        "Preço UN": 25.41,
+        "Notas": null
+      },
+      {
+        "ID do item": 100003,
+        "Nome do item": "broca martelete 10mm",
+        "Quantidade": 14.0,
+        "Preço UN": 19.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 100004,
+        "Nome do item": "broca martelete 13mm",
+        "Quantidade": 4.0,
+        "Preço UN": 16.63,
+        "Notas": null
+      },
+      {
+        "ID do item": 100005,
+        "Nome do item": "broca martelete 16mm",
+        "Quantidade": 14.0,
+        "Preço UN": 35.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 100006,
+        "Nome do item": "broca martelete 19mm",
+        "Quantidade": 2.0,
+        "Preço UN": 68.54,
+        "Notas": null
+      },
+      {
+        "ID do item": 100007,
+        "Nome do item": "broca martelete 25mm",
+        "Quantidade": 2.0,
+        "Preço UN": 249.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 101007,
+        "Nome do item": "broca furadeira para concreto 4mm",
+        "Quantidade": 3.0,
+        "Preço UN": 5.46,
+        "Notas": null
+      },
+      {
+        "ID do item": 101008,
+        "Nome do item": "broca furadeira para concreto 5mm",
+        "Quantidade": 2.0,
+        "Preço UN": 5.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 101001,
+        "Nome do item": "broca furadeira para concreto 6mm",
+        "Quantidade": 9.0,
+        "Preço UN": 27.63,
+        "Notas": null
+      },
+      {
+        "ID do item": 101002,
+        "Nome do item": "broca furadeira para concreto 8mm",
+        "Quantidade": 9.0,
+        "Preço UN": 34.14,
+        "Notas": null
+      },
+      {
+        "ID do item": 101003,
+        "Nome do item": "broca furadeira para concreto 10mm",
+        "Quantidade": 8.0,
+        "Preço UN": 49.23,
+        "Notas": null
+      },
+      {
+        "ID do item": 101004,
+        "Nome do item": "broca furadeira para concreto 13mm longa",
+        "Quantidade": 10.0,
+        "Preço UN": 21.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 101005,
+        "Nome do item": "broca furadeira para concreto 13mm curta",
+        "Quantidade": 10.0,
+        "Preço UN": 19.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 101006,
+        "Nome do item": "broca furadeira para concreto 19mm",
+        "Quantidade": 4.0,
+        "Preço UN": 33.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 102001,
+        "Nome do item": "broca aço 2,5mm",
+        "Quantidade": 8.0,
+        "Preço UN": 15.73,
+        "Notas": null
+      },
+      {
+        "ID do item": 102002,
+        "Nome do item": "broca aço 3mm",
+        "Quantidade": 3.0,
+        "Preço UN": 6.57,
+        "Notas": null
+      },
+      {
+        "ID do item": 102003,
+        "Nome do item": "broca aço 3,5mm",
+        "Quantidade": 6.0,
+        "Preço UN": 15.94,
+        "Notas": null
+      },
+      {
+        "ID do item": 102004,
+        "Nome do item": "broca aço 4mm",
+        "Quantidade": 3.0,
+        "Preço UN": 9.68,
+        "Notas": null
+      },
+      {
+        "ID do item": 102005,
+        "Nome do item": "broca aço 5mm",
+        "Quantidade": 13.0,
+        "Preço UN": 15.73,
+        "Notas": null
+      },
+      {
+        "ID do item": 102006,
+        "Nome do item": "broca aço 5,5mm",
+        "Quantidade": 6.0,
+        "Preço UN": 12.37,
+        "Notas": null
+      },
+      {
+        "ID do item": 102007,
+        "Nome do item": "broca aço 6mm",
+        "Quantidade": 3.0,
+        "Preço UN": 10.23,
+        "Notas": null
+      },
+      {
+        "ID do item": 102008,
+        "Nome do item": "broca aço 6,5mm",
+        "Quantidade": 17.0,
+        "Preço UN": 13.04,
+        "Notas": null
+      },
+      {
+        "ID do item": 102009,
+        "Nome do item": "broca aço 7mm",
+        "Quantidade": 8.0,
+        "Preço UN": 13.22,
+        "Notas": null
+      },
+      {
+        "ID do item": 102010,
+        "Nome do item": "broca aço 8mm",
+        "Quantidade": 14.0,
+        "Preço UN": 27.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 102011,
+        "Nome do item": "broca aço 9mm",
+        "Quantidade": 14.0,
+        "Preço UN": 39.24,
+        "Notas": null
+      },
+      {
+        "ID do item": 102012,
+        "Nome do item": "broca aço 10mm",
+        "Quantidade": 12.0,
+        "Preço UN": 59.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 102013,
+        "Nome do item": "broca aço 11mm",
+        "Quantidade": 6.0,
+        "Preço UN": 40.16,
+        "Notas": null
+      },
+      {
+        "ID do item": 102014,
+        "Nome do item": "broca aço 11,5mm",
+        "Quantidade": 1.0,
+        "Preço UN": 69.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 102015,
+        "Nome do item": "broca aço 12mm",
+        "Quantidade": 5.0,
+        "Preço UN": 69.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 102016,
+        "Nome do item": "broca aço 13mm",
+        "Quantidade": 6.0,
+        "Preço UN": 170.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 102017,
+        "Nome do item": "broca aço 14mm",
+        "Quantidade": 5.0,
+        "Preço UN": 219.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 102018,
+        "Nome do item": "broca aço 15mm",
+        "Quantidade": 4.0,
+        "Preço UN": 244.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 102019,
+        "Nome do item": "broca aço 16mm",
+        "Quantidade": 4.0,
+        "Preço UN": 379.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 102020,
+        "Nome do item": "broca aço 18mm",
+        "Quantidade": 1.0,
+        "Preço UN": 390.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 102021,
+        "Nome do item": "broca aço 19mm",
+        "Quantidade": 1.0,
+        "Preço UN": 355.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 103001,
+        "Nome do item": "fio amarelo 1,5mm",
+        "Quantidade": 160.0,
+        "Preço UN": 12.76,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103002,
+        "Nome do item": "fio branco 1,5mm",
+        "Quantidade": 270.0,
+        "Preço UN": 12.76,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103034,
+        "Nome do item": "fio branco 1mm",
+        "Quantidade": 75.0,
+        "Preço UN": 12.76,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103033,
+        "Nome do item": "fio cinza 1mm",
+        "Quantidade": 123.0,
+        "Preço UN": 12.76,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103003,
+        "Nome do item": "fio preto 1,5mm",
+        "Quantidade": 368.0,
+        "Preço UN": 12.76,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103004,
+        "Nome do item": "fio amarelo 2,5mm",
+        "Quantidade": 100.0,
+        "Preço UN": 21.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103005,
+        "Nome do item": "fio azul 2,5mm",
+        "Quantidade": 880.0,
+        "Preço UN": 21.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103006,
+        "Nome do item": "fio branco 2,5mm",
+        "Quantidade": 160.0,
+        "Preço UN": 21.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103007,
+        "Nome do item": "fio preto 2,5mm",
+        "Quantidade": 160.0,
+        "Preço UN": 21.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103008,
+        "Nome do item": "fio verde 2,5mm",
+        "Quantidade": 457.0,
+        "Preço UN": 21.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103009,
+        "Nome do item": "fio vermelho 2,5mm",
+        "Quantidade": 224.0,
+        "Preço UN": 21.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103010,
+        "Nome do item": "fio amarelo 4mm",
+        "Quantidade": 15.0,
+        "Preço UN": 40.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103011,
+        "Nome do item": "fio azul 4mm",
+        "Quantidade": 450.0,
+        "Preço UN": 40.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103012,
+        "Nome do item": "fio branco 4mm",
+        "Quantidade": 165.0,
+        "Preço UN": 40.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103013,
+        "Nome do item": "fio verde 4mm",
+        "Quantidade": 371.0,
+        "Preço UN": 40.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103014,
+        "Nome do item": "fio vermelho 4mm",
+        "Quantidade": 277.0,
+        "Preço UN": 40.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103015,
+        "Nome do item": "fio azul 6mm",
+        "Quantidade": 310.0,
+        "Preço UN": 52.7,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103016,
+        "Nome do item": "fio preto 6mm",
+        "Quantidade": 0.0,
+        "Preço UN": 52.7,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103017,
+        "Nome do item": "fio verde 6mm",
+        "Quantidade": 300.0,
+        "Preço UN": 52.7,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103018,
+        "Nome do item": "fio vermelho 6mm",
+        "Quantidade": 290.0,
+        "Preço UN": 52.7,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103019,
+        "Nome do item": "fio branco 10mm",
+        "Quantidade": 0.0,
+        "Preço UN": 42.5,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103020,
+        "Nome do item": "fio vermelho 10mm",
+        "Quantidade": 5.0,
+        "Preço UN": 42.5,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103021,
+        "Nome do item": "fio branco anti-chama 1,5mm",
+        "Quantidade": 1.0,
+        "Preço UN": 12.76,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103022,
+        "Nome do item": "fio preto anti-chama 1,5mm",
+        "Quantidade": 1.0,
+        "Preço UN": 12.76,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103023,
+        "Nome do item": "fio azul anti-chama 2,5mm",
+        "Quantidade": 1.0,
+        "Preço UN": 21.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103024,
+        "Nome do item": "fio branco anti-chama 2,5mm",
+        "Quantidade": 1.0,
+        "Preço UN": 21.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103025,
+        "Nome do item": "fio preto anti-chama 2,5mm",
+        "Quantidade": 1.0,
+        "Preço UN": 21.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103026,
+        "Nome do item": "fio preto anti-chama 4mm",
+        "Quantidade": 1.0,
+        "Preço UN": 40.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103027,
+        "Nome do item": "fio vermelho anti-chmama 4m",
+        "Quantidade": 3.0,
+        "Preço UN": 40.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103028,
+        "Nome do item": "cabo alarme",
+        "Quantidade": 2.0,
+        "Preço UN": 2.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103029,
+        "Nome do item": "cabo coaxial",
+        "Quantidade": 1.0,
+        "Preço UN": 0.96,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103030,
+        "Nome do item": "cabo p/ camera",
+        "Quantidade": 1.0,
+        "Preço UN": 0.96,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103031,
+        "Nome do item": "cabo PP 2X2,5mm",
+        "Quantidade": 57.0,
+        "Preço UN": 3.81,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103032,
+        "Nome do item": "cabo PP 3X2,5mm",
+        "Quantidade": 0.0,
+        "Preço UN": 5.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103033,
+        "Nome do item": "cabo PP 4x1,5mm",
+        "Quantidade": 0.0,
+        "Preço UN": 39.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103034,
+        "Nome do item": "cabo PP 7x1,5mm",
+        "Quantidade": 22.0,
+        "Preço UN": 49.99,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103035,
+        "Nome do item": "cabo PP 2X1mm",
+        "Quantidade": 100.0,
+        "Preço UN": 20.99,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103036,
+        "Nome do item": "fio 4mm brasileiro",
+        "Quantidade": 17.0,
+        "Preço UN": 40.9,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103037,
+        "Nome do item": "cabo cobre nu 35mm",
+        "Quantidade": 0.0,
+        "Preço UN": 32.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103038,
+        "Nome do item": "cabo cobre nu 50mm",
+        "Quantidade": 80.0,
+        "Preço UN": 42.0,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103039,
+        "Nome do item": "fio 2,5mm brasileiro",
+        "Quantidade": 445.0,
+        "Preço UN": 3.85,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 103040,
+        "Nome do item": "fio 10mm verde",
+        "Quantidade": 2.0,
+        "Preço UN": 3.85,
+        "Notas": "preço e quantidade por metro"
+      },
+      {
+        "ID do item": 104001,
+        "Nome do item": "lampadas bulbo",
+        "Quantidade": 9.0,
+        "Preço UN": 4.15,
+        "Notas": null
+      },
+      {
+        "ID do item": 104002,
+        "Nome do item": "soquetes E27",
+        "Quantidade": 7.0,
+        "Preço UN": 1.69,
+        "Notas": null
+      },
+      {
+        "ID do item": 104003,
+        "Nome do item": "caixa de montagem",
+        "Quantidade": 2.0,
+        "Preço UN": 139.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 104004,
+        "Nome do item": "soquete luminária bipino",
+        "Quantidade": 54.0,
+        "Preço UN": 4.39,
+        "Notas": null
+      },
+      {
+        "ID do item": 105001,
+        "Nome do item": "fita isolante amarela",
+        "Quantidade": 10.0,
+        "Preço UN": 2.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 105002,
+        "Nome do item": "fita isolante azul",
+        "Quantidade": 11.0,
+        "Preço UN": 2.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 105003,
+        "Nome do item": "fita isolante branca",
+        "Quantidade": 9.0,
+        "Preço UN": 2.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 105004,
+        "Nome do item": "fita isolante preta",
+        "Quantidade": 35.0,
+        "Preço UN": 7.19,
+        "Notas": null
+      },
+      {
+        "ID do item": 105005,
+        "Nome do item": "fita isolante verde",
+        "Quantidade": 12.0,
+        "Preço UN": 2.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 105006,
+        "Nome do item": "fita isolante vermelha",
+        "Quantidade": 8.0,
+        "Preço UN": 2.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 105007,
+        "Nome do item": "fita isolante autofusão",
+        "Quantidade": 3.0,
+        "Preço UN": 32.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 106001,
+        "Nome do item": "refletor 300w",
+        "Quantidade": 3.0,
+        "Preço UN": 279.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 106002,
+        "Nome do item": "luminária de embutir quadrada 18W",
+        "Quantidade": 4.0,
+        "Preço UN": 25.03,
+        "Notas": null
+      },
+      {
+        "ID do item": 106003,
+        "Nome do item": "luminária de embutir redonda 18W",
+        "Quantidade": 11.0,
+        "Preço UN": 25.03,
+        "Notas": null
+      },
+      {
+        "ID do item": 106004,
+        "Nome do item": "luminária de emergência 2200 lumens",
+        "Quantidade": 6.0,
+        "Preço UN": 179.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 106005,
+        "Nome do item": "luminária de emergência 3000 lumens",
+        "Quantidade": 5.0,
+        "Preço UN": 227.91,
+        "Notas": null
+      },
+      {
+        "ID do item": 106006,
+        "Nome do item": "luminária de emergência 30 leds",
+        "Quantidade": 4.0,
+        "Preço UN": 10.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 106007,
+        "Nome do item": "luminária de emergência 2 leds",
+        "Quantidade": 4.0,
+        "Preço UN": 6.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 106008,
+        "Nome do item": "calha de led 18w",
+        "Quantidade": 1.0,
+        "Preço UN": 18.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 106009,
+        "Nome do item": "luminária sobrepor 18w",
+        "Quantidade": 28.0,
+        "Preço UN": 25.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 106010,
+        "Nome do item": "luminária sobrepor 32w",
+        "Quantidade": 23.0,
+        "Preço UN": 120.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 107001,
+        "Nome do item": "suporte 4x2 MG",
+        "Quantidade": 19.0,
+        "Preço UN": 3.59,
+        "Notas": null
+      },
+      {
+        "ID do item": 107002,
+        "Nome do item": "suporte 4x4 MG",
+        "Quantidade": 4.0,
+        "Preço UN": 2.89,
+        "Notas": null
+      },
+      {
+        "ID do item": 107003,
+        "Nome do item": "placa 4x2 1p MG",
+        "Quantidade": 12.0,
+        "Preço UN": 4.19,
+        "Notas": null
+      },
+      {
+        "ID do item": 107004,
+        "Nome do item": "placa 4x2 3p MG",
+        "Quantidade": 18.0,
+        "Preço UN": 2.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 107005,
+        "Nome do item": "placa 4x2 cega MG",
+        "Quantidade": 20.0,
+        "Preço UN": 6.41,
+        "Notas": null
+      },
+      {
+        "ID do item": 107006,
+        "Nome do item": "placa 4x4 4p juntos MG",
+        "Quantidade": 17.0,
+        "Preço UN": 7.04,
+        "Notas": null
+      },
+      {
+        "ID do item": 107007,
+        "Nome do item": "placa 4x4 4p separados MG",
+        "Quantidade": 13.0,
+        "Preço UN": 9.23,
+        "Notas": null
+      },
+      {
+        "ID do item": 107008,
+        "Nome do item": "placa 4x4 2p MG",
+        "Quantidade": 14.0,
+        "Preço UN": 7.03,
+        "Notas": null
+      },
+      {
+        "ID do item": 107009,
+        "Nome do item": "placa 4x4 6p MG",
+        "Quantidade": 16.0,
+        "Preço UN": 8.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 107010,
+        "Nome do item": "placa 4x4 cega MG",
+        "Quantidade": 12.0,
+        "Preço UN": 9.34,
+        "Notas": null
+      },
+      {
+        "ID do item": 107036,
+        "Nome do item": "placa 4x2 2p MG",
+        "Quantidade": 0.0,
+        "Preço UN": 2.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 107011,
+        "Nome do item": "caixa de sobrepor 1 posto MG",
+        "Quantidade": 54.0,
+        "Preço UN": 6.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 107012,
+        "Nome do item": "tomada em barra tripla extensão",
+        "Quantidade": 3.0,
+        "Preço UN": 10.74,
+        "Notas": null
+      },
+      {
+        "ID do item": 107013,
+        "Nome do item": "tomada tripla 20A ILUMI",
+        "Quantidade": 4.0,
+        "Preço UN": 19.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 107014,
+        "Nome do item": "modulo tomada branca 20A MG",
+        "Quantidade": 127.0,
+        "Preço UN": 5.15,
+        "Notas": null
+      },
+      {
+        "ID do item": 107015,
+        "Nome do item": "modulo tomada vermelha 20A MG",
+        "Quantidade": 38.0,
+        "Preço UN": 6.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 107016,
+        "Nome do item": "modulo interruptor simples MG",
+        "Quantidade": 34.0,
+        "Preço UN": 6.61,
+        "Notas": null
+      },
+      {
+        "ID do item": 107017,
+        "Nome do item": "modulo interruptor paralelo MG",
+        "Quantidade": 0.0,
+        "Preço UN": 7.84,
+        "Notas": null
+      },
+      {
+        "ID do item": 107018,
+        "Nome do item": "modulo cego s/furo MG",
+        "Quantidade": 36.0,
+        "Preço UN": 1.51,
+        "Notas": null
+      },
+      {
+        "ID do item": 107019,
+        "Nome do item": "modulo cego c/furo MG",
+        "Quantidade": 8.0,
+        "Preço UN": 1.84,
+        "Notas": null
+      },
+      {
+        "ID do item": 107020,
+        "Nome do item": "modulo tomada cat6 MG",
+        "Quantidade": 10.0,
+        "Preço UN": 41.71,
+        "Notas": null
+      },
+      {
+        "ID do item": 107021,
+        "Nome do item": "tomada vermelha red. s/ espelho",
+        "Quantidade": 16.0,
+        "Preço UN": 6.06,
+        "Notas": null
+      },
+      {
+        "ID do item": 107022,
+        "Nome do item": "tomada preta red. s/ espelho",
+        "Quantidade": 15.0,
+        "Preço UN": 6.05,
+        "Notas": null
+      },
+      {
+        "ID do item": 107023,
+        "Nome do item": "tomada dupla 20A",
+        "Quantidade": 1.0,
+        "Preço UN": 15.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 107024,
+        "Nome do item": "interruptor sem placa",
+        "Quantidade": 1.0,
+        "Preço UN": 6.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 107025,
+        "Nome do item": "tomada de torre",
+        "Quantidade": 9.0,
+        "Preço UN": 163.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 107036,
+        "Nome do item": "relê fotoeletrônico 500w MG",
+        "Quantidade": 12.0,
+        "Preço UN": 24.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 107026,
+        "Nome do item": "relê fotoeletrônico 1000W MG",
+        "Quantidade": 4.0,
+        "Preço UN": 29.72,
+        "Notas": null
+      },
+      {
+        "ID do item": 107027,
+        "Nome do item": "sensor de presença",
+        "Quantidade": 1.0,
+        "Preço UN": 34.39,
+        "Notas": null
+      },
+      {
+        "ID do item": 107028,
+        "Nome do item": "tomada simples 20A",
+        "Quantidade": 4.0,
+        "Preço UN": 4.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 107029,
+        "Nome do item": "interruptor simples",
+        "Quantidade": 3.0,
+        "Preço UN": 4.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 107030,
+        "Nome do item": "plugue macho 10A",
+        "Quantidade": 0.0,
+        "Preço UN": 6.09,
+        "Notas": null
+      },
+      {
+        "ID do item": 107031,
+        "Nome do item": "plugue macho 20A",
+        "Quantidade": 17.0,
+        "Preço UN": 7.05,
+        "Notas": null
+      },
+      {
+        "ID do item": 107032,
+        "Nome do item": "plugue femea 10A",
+        "Quantidade": 5.0,
+        "Preço UN": 6.19,
+        "Notas": null
+      },
+      {
+        "ID do item": 107033,
+        "Nome do item": "plugue femea 20A",
+        "Quantidade": 33.0,
+        "Preço UN": 6.17,
+        "Notas": null
+      },
+      {
+        "ID do item": 107034,
+        "Nome do item": "tomada trifasica alta voltagem extensão fêmea",
+        "Quantidade": 2.0,
+        "Preço UN": 140.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 107035,
+        "Nome do item": "tomada trifasica alta voltagem macho",
+        "Quantidade": 2.0,
+        "Preço UN": 140.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 107036,
+        "Nome do item": "modulo tomada de rede rj45",
+        "Quantidade": 14.0,
+        "Preço UN": 19.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 107037,
+        "Nome do item": "modulo interruptor duplo paralelo",
+        "Quantidade": 10.0,
+        "Preço UN": 16.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 107038,
+        "Nome do item": "caixa sobrepor 2p",
+        "Quantidade": 27.0,
+        "Preço UN": 7.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 107039,
+        "Nome do item": "caixa sobrepor 3p",
+        "Quantidade": 2.0,
+        "Preço UN": 7.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 107040,
+        "Nome do item": "tomada trifasica alta voltagem fixa",
+        "Quantidade": 3.0,
+        "Preço UN": 140.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 108036,
+        "Nome do item": "tampa cega 1\" WETZEL",
+        "Quantidade": 7.0,
+        "Preço UN": 6.69,
+        "Notas": null
+      },
+      {
+        "ID do item": 108037,
+        "Nome do item": "tampa 3 interruptores 1\" WETZEL",
+        "Quantidade": 3.0,
+        "Preço UN": 6.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 108038,
+        "Nome do item": "tampa tomada redonda 1\" WETZEL",
+        "Quantidade": 2.0,
+        "Preço UN": 3.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 108039,
+        "Nome do item": "tampa tomada vertical 1\" WETZEL",
+        "Quantidade": 2.0,
+        "Preço UN": 3.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 108040,
+        "Nome do item": "tampa tomada redonda 3/4\" WETZEL",
+        "Quantidade": 41.0,
+        "Preço UN": 5.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 108041,
+        "Nome do item": "tampa cega 3/4\" WETZEL",
+        "Quantidade": 16.0,
+        "Preço UN": 3.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 108042,
+        "Nome do item": "tampa cega 1\" WETZEL",
+        "Quantidade": 2.0,
+        "Preço UN": 5.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 108043,
+        "Nome do item": "condulete 3/4\" WETZEL",
+        "Quantidade": 33.0,
+        "Preço UN": 8.36,
+        "Notas": null
+      },
+      {
+        "ID do item": 108044,
+        "Nome do item": "tampão dailet 3/4\"",
+        "Quantidade": 76.0,
+        "Preço UN": 0.31,
+        "Notas": null
+      },
+      {
+        "ID do item": 108045,
+        "Nome do item": "tomada p/ relé",
+        "Quantidade": 2.0,
+        "Preço UN": 18.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 109001,
+        "Nome do item": "barramento tripolar",
+        "Quantidade": 1.0,
+        "Preço UN": 53.92,
+        "Notas": null
+      },
+      {
+        "ID do item": 109003,
+        "Nome do item": "Clip monitor trifásico",
+        "Quantidade": 0.0,
+        "Preço UN": 178.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 109004,
+        "Nome do item": "easy tesys SCHNEIDER",
+        "Quantidade": 1.0,
+        "Preço UN": 179.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 109005,
+        "Nome do item": "easy pact SCHNEIDER",
+        "Quantidade": 1.0,
+        "Preço UN": 484.79,
+        "Notas": null
+      },
+      {
+        "ID do item": 109006,
+        "Nome do item": "switching power supply",
+        "Quantidade": 1.0,
+        "Preço UN": 385.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 109007,
+        "Nome do item": "refletor 50w",
+        "Quantidade": 1.0,
+        "Preço UN": 108.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 109008,
+        "Nome do item": "terminal elétrico 95mm² TCM",
+        "Quantidade": 19.0,
+        "Preço UN": 27.1,
+        "Notas": null
+      },
+      {
+        "ID do item": 109009,
+        "Nome do item": "terminal elétrico 25mm² TCM",
+        "Quantidade": 18.0,
+        "Preço UN": 13.07,
+        "Notas": null
+      },
+      {
+        "ID do item": 109010,
+        "Nome do item": "disjuntor monofasico c10",
+        "Quantidade": 5.0,
+        "Preço UN": 10.56,
+        "Notas": null
+      },
+      {
+        "ID do item": 109011,
+        "Nome do item": "disjuntor monofasico c16",
+        "Quantidade": 7.0,
+        "Preço UN": 11.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 109012,
+        "Nome do item": "disjuntor monofasico c20",
+        "Quantidade": 5.0,
+        "Preço UN": 11.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 109013,
+        "Nome do item": "disjuntor monofasico c32",
+        "Quantidade": 1.0,
+        "Preço UN": 11.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 109014,
+        "Nome do item": "disjuntor monofasico c63",
+        "Quantidade": 5.0,
+        "Preço UN": 14.4,
+        "Notas": null
+      },
+      {
+        "ID do item": 109015,
+        "Nome do item": "disjuntor bifasico c10",
+        "Quantidade": 8.0,
+        "Preço UN": 44.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 109016,
+        "Nome do item": "disjuntor bifasico c16",
+        "Quantidade": 2.0,
+        "Preço UN": 44.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 109017,
+        "Nome do item": "disjuntor bifasico c20",
+        "Quantidade": 4.0,
+        "Preço UN": 44.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 109018,
+        "Nome do item": "disjuntor bifasico c32",
+        "Quantidade": 2.0,
+        "Preço UN": 44.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 109019,
+        "Nome do item": "disjuntor bifasico c40",
+        "Quantidade": 4.0,
+        "Preço UN": 45.4,
+        "Notas": null
+      },
+      {
+        "ID do item": 109020,
+        "Nome do item": "disjuntor bifasico c50",
+        "Quantidade": 5.0,
+        "Preço UN": 45.4,
+        "Notas": null
+      },
+      {
+        "ID do item": 109021,
+        "Nome do item": "disjuntor trifasico c10",
+        "Quantidade": 4.0,
+        "Preço UN": 58.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 109022,
+        "Nome do item": "disjuntor trifasico c16",
+        "Quantidade": 18.0,
+        "Preço UN": 58.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 109023,
+        "Nome do item": "disjuntor trifasico c25",
+        "Quantidade": 3.0,
+        "Preço UN": 58.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 109024,
+        "Nome do item": "disjuntor trifasico c32",
+        "Quantidade": 2.0,
+        "Preço UN": 58.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 109025,
+        "Nome do item": "disjuntor trifasico c50",
+        "Quantidade": 4.0,
+        "Preço UN": 59.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 109026,
+        "Nome do item": "disjuntor trifasico 100A",
+        "Quantidade": 3.0,
+        "Preço UN": 104.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 109027,
+        "Nome do item": "disjuntor trifasico 125A",
+        "Quantidade": 1.0,
+        "Preço UN": 120.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 109028,
+        "Nome do item": "disjuntor motor 22-32",
+        "Quantidade": 2.0,
+        "Preço UN": 1013.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 109029,
+        "Nome do item": "disjuntor motor 18-25",
+        "Quantidade": 4.0,
+        "Preço UN": 301.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 109030,
+        "Nome do item": "disjuntor trifasico c63",
+        "Quantidade": 0.0,
+        "Preço UN": 79.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 109031,
+        "Nome do item": "disjuntor trifásico 20A",
+        "Quantidade": 2.0,
+        "Preço UN": 33.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 109032,
+        "Nome do item": "disjuntor monofásico 25A",
+        "Quantidade": 2.0,
+        "Preço UN": 8.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 110000,
+        "Nome do item": "caixa de passagem intelbras",
+        "Quantidade": 3.0,
+        "Preço UN": 8.89,
+        "Notas": null
+      },
+      {
+        "ID do item": 111001,
+        "Nome do item": "caixa de lux 4X2 preta",
+        "Quantidade": 6.0,
+        "Preço UN": 1.78,
+        "Notas": null
+      },
+      {
+        "ID do item": 111002,
+        "Nome do item": "caixa de luz 4X2 p/ gesso amarela",
+        "Quantidade": 3.0,
+        "Preço UN": 2.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 111003,
+        "Nome do item": "caixa de luz 4X4 p/ gesso amarela",
+        "Quantidade": 16.0,
+        "Preço UN": 4.39,
+        "Notas": null
+      },
+      {
+        "ID do item": 111004,
+        "Nome do item": "caixa de lux 4X4 amarela",
+        "Quantidade": 1.0,
+        "Preço UN": 9.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 111005,
+        "Nome do item": "trilho p/ disjuntor",
+        "Quantidade": 2.0,
+        "Preço UN": 15.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 111006,
+        "Nome do item": "suporte para caixa azul de luz",
+        "Quantidade": 138.0,
+        "Preço UN": 4.58,
+        "Notas": null
+      },
+      {
+        "ID do item": 111007,
+        "Nome do item": "caixa de luz 4x4 gesso azul",
+        "Quantidade": 148.0,
+        "Preço UN": 8.13,
+        "Notas": null
+      },
+      {
+        "ID do item": 111008,
+        "Nome do item": "caixa de luz 4x2 gesso azul",
+        "Quantidade": 86.0,
+        "Preço UN": 6.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 111009,
+        "Nome do item": "luva de eletroduto rosca 1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 4.69,
+        "Notas": null
+      },
+      {
+        "ID do item": 111010,
+        "Nome do item": "luva de eletroduto rosca 3/4\"",
+        "Quantidade": 4.0,
+        "Preço UN": 13.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 111011,
+        "Nome do item": "luva de eletroduto rosca 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 7.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 111012,
+        "Nome do item": "luva de eletroduto rosca 1.1/4\"",
+        "Quantidade": 1.0,
+        "Preço UN": 4.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 111013,
+        "Nome do item": "luva de eletroduto rosca 2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 5.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 111014,
+        "Nome do item": "luva de eletroduto rosca 2.1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 6.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 111015,
+        "Nome do item": "luva de pvc lisa cinza 32mm",
+        "Quantidade": 5.0,
+        "Preço UN": 2.66,
+        "Notas": null
+      },
+      {
+        "ID do item": 111016,
+        "Nome do item": "luva p/ mangueira corrugada 32mm",
+        "Quantidade": 9.0,
+        "Preço UN": 1.55,
+        "Notas": null
+      },
+      {
+        "ID do item": 111017,
+        "Nome do item": "luva p/ mangueira corrugada 25mm",
+        "Quantidade": 1.0,
+        "Preço UN": 1.45,
+        "Notas": null
+      },
+      {
+        "ID do item": 112001,
+        "Nome do item": "curva 90° eletroduto rosca 40mm",
+        "Quantidade": 2.0,
+        "Preço UN": 4.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 112002,
+        "Nome do item": "curva 90° eletroduto soldavel 25mm",
+        "Quantidade": 10.0,
+        "Preço UN": 2.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 112003,
+        "Nome do item": "curva 90° eletroduto soldavel 32mm",
+        "Quantidade": 4.0,
+        "Preço UN": 2.75,
+        "Notas": null
+      },
+      {
+        "ID do item": 112005,
+        "Nome do item": "curva 90° galvanizado 3/4\"",
+        "Quantidade": 11.0,
+        "Preço UN": 5.91,
+        "Notas": null
+      },
+      {
+        "ID do item": 112006,
+        "Nome do item": "curva 90° galvanizado 1\"",
+        "Quantidade": 4.0,
+        "Preço UN": 4.75,
+        "Notas": null
+      },
+      {
+        "ID do item": 112007,
+        "Nome do item": "curva 90° galvanizado 2\"",
+        "Quantidade": 4.0,
+        "Preço UN": 35.96,
+        "Notas": null
+      },
+      {
+        "ID do item": 112008,
+        "Nome do item": "curva 90° galvanizado 3\"",
+        "Quantidade": 2.0,
+        "Preço UN": 113.96,
+        "Notas": null
+      },
+      {
+        "ID do item": 112009,
+        "Nome do item": "eletrocalha 200x100",
+        "Quantidade": 2.0,
+        "Preço UN": 120.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112010,
+        "Nome do item": "emenda eletrocalha 200x100",
+        "Quantidade": 9.0,
+        "Preço UN": 10.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112011,
+        "Nome do item": "curva horizontal 90° eletrocalha 100x100",
+        "Quantidade": 8.0,
+        "Preço UN": 42.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112012,
+        "Nome do item": "eletrocalha 100x100",
+        "Quantidade": 8.0,
+        "Preço UN": 180.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112013,
+        "Nome do item": "canaleta 40x16x2000mm branca",
+        "Quantidade": 43.0,
+        "Preço UN": 28.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 112014,
+        "Nome do item": "canaleta 20x10x2000mm branca",
+        "Quantidade": 3.0,
+        "Preço UN": 9.35,
+        "Notas": null
+      },
+      {
+        "ID do item": 112015,
+        "Nome do item": "haste terra 5/8\" x 2,4m",
+        "Quantidade": 1.0,
+        "Preço UN": 37.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112016,
+        "Nome do item": "suporte suspenso eletrocalha 200x100",
+        "Quantidade": 5.0,
+        "Preço UN": 19.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112017,
+        "Nome do item": "barra roscada 1/4",
+        "Quantidade": 4.0,
+        "Preço UN": 17.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112018,
+        "Nome do item": "saída horizontal 3/4\" eletrocalha",
+        "Quantidade": 10.0,
+        "Preço UN": 160.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112019,
+        "Nome do item": "emenda eletrocalha 100x100",
+        "Quantidade": 9.0,
+        "Preço UN": 10.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112020,
+        "Nome do item": "redução eletrocalha 200x100x100",
+        "Quantidade": 0.0,
+        "Preço UN": 68.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112021,
+        "Nome do item": "te eletrocalha horizontal 100x100",
+        "Quantidade": 10.0,
+        "Preço UN": 43.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112022,
+        "Nome do item": "te eletrocalha horizontal 200x100",
+        "Quantidade": 0.0,
+        "Preço UN": 84.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 112023,
+        "Nome do item": "cruzeta eletrocalha horizontal 200x100",
+        "Quantidade": 0.0,
+        "Preço UN": 96.23,
+        "Notas": null
+      },
+      {
+        "ID do item": 112024,
+        "Nome do item": "suporte suspenso eletrocalha 100x100",
+        "Quantidade": 9.0,
+        "Preço UN": 8.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 113001,
+        "Nome do item": "quadro de força",
+        "Quantidade": 1.0,
+        "Preço UN": 139.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 114002,
+        "Nome do item": "terminal olhal amarelo 4-6mm",
+        "Quantidade": 329.0,
+        "Preço UN": 0.39,
+        "Notas": null
+      },
+      {
+        "ID do item": 114003,
+        "Nome do item": "terminal olhal azul 2,5mm",
+        "Quantidade": null,
+        "Preço UN": 0.12,
+        "Notas": null
+      },
+      {
+        "ID do item": 114004,
+        "Nome do item": "terminal olhal vermelho 10mm",
+        "Quantidade": 34.0,
+        "Preço UN": 1.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 114005,
+        "Nome do item": "terminal tubular simples amarelo 6mm",
+        "Quantidade": 335.0,
+        "Preço UN": 0.16,
+        "Notas": null
+      },
+      {
+        "ID do item": 114006,
+        "Nome do item": "terminal tubular simples azul 2,5mm",
+        "Quantidade": 240.0,
+        "Preço UN": 0.1,
+        "Notas": null
+      },
+      {
+        "ID do item": 114007,
+        "Nome do item": "terminal tubular simples azul 16mm",
+        "Quantidade": 79.0,
+        "Preço UN": 1.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 114008,
+        "Nome do item": "terminal tubular simples cinza 0,75mm",
+        "Quantidade": 500.0,
+        "Preço UN": 0.04,
+        "Notas": null
+      },
+      {
+        "ID do item": 114009,
+        "Nome do item": "terminal tubular simples cinza 4mm",
+        "Quantidade": 477.0,
+        "Preço UN": 0.18,
+        "Notas": null
+      },
+      {
+        "ID do item": 114010,
+        "Nome do item": "terminal tubular simples preto 1,5mm",
+        "Quantidade": 35.0,
+        "Preço UN": 0.09,
+        "Notas": null
+      },
+      {
+        "ID do item": 114011,
+        "Nome do item": "terminal tubular simples vermelho 10mm",
+        "Quantidade": 435.0,
+        "Preço UN": 1.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 114012,
+        "Nome do item": "terminal tubular duplo amarelo 6mm",
+        "Quantidade": 494.0,
+        "Preço UN": 0.18,
+        "Notas": null
+      },
+      {
+        "ID do item": 114013,
+        "Nome do item": "terminal tubular duplo azul 2,5mm",
+        "Quantidade": 489.0,
+        "Preço UN": 0.1,
+        "Notas": null
+      },
+      {
+        "ID do item": 114014,
+        "Nome do item": "terminal tubular duplo cinza 0,75mm",
+        "Quantidade": 500.0,
+        "Preço UN": 0.05,
+        "Notas": null
+      },
+      {
+        "ID do item": 114015,
+        "Nome do item": "terminal tubular duplo cinza 4mm",
+        "Quantidade": 500.0,
+        "Preço UN": 0.18,
+        "Notas": null
+      },
+      {
+        "ID do item": 114016,
+        "Nome do item": "terminal tubular duplo preto 1,5mm",
+        "Quantidade": 498.0,
+        "Preço UN": 0.09,
+        "Notas": null
+      },
+      {
+        "ID do item": 114017,
+        "Nome do item": "terminal tubular duplo vermelho 1mm",
+        "Quantidade": 400.0,
+        "Preço UN": 0.09,
+        "Notas": null
+      },
+      {
+        "ID do item": 114018,
+        "Nome do item": "terminal tipo femea amarelo 4-6mm",
+        "Quantidade": 99.0,
+        "Preço UN": 0.28,
+        "Notas": null
+      },
+      {
+        "ID do item": 114019,
+        "Nome do item": "terminal tipo femea azul 2,5mm",
+        "Quantidade": 75.0,
+        "Preço UN": 0.22,
+        "Notas": null
+      },
+      {
+        "ID do item": 114020,
+        "Nome do item": "terminal tipo femea vermelho 1,5mm",
+        "Quantidade": 99.0,
+        "Preço UN": 0.22,
+        "Notas": null
+      },
+      {
+        "ID do item": 114021,
+        "Nome do item": "terminal pino amarelo 4-6mm",
+        "Quantidade": 74.0,
+        "Preço UN": 0.18,
+        "Notas": null
+      },
+      {
+        "ID do item": 114022,
+        "Nome do item": "terminal pino azul 2,5mm",
+        "Quantidade": 78.0,
+        "Preço UN": 0.18,
+        "Notas": null
+      },
+      {
+        "ID do item": 114023,
+        "Nome do item": "terminal pino vermelho 10mm",
+        "Quantidade": 36.0,
+        "Preço UN": 1.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 114024,
+        "Nome do item": "terminal olhal de compressão 16mm",
+        "Quantidade": 48.0,
+        "Preço UN": 1.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 114025,
+        "Nome do item": "terminal olhal de compressão 25mm",
+        "Quantidade": 48.0,
+        "Preço UN": 4.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 114026,
+        "Nome do item": "terminal olhal de compressão 35mm",
+        "Quantidade": 51.0,
+        "Preço UN": 5.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 114027,
+        "Nome do item": "terminal olhal de compressão 95mm",
+        "Quantidade": 5.0,
+        "Preço UN": 26.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 115001,
+        "Nome do item": "conector boxer 3\"",
+        "Quantidade": 2.0,
+        "Preço UN": 46.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 115002,
+        "Nome do item": "conector boxer 2\"",
+        "Quantidade": 5.0,
+        "Preço UN": 20.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 115003,
+        "Nome do item": "conector boxer 1.1/2\"",
+        "Quantidade": 3.0,
+        "Preço UN": 13.96,
+        "Notas": null
+      },
+      {
+        "ID do item": 115004,
+        "Nome do item": "conector boxer 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 8.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 115005,
+        "Nome do item": "conector boxer 3/4\"",
+        "Quantidade": 82.0,
+        "Preço UN": 4.13,
+        "Notas": null
+      },
+      {
+        "ID do item": 115006,
+        "Nome do item": "luva de emenda metálica 70mm",
+        "Quantidade": 4.0,
+        "Preço UN": 46.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 116001,
+        "Nome do item": "luva de emenda metálica 60mm",
+        "Quantidade": 8.0,
+        "Preço UN": 13.16,
+        "Notas": null
+      },
+      {
+        "ID do item": 116002,
+        "Nome do item": "luva de emenda metálica 50mm",
+        "Quantidade": 17.0,
+        "Preço UN": 12.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 116003,
+        "Nome do item": "luva de emenda metálica 32mm",
+        "Quantidade": 7.0,
+        "Preço UN": 10.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 116004,
+        "Nome do item": "luva de emenda metálica 25mm",
+        "Quantidade": 23.0,
+        "Preço UN": 6.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 117001,
+        "Nome do item": "luva metalica rosca 3\"",
+        "Quantidade": 10.0,
+        "Preço UN": 12.55,
+        "Notas": null
+      },
+      {
+        "ID do item": 117002,
+        "Nome do item": "luva metalica rosca 1.1/2\"",
+        "Quantidade": 5.0,
+        "Preço UN": 7.59,
+        "Notas": null
+      },
+      {
+        "ID do item": 117003,
+        "Nome do item": "luva metalica rosca 1\"",
+        "Quantidade": 4.0,
+        "Preço UN": 1.89,
+        "Notas": null
+      },
+      {
+        "ID do item": 117004,
+        "Nome do item": "luva metalica rosca 3/4\"",
+        "Quantidade": 6.0,
+        "Preço UN": 1.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 117005,
+        "Nome do item": "prensa cabos m50X1,5",
+        "Quantidade": 1.0,
+        "Preço UN": 16.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 118001,
+        "Nome do item": "chuveiro para uso",
+        "Quantidade": 1.0,
+        "Preço UN": 114.94,
+        "Notas": null
+      },
+      {
+        "ID do item": 118002,
+        "Nome do item": "resistência",
+        "Quantidade": 1.0,
+        "Preço UN": 39.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 118003,
+        "Nome do item": "mangueira corrugada amarela",
+        "Quantidade": 1.0,
+        "Preço UN": 0.79,
+        "Notas": null
+      },
+      {
+        "ID do item": 118004,
+        "Nome do item": "mangueira corrugada laranja",
+        "Quantidade": 1.0,
+        "Preço UN": 1.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 118005,
+        "Nome do item": "exaustor para banheiro",
+        "Quantidade": 0.0,
+        "Preço UN": 93.84,
+        "Notas": null
+      },
+      {
+        "ID do item": 118007,
+        "Nome do item": "estação de recarga p/ carros eletricos",
+        "Quantidade": 1.0,
+        "Preço UN": 4741.87,
+        "Notas": null
+      },
+      {
+        "ID do item": 118008,
+        "Nome do item": "kit suporte octogonal 4x4",
+        "Quantidade": 1.0,
+        "Preço UN": 14.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 118010,
+        "Nome do item": "mangueira corrugada preta 25mm",
+        "Quantidade": 50.0,
+        "Preço UN": 1.14,
+        "Notas": null
+      },
+      {
+        "ID do item": 118011,
+        "Nome do item": "isolador elétrico cerâmica",
+        "Quantidade": 2.0,
+        "Preço UN": 9.14,
+        "Notas": null
+      },
+      {
+        "ID do item": 118012,
+        "Nome do item": "suporte p/ isolador eletrico",
+        "Quantidade": 3.0,
+        "Preço UN": 19.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 118013,
+        "Nome do item": "split bolt conector para cabos",
+        "Quantidade": 39.0,
+        "Preço UN": 6.44,
+        "Notas": null
+      },
+      {
+        "ID do item": 118014,
+        "Nome do item": "organizador de cabos",
+        "Quantidade": 20.0,
+        "Preço UN": 6.9,
+        "Notas": "quantidade em rolos"
+      },
+      {
+        "ID do item": 118015,
+        "Nome do item": "mangueira corrugada azul",
+        "Quantidade": 1.0,
+        "Preço UN": 9.0,
+        "Notas": "quantidade em rolos"
+      },
+      {
+        "ID do item": 118016,
+        "Nome do item": "luva de encaixe vermelha 3/4\"",
+        "Quantidade": 299.0,
+        "Preço UN": 1.89,
+        "Notas": null
+      },
+      {
+        "ID do item": 118017,
+        "Nome do item": "adaptador vermelho s/ rosca 3/4\"",
+        "Quantidade": 86.0,
+        "Preço UN": 0.73,
+        "Notas": null
+      },
+      {
+        "ID do item": 118018,
+        "Nome do item": "caixa 5 entradas vermelha",
+        "Quantidade": 1.0,
+        "Preço UN": 6.74,
+        "Notas": null
+      },
+      {
+        "ID do item": 118019,
+        "Nome do item": "tampa cega vermelha",
+        "Quantidade": 31.0,
+        "Preço UN": 2.57,
+        "Notas": null
+      },
+      {
+        "ID do item": 118020,
+        "Nome do item": "curva 90° vermelha 3/4\"",
+        "Quantidade": 0.0,
+        "Preço UN": 3.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 118021,
+        "Nome do item": "abraçadeira vermelha 3/4",
+        "Quantidade": 0.0,
+        "Preço UN": 0.94,
+        "Notas": null
+      },
+      {
+        "ID do item": 118022,
+        "Nome do item": "cabo vermelho para sistema anti-incêndio",
+        "Quantidade": 1.0,
+        "Preço UN": 4.66,
+        "Notas": "quantidade em rolos"
+      },
+      {
+        "ID do item": 118023,
+        "Nome do item": "tubo vermelho anti-chama",
+        "Quantidade": 312.0,
+        "Preço UN": 18.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 118024,
+        "Nome do item": "conector de derivação 70",
+        "Quantidade": 1.0,
+        "Preço UN": 25.64,
+        "Notas": null
+      },
+      {
+        "ID do item": 118025,
+        "Nome do item": "conector de derivação 150-35",
+        "Quantidade": 0.0,
+        "Preço UN": 17.26,
+        "Notas": null
+      },
+      {
+        "ID do item": 118026,
+        "Nome do item": "boia elétrica",
+        "Quantidade": 6.0,
+        "Preço UN": 28.28,
+        "Notas": null
+      },
+      {
+        "ID do item": 118027,
+        "Nome do item": "caixa 5 entradas preto",
+        "Quantidade": 5.0,
+        "Preço UN": 4.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 118028,
+        "Nome do item": "tampa cega preta",
+        "Quantidade": 4.0,
+        "Preço UN": 2.57,
+        "Notas": null
+      },
+      {
+        "ID do item": 118029,
+        "Nome do item": "adaptador preto s/ rosca 3/4\"",
+        "Quantidade": 23.0,
+        "Preço UN": 0.73,
+        "Notas": null
+      },
+      {
+        "ID do item": 118030,
+        "Nome do item": "presilha latão tipo \"U\" 35/50mm",
+        "Quantidade": 19.0,
+        "Preço UN": 1.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 110003,
+        "Nome do item": "Abraçadeira tipo \"D\"2.1/2\"",
+        "Quantidade": 4.0,
+        "Preço UN": 9.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 110004,
+        "Nome do item": "Abraçadeira tipo \"D\" 2\"",
+        "Quantidade": 4.0,
+        "Preço UN": 2.57,
+        "Notas": null
+      },
+      {
+        "ID do item": 110005,
+        "Nome do item": "Abraçadeira tipo \"D\" 1.1/2\"",
+        "Quantidade": 33.0,
+        "Preço UN": 6.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 110006,
+        "Nome do item": "Abraçadeira tipo \"D\" 1.1/4\"",
+        "Quantidade": 63.0,
+        "Preço UN": 6.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 110007,
+        "Nome do item": "Abraçadeira tipo \"D\" 1\"",
+        "Quantidade": 6.0,
+        "Preço UN": 1.93,
+        "Notas": null
+      },
+      {
+        "ID do item": 110008,
+        "Nome do item": "Abraçadeira tipo \"D\" 3/4\"",
+        "Quantidade": 138.0,
+        "Preço UN": 0.78,
+        "Notas": null
+      },
+      {
+        "ID do item": 110009,
+        "Nome do item": "Abraçadeira tipo \"U\" 5.1/2\"",
+        "Quantidade": 5.0,
+        "Preço UN": 13.01,
+        "Notas": null
+      },
+      {
+        "ID do item": 110010,
+        "Nome do item": "Abraçadeira tipo \"U\" 4\"",
+        "Quantidade": 10.0,
+        "Preço UN": 1.92,
+        "Notas": null
+      },
+      {
+        "ID do item": 110011,
+        "Nome do item": "Abraçadeira tipo \"U\" 3\"",
+        "Quantidade": 22.0,
+        "Preço UN": 4.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 110012,
+        "Nome do item": "Abraçadeira tipo \"U\" 2.1/2\"",
+        "Quantidade": 20.0,
+        "Preço UN": 2.32,
+        "Notas": null
+      },
+      {
+        "ID do item": 110013,
+        "Nome do item": "Abraçadeira tipo \"U\" 2\"",
+        "Quantidade": 28.0,
+        "Preço UN": 1.69,
+        "Notas": null
+      },
+      {
+        "ID do item": 110014,
+        "Nome do item": "Abraçadeira tipo \"U\" 1.1/2\"",
+        "Quantidade": 20.0,
+        "Preço UN": 2.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 110015,
+        "Nome do item": "Abraçadeira tipo \"U\" 1\"",
+        "Quantidade": 50.0,
+        "Preço UN": 0.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 110016,
+        "Nome do item": "Abraçadeira tipo \"U\" 3/4\"",
+        "Quantidade": 46.0,
+        "Preço UN": 0.63,
+        "Notas": null
+      },
+      {
+        "ID do item": 110017,
+        "Nome do item": "Abraçadeira tipo \"U\" 1/2\"",
+        "Quantidade": 20.0,
+        "Preço UN": 0.67,
+        "Notas": null
+      },
+      {
+        "ID do item": 110018,
+        "Nome do item": "Abraçadeira tipo \"RSF\" 14-22mm",
+        "Quantidade": 21.0,
+        "Preço UN": 2.88,
+        "Notas": null
+      },
+      {
+        "ID do item": 110019,
+        "Nome do item": "Abraçadeira tipo \"RSF\" 16-25mm",
+        "Quantidade": 9.0,
+        "Preço UN": 5.79,
+        "Notas": null
+      },
+      {
+        "ID do item": 110020,
+        "Nome do item": "Abraçadeira tipo \"RSF\" 25-38mm",
+        "Quantidade": 6.0,
+        "Preço UN": 3.65,
+        "Notas": null
+      },
+      {
+        "ID do item": 110021,
+        "Nome do item": "Abraçadeira tipo \"RSF\" 38-51mm",
+        "Quantidade": 9.0,
+        "Preço UN": 3.44,
+        "Notas": null
+      },
+      {
+        "ID do item": 110022,
+        "Nome do item": "Abraçadeira tipo \"RSF\" 64 - 83mm",
+        "Quantidade": 10.0,
+        "Preço UN": 3.78,
+        "Notas": null
+      },
+      {
+        "ID do item": 110023,
+        "Nome do item": "Abraçadeira para lâmpadas tubulares",
+        "Quantidade": 39.0,
+        "Preço UN": 0.48,
+        "Notas": null
+      },
+      {
+        "ID do item": 119001,
+        "Nome do item": "sifão articulado branco",
+        "Quantidade": 4.0,
+        "Preço UN": 2.44,
+        "Notas": null
+      },
+      {
+        "ID do item": 119002,
+        "Nome do item": "sifão articulado cromado",
+        "Quantidade": 2.0,
+        "Preço UN": 18.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 119003,
+        "Nome do item": "acabamento de registro deca",
+        "Quantidade": 5.0,
+        "Preço UN": 55.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 119004,
+        "Nome do item": "valvula p/ tanque 1 1/4\"",
+        "Quantidade": 3.0,
+        "Preço UN": 29.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 119005,
+        "Nome do item": "torneira mesa",
+        "Quantidade": 2.0,
+        "Preço UN": 165.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 119006,
+        "Nome do item": "torneira jardim metal",
+        "Quantidade": 0.0,
+        "Preço UN": 19.74,
+        "Notas": null
+      },
+      {
+        "ID do item": 119007,
+        "Nome do item": "torneira de jardim 1/4 de volta",
+        "Quantidade": 1.0,
+        "Preço UN": 19.74,
+        "Notas": null
+      },
+      {
+        "ID do item": 119008,
+        "Nome do item": "torneira jardim plastico",
+        "Quantidade": 0.0,
+        "Preço UN": 2.1,
+        "Notas": null
+      },
+      {
+        "ID do item": 119009,
+        "Nome do item": "engate 40cm",
+        "Quantidade": 0.0,
+        "Preço UN": 3.39,
+        "Notas": null
+      },
+      {
+        "ID do item": 119010,
+        "Nome do item": "engate 60cm",
+        "Quantidade": 2.0,
+        "Preço UN": 4.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 119011,
+        "Nome do item": "puxador porta de vidro",
+        "Quantidade": 4.0,
+        "Preço UN": 135.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 119012,
+        "Nome do item": "cadeado pado LT30",
+        "Quantidade": 2.0,
+        "Preço UN": 16.2,
+        "Notas": null
+      },
+      {
+        "ID do item": 119013,
+        "Nome do item": "mola aerea",
+        "Quantidade": 1.0,
+        "Preço UN": 48.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 119014,
+        "Nome do item": "fechadura para moveis",
+        "Quantidade": 5.0,
+        "Preço UN": 13.58,
+        "Notas": null
+      },
+      {
+        "ID do item": 119015,
+        "Nome do item": "reparo hidraulico",
+        "Quantidade": 6.0,
+        "Preço UN": 22.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 119016,
+        "Nome do item": "boia 3/4\"",
+        "Quantidade": 0.0,
+        "Preço UN": 21.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 119017,
+        "Nome do item": "boia click 1/2\", 3/4\"",
+        "Quantidade": 1.0,
+        "Preço UN": 109.83,
+        "Notas": null
+      },
+      {
+        "ID do item": 119019,
+        "Nome do item": "porta grelha quad. 100mm",
+        "Quantidade": 7.0,
+        "Preço UN": 2.1,
+        "Notas": null
+      },
+      {
+        "ID do item": 119020,
+        "Nome do item": "grelha quad. 100mm abre/fecha",
+        "Quantidade": 7.0,
+        "Preço UN": 7.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 119021,
+        "Nome do item": "grelha quad. Inox vazada",
+        "Quantidade": 1.0,
+        "Preço UN": 20.48,
+        "Notas": null
+      },
+      {
+        "ID do item": 119022,
+        "Nome do item": "registro gaveta deca 3/4\"",
+        "Quantidade": 2.0,
+        "Preço UN": 35.99,
+        "Notas": null
+      },
+      {
+        "ID do item": 119023,
+        "Nome do item": "registro gaveta docol 1\"",
+        "Quantidade": 1.0,
+        "Preço UN": 57.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 119024,
+        "Nome do item": "ralo click 100mm",
+        "Quantidade": 1.0,
+        "Preço UN": 21.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 119025,
+        "Nome do item": "reparo para valvula de descarga",
+        "Quantidade": 4.0,
+        "Preço UN": 69.98,
+        "Notas": null
+      },
+      {
+        "ID do item": 119026,
+        "Nome do item": "valvula lavatorio click",
+        "Quantidade": 1.0,
+        "Preço UN": 39.87,
+        "Notas": null
+      },
+      {
+        "ID do item": 120001,
+        "Nome do item": "engate rápido de ar comprimido",
+        "Quantidade": 2.0,
+        "Preço UN": 28.98,
+        "Notas": null
+      },
+      {
+        "ID do item": 120002,
+        "Nome do item": "conjunto fixação lateral",
+        "Quantidade": 1.0,
+        "Preço UN": 21.4,
+        "Notas": null
+      },
+      {
+        "ID do item": 120003,
+        "Nome do item": "clipes de montagem de luminária",
+        "Quantidade": 172.0,
+        "Preço UN": 2.58,
+        "Notas": null
+      },
+      {
+        "ID do item": 121001,
+        "Nome do item": "botina 39",
+        "Quantidade": 1.0,
+        "Preço UN": 78.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 121002,
+        "Nome do item": "botina 40",
+        "Quantidade": 1.0,
+        "Preço UN": 78.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 121003,
+        "Nome do item": "botina 41",
+        "Quantidade": 2.0,
+        "Preço UN": 78.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 121004,
+        "Nome do item": "botina 42",
+        "Quantidade": 1.0,
+        "Preço UN": 78.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 121005,
+        "Nome do item": "botina 43",
+        "Quantidade": 0.0,
+        "Preço UN": 78.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 121006,
+        "Nome do item": "bota de PVC 43",
+        "Quantidade": 1.0,
+        "Preço UN": 83.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 121007,
+        "Nome do item": "luva cirúrgica punho longo XG",
+        "Quantidade": 3.0,
+        "Preço UN": 42.9,
+        "Notas": "quantidade em caixas"
+      },
+      {
+        "ID do item": 121008,
+        "Nome do item": "luva cirúrgica punho longo G",
+        "Quantidade": 2.0,
+        "Preço UN": 42.9,
+        "Notas": "quantidade em caixas"
+      },
+      {
+        "ID do item": 121009,
+        "Nome do item": "luva cirúrgica GG",
+        "Quantidade": 2.0,
+        "Preço UN": 19.46,
+        "Notas": "quantidade em caixas"
+      },
+      {
+        "ID do item": 121010,
+        "Nome do item": "luva cirúrgica G",
+        "Quantidade": 10.0,
+        "Preço UN": 19.46,
+        "Notas": "quantidade em caixas"
+      },
+      {
+        "ID do item": 121011,
+        "Nome do item": "luva cirurgica M",
+        "Quantidade": 1.0,
+        "Preço UN": 19.46,
+        "Notas": "quantidade em caixas"
+      },
+      {
+        "ID do item": 121012,
+        "Nome do item": "luva cirurgca P",
+        "Quantidade": 3.0,
+        "Preço UN": 19.46,
+        "Notas": "quantidade em caixas"
+      },
+      {
+        "ID do item": 121013,
+        "Nome do item": "luva alta temperatura laranja",
+        "Quantidade": 1.0,
+        "Preço UN": 57.9,
+        "Notas": "quantidades em pares"
+      },
+      {
+        "ID do item": 121014,
+        "Nome do item": "luva de proteção preta",
+        "Quantidade": 17.0,
+        "Preço UN": 7.5,
+        "Notas": "quantidades em pares"
+      },
+      {
+        "ID do item": 121015,
+        "Nome do item": "luva de latex limpeza G",
+        "Quantidade": 42.0,
+        "Preço UN": 5.2,
+        "Notas": "quantidades em pares"
+      },
+      {
+        "ID do item": 121016,
+        "Nome do item": "luva de latex limpeza M",
+        "Quantidade": 13.0,
+        "Preço UN": 5.2,
+        "Notas": "quantidades em pares"
+      },
+      {
+        "ID do item": 121017,
+        "Nome do item": "filtro multigases",
+        "Quantidade": 3.0,
+        "Preço UN": 196.0,
+        "Notas": "quantidades em pares"
+      },
+      {
+        "ID do item": 121018,
+        "Nome do item": "filtro de partículas",
+        "Quantidade": 7.0,
+        "Preço UN": 16.0,
+        "Notas": "quantidades em pares"
+      },
+      {
+        "ID do item": 121019,
+        "Nome do item": "respirador semifacial",
+        "Quantidade": 1.0,
+        "Preço UN": 103.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 121020,
+        "Nome do item": "suporte para filtro",
+        "Quantidade": 13.0,
+        "Preço UN": 17.85,
+        "Notas": null
+      },
+      {
+        "ID do item": 121021,
+        "Nome do item": "capacete de segurança",
+        "Quantidade": 2.0,
+        "Preço UN": 10.79,
+        "Notas": null
+      },
+      {
+        "ID do item": 121022,
+        "Nome do item": "óculos de segurança transparente",
+        "Quantidade": 21.0,
+        "Preço UN": 2.52,
+        "Notas": null
+      },
+      {
+        "ID do item": 121023,
+        "Nome do item": "óculos de segurança preto",
+        "Quantidade": 9.0,
+        "Preço UN": 2.52,
+        "Notas": null
+      },
+      {
+        "ID do item": 121024,
+        "Nome do item": "protetor auricular",
+        "Quantidade": 19.0,
+        "Preço UN": 3.58,
+        "Notas": null
+      },
+      {
+        "ID do item": 121025,
+        "Nome do item": "abafador de ruído",
+        "Quantidade": 0.0,
+        "Preço UN": 75.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 121026,
+        "Nome do item": "respirador descartável",
+        "Quantidade": 52.0,
+        "Preço UN": 0.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 121030,
+        "Nome do item": "Filtro de carvão para água",
+        "Quantidade": 8.0,
+        "Preço UN": 55.88,
+        "Notas": null
+      },
+      {
+        "ID do item": 122001,
+        "Nome do item": "silicone PU solufix",
+        "Quantidade": 15.0,
+        "Preço UN": 25.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 122002,
+        "Nome do item": "silicone PU autofix",
+        "Quantidade": 44.0,
+        "Preço UN": 32.8,
+        "Notas": null
+      },
+      {
+        "ID do item": 122003,
+        "Nome do item": "TF7",
+        "Quantidade": 14.0,
+        "Preço UN": 69.64,
+        "Notas": null
+      },
+      {
+        "ID do item": 122004,
+        "Nome do item": "desengripante",
+        "Quantidade": 4.0,
+        "Preço UN": 11.1,
+        "Notas": null
+      },
+      {
+        "ID do item": 122005,
+        "Nome do item": "graxa em spray",
+        "Quantidade": 5.0,
+        "Preço UN": 20.9,
+        "Notas": null
+      },
+      {
+        "ID do item": 122006,
+        "Nome do item": "lixa p/ lixadeira G80",
+        "Quantidade": 44.0,
+        "Preço UN": 4.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 122007,
+        "Nome do item": "lixa p/ lixadeira G240",
+        "Quantidade": 60.0,
+        "Preço UN": 4.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 122008,
+        "Nome do item": "lixa G80",
+        "Quantidade": 101.0,
+        "Preço UN": 2.66,
+        "Notas": null
+      },
+      {
+        "ID do item": 122009,
+        "Nome do item": "lixa G100",
+        "Quantidade": 55.0,
+        "Preço UN": 2.66,
+        "Notas": null
+      },
+      {
+        "ID do item": 122010,
+        "Nome do item": "lixa G120",
+        "Quantidade": 39.0,
+        "Preço UN": 2.66,
+        "Notas": null
+      },
+      {
+        "ID do item": 122011,
+        "Nome do item": "lixa G150",
+        "Quantidade": 98.0,
+        "Preço UN": 2.66,
+        "Notas": null
+      },
+      {
+        "ID do item": 122012,
+        "Nome do item": "lixa G180",
+        "Quantidade": 80.0,
+        "Preço UN": 2.66,
+        "Notas": null
+      },
+      {
+        "ID do item": 122013,
+        "Nome do item": "lixa G220",
+        "Quantidade": 78.0,
+        "Preço UN": 2.66,
+        "Notas": null
+      },
+      {
+        "ID do item": 122014,
+        "Nome do item": "fita crepe 48mm",
+        "Quantidade": 12.0,
+        "Preço UN": 9.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 122015,
+        "Nome do item": "fita crepe 24mm",
+        "Quantidade": 174.0,
+        "Preço UN": 5.91,
+        "Notas": null
+      },
+      {
+        "ID do item": 122016,
+        "Nome do item": "suporte para rolo de pintura",
+        "Quantidade": 9.0,
+        "Preço UN": 9.55,
+        "Notas": null
+      },
+      {
+        "ID do item": 122017,
+        "Nome do item": "pincel latex 2\"",
+        "Quantidade": 17.0,
+        "Preço UN": 3.52,
+        "Notas": null
+      },
+      {
+        "ID do item": 122018,
+        "Nome do item": "pincel latex 1/2\"",
+        "Quantidade": 1.0,
+        "Preço UN": 2.55,
+        "Notas": null
+      },
+      {
+        "ID do item": 122019,
+        "Nome do item": "rolo lã 9cm com suporte",
+        "Quantidade": 20.0,
+        "Preço UN": 6.69,
+        "Notas": null
+      },
+      {
+        "ID do item": 122020,
+        "Nome do item": "rolo lã 23cm pelo alto",
+        "Quantidade": 14.0,
+        "Preço UN": 10.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 122021,
+        "Nome do item": "rolo lã 23cm anti gotas",
+        "Quantidade": 12.0,
+        "Preço UN": 11.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 123001,
+        "Nome do item": "porca 1/4\"",
+        "Quantidade": 1342.0,
+        "Preço UN": 0.15,
+        "Notas": null
+      },
+      {
+        "ID do item": 123002,
+        "Nome do item": "porca 5/16\"",
+        "Quantidade": 372.0,
+        "Preço UN": 0.12,
+        "Notas": null
+      },
+      {
+        "ID do item": 123003,
+        "Nome do item": "porca 3/8\"",
+        "Quantidade": 1730.0,
+        "Preço UN": 0.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 123004,
+        "Nome do item": "porca 1/2\"",
+        "Quantidade": 147.0,
+        "Preço UN": 0.12,
+        "Notas": null
+      },
+      {
+        "ID do item": 123005,
+        "Nome do item": "porca 5/8\"",
+        "Quantidade": 18.0,
+        "Preço UN": 0.54,
+        "Notas": null
+      },
+      {
+        "ID do item": 123006,
+        "Nome do item": "porca 3/4\"",
+        "Quantidade": 14.0,
+        "Preço UN": 5.58,
+        "Notas": null
+      },
+      {
+        "ID do item": 123007,
+        "Nome do item": "porca de pressão 3/8\"",
+        "Quantidade": 57.0,
+        "Preço UN": 0.38,
+        "Notas": null
+      },
+      {
+        "ID do item": 123008,
+        "Nome do item": "porca de pressão 1/2\"",
+        "Quantidade": 50.0,
+        "Preço UN": 1.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 123009,
+        "Nome do item": "arroela 1/4\" galvanizada",
+        "Quantidade": 908.0,
+        "Preço UN": 0.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 123010,
+        "Nome do item": "arroela 5/16\" galvanizada",
+        "Quantidade": 1442.0,
+        "Preço UN": 0.09,
+        "Notas": null
+      },
+      {
+        "ID do item": 123011,
+        "Nome do item": "arroela 5/16\" inox",
+        "Quantidade": 1000.0,
+        "Preço UN": 0.27,
+        "Notas": null
+      },
+      {
+        "ID do item": 123012,
+        "Nome do item": "arroela 3/8\" galvanizada",
+        "Quantidade": 553.0,
+        "Preço UN": 0.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 123013,
+        "Nome do item": "arroela 3/8\" inox",
+        "Quantidade": 1600.0,
+        "Preço UN": 0.28,
+        "Notas": null
+      },
+      {
+        "ID do item": 123014,
+        "Nome do item": "arroela 1/2\" galvanizada",
+        "Quantidade": 26.0,
+        "Preço UN": 0.63,
+        "Notas": null
+      },
+      {
+        "ID do item": 123015,
+        "Nome do item": "arroela 5/8\" inox",
+        "Quantidade": 176.0,
+        "Preço UN": 1.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 123016,
+        "Nome do item": "arroela 3/4\" inox",
+        "Quantidade": 48.0,
+        "Preço UN": 1.04,
+        "Notas": null
+      },
+      {
+        "ID do item": 123017,
+        "Nome do item": "rebite 3,2 x 12mm",
+        "Quantidade": 488.0,
+        "Preço UN": 0.12,
+        "Notas": null
+      },
+      {
+        "ID do item": 123018,
+        "Nome do item": "rebite 4,8 x 16mm",
+        "Quantidade": 4247.0,
+        "Preço UN": 0.15,
+        "Notas": null
+      },
+      {
+        "ID do item": 123019,
+        "Nome do item": "rebite 6 x 16mm",
+        "Quantidade": 111.0,
+        "Preço UN": 0.23,
+        "Notas": null
+      },
+      {
+        "ID do item": 123020,
+        "Nome do item": "rebite 6 x 22mm",
+        "Quantidade": 103.0,
+        "Preço UN": 0.25,
+        "Notas": null
+      },
+      {
+        "ID do item": 123021,
+        "Nome do item": "rebite 6 x 35mm",
+        "Quantidade": 9.0,
+        "Preço UN": 0.35,
+        "Notas": null
+      },
+      {
+        "ID do item": 123022,
+        "Nome do item": "bucha s6",
+        "Quantidade": 771.0,
+        "Preço UN": 0.03,
+        "Notas": null
+      },
+      {
+        "ID do item": 123023,
+        "Nome do item": "bucha s8",
+        "Quantidade": 352.0,
+        "Preço UN": 0.08,
+        "Notas": null
+      },
+      {
+        "ID do item": 123024,
+        "Nome do item": "bucha s10",
+        "Quantidade": 563.0,
+        "Preço UN": 0.14,
+        "Notas": null
+      },
+      {
+        "ID do item": 123025,
+        "Nome do item": "bucha s12",
+        "Quantidade": 1055.0,
+        "Preço UN": 0.22,
+        "Notas": null
+      },
+      {
+        "ID do item": 123026,
+        "Nome do item": "bucha p/ drywall 8mm",
+        "Quantidade": 104.0,
+        "Preço UN": 0.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 123027,
+        "Nome do item": "bucha p/ drywall 10mm",
+        "Quantidade": 78.0,
+        "Preço UN": 0.49,
+        "Notas": null
+      },
+      {
+        "ID do item": 123028,
+        "Nome do item": "parafuso brocante p/ drywall 35 X 3,5mm",
+        "Quantidade": 478.0,
+        "Preço UN": 0.08,
+        "Notas": null
+      },
+      {
+        "ID do item": 123029,
+        "Nome do item": "parafuso brocante p/ drywall 29 X 3,5mm",
+        "Quantidade": 555.0,
+        "Preço UN": 0.07,
+        "Notas": null
+      },
+      {
+        "ID do item": 123030,
+        "Nome do item": "parafuso brocante phillips 4,2 X 13mm",
+        "Quantidade": 386.0,
+        "Preço UN": 0.07,
+        "Notas": null
+      },
+      {
+        "ID do item": 123031,
+        "Nome do item": "parafuso agulha 4,2 X 13mm",
+        "Quantidade": 685.0,
+        "Preço UN": 0.07,
+        "Notas": null
+      },
+      {
+        "ID do item": 123032,
+        "Nome do item": "parafuso sextavado p/ bucha 7,5 X 70mm",
+        "Quantidade": 107.0,
+        "Preço UN": 1.7,
+        "Notas": null
+      },
+      {
+        "ID do item": 123033,
+        "Nome do item": "parafuso lentilha 1/4\" x 7/16\" cabeça fina",
+        "Quantidade": 25.0,
+        "Preço UN": 0.14,
+        "Notas": null
+      },
+      {
+        "ID do item": 123034,
+        "Nome do item": "parafuso lentilha fenda 1/4\" X 7/16\"",
+        "Quantidade": 33.0,
+        "Preço UN": 0.14,
+        "Notas": null
+      },
+      {
+        "ID do item": 123035,
+        "Nome do item": "parafuso lentilha com trava 1/4\" x 1/2\"",
+        "Quantidade": 1105.0,
+        "Preço UN": 0.3,
+        "Notas": null
+      },
+      {
+        "ID do item": 123036,
+        "Nome do item": "parafuso sextavado 1/4 x 5/8\"",
+        "Quantidade": 32.0,
+        "Preço UN": 0.28,
+        "Notas": null
+      },
+      {
+        "ID do item": 123037,
+        "Nome do item": "parafuso sextavado 9/16 x 3/8\"",
+        "Quantidade": 20.0,
+        "Preço UN": 0.72,
+        "Notas": null
+      },
+      {
+        "ID do item": 123038,
+        "Nome do item": "parafuso sextavado 5/16\" x 3/4\"",
+        "Quantidade": 142.0,
+        "Preço UN": 0.31,
+        "Notas": null
+      },
+      {
+        "ID do item": 123039,
+        "Nome do item": "parafuso sextavado 5/16\" x 3\"",
+        "Quantidade": 156.0,
+        "Preço UN": 1.46,
+        "Notas": null
+      },
+      {
+        "ID do item": 123040,
+        "Nome do item": "parafuso sextavado 3/8\" x 3/4\"",
+        "Quantidade": 600.0,
+        "Preço UN": 0.45,
+        "Notas": null
+      },
+      {
+        "ID do item": 123041,
+        "Nome do item": "parafuso sextavado 3/8\" x 1\"",
+        "Quantidade": 230.0,
+        "Preço UN": 0.73,
+        "Notas": null
+      },
+      {
+        "ID do item": 123042,
+        "Nome do item": "parafuso sextavado 3/8\" x 1.1/4\"",
+        "Quantidade": 193.0,
+        "Preço UN": 0.76,
+        "Notas": null
+      },
+      {
+        "ID do item": 123043,
+        "Nome do item": "parafuso sextavado 3/8\" x 2\"",
+        "Quantidade": 79.0,
+        "Preço UN": 0.97,
+        "Notas": null
+      },
+      {
+        "ID do item": 123044,
+        "Nome do item": "parafuso sextavado 3/8\" x 3.1/2\"",
+        "Quantidade": 222.0,
+        "Preço UN": 1.26,
+        "Notas": null
+      },
+      {
+        "ID do item": 123045,
+        "Nome do item": "parafuso sextavado 5/8\" x 3.1/2\"",
+        "Quantidade": 20.0,
+        "Preço UN": 14.5,
+        "Notas": null
+      },
+      {
+        "ID do item": 123046,
+        "Nome do item": "parafuso sextavado 5/8\" x 3\"",
+        "Quantidade": 7.0,
+        "Preço UN": 9.6,
+        "Notas": null
+      },
+      {
+        "ID do item": 123047,
+        "Nome do item": "parafuso sextavado 3/4\" x 2.1/2\"",
+        "Quantidade": 4.0,
+        "Preço UN": 8.68,
+        "Notas": null
+      },
+      {
+        "ID do item": 123048,
+        "Nome do item": "parafuso sextavado 1/2\" x 2.1/4\"",
+        "Quantidade": 0.0,
+        "Preço UN": 0.55,
+        "Notas": null
+      },
+      {
+        "ID do item": 123049,
+        "Nome do item": "parafuso sextavado 5/8\" x 2\"",
+        "Quantidade": 6.0,
+        "Preço UN": 5.0,
+        "Notas": null
+      },
+      {
+        "ID do item": 123050,
+        "Nome do item": "parafuso phillips 4x45mm",
+        "Quantidade": 834.0,
+        "Preço UN": 0.03,
+        "Notas": null
+      },
+      {
+        "ID do item": 123051,
+        "Nome do item": "parafuso phillips 5x50mm",
+        "Quantidade": 172.0,
+        "Preço UN": 0.04,
+        "Notas": null
+      },
+      {
+        "ID do item": 123052,
+        "Nome do item": "parafuso phillips 6x60mm",
+        "Quantidade": 477.0,
+        "Preço UN": 0.18,
+        "Notas": null
+      },
+      {
+        "ID do item": 123053,
+        "Nome do item": "parafuso phillips 6x70mm",
+        "Quantidade": 484.0,
+        "Preço UN": 0.37,
+        "Notas": null
+      },
+      {
+        "ID do item": 123054,
+        "Nome do item": "parafuso brocante 3/16\" x 3.1/2\"",
+        "Quantidade": 1009.0,
+        "Preço UN": 0.39,
+        "Notas": null
+      },
+      {
+        "ID do item": 123055,
+        "Nome do item": "parafuso brocante sextavado 5.5 x 19mm",
+        "Quantidade": 1162.0,
+        "Preço UN": 0.17,
+        "Notas": null
+      }
+    ]
+  }
+}
