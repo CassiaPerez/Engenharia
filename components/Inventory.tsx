@@ -68,7 +68,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   const loadOS = async () => {
     try {
-      const { data, error } = await supabase.from('os').select('*');
+      const { data, error } = await supabase.from('oss').select('*');
       if (error) throw error;
       if (data) {
         const osList = data.map(item => item.json_content);
