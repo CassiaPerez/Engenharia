@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useMemo } from 'react';
-import { OS, User, OSStatus, Project, Building, ServiceType, Material } from '../types';
+import { OS, User, OSStatus, Project, Building, ServiceType, Material, Equipment } from '../types';
 import ModalPortal from './ModalPortal';
 import { supabase, mapToSupabase } from '../services/supabase';
 
@@ -10,12 +10,13 @@ interface Props {
   setOss: React.Dispatch<React.SetStateAction<OS[]>>;
   projects: Project[];
   buildings: Building[];
-  materials?: Material[]; 
-  services?: ServiceType[]; 
+  equipments?: Equipment[];
+  materials?: Material[];
+  services?: ServiceType[];
   onLogout: () => void;
 }
 
-const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings, materials = [], services = [], onLogout }) => {
+const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings, equipments = [], materials = [], services = [], onLogout }) => {
   const [activeTab, setActiveTab] = useState<'TODO' | 'DONE' | 'CALENDAR'>('TODO');
   const [finishingOS, setFinishingOS] = useState<OS | null>(null);
   const [viewDetailOS, setViewDetailOS] = useState<OS | null>(null);
@@ -50,12 +51,15 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
   const getContext = (os: OS) => {
     if (os.projectId) {
         const p = projects.find(x => x.id === os.projectId);
-        return { name: p?.description, type: 'PROJETO', code: p?.code, location: p?.location, city: p?.city };
+        return { name: p?.description, type: 'PROJETO', code: p?.code, location: p?.location, city: p?.city, equipment: null };
     } else if (os.buildingId) {
         const b = buildings.find(x => x.id === os.buildingId);
-        return { name: b?.name, type: 'EDIFÍCIO', code: 'FACILITIES', location: b?.address, city: b?.city };
+        return { name: b?.name, type: 'EDIFÍCIO', code: 'FACILITIES', location: b?.address, city: b?.city, equipment: null };
+    } else if (os.equipmentId) {
+        const e = equipments.find(x => x.id === os.equipmentId);
+        return { name: e?.name || 'Equipamento', type: 'EQUIPAMENTO', code: e?.code || '---', location: e?.location || '', city: '', equipment: e };
     }
-    return { name: 'Local Não Definido', type: '---', code: '---', location: '', city: '' };
+    return { name: 'Local Não Definido', type: '---', code: '---', location: '', city: '', equipment: null };
   };
 
   const handleGoogleCalendarSync = (os: OS) => {
@@ -306,16 +310,43 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       return (
         <div key={os.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 relative overflow-hidden mb-4 group hover:shadow-md transition-shadow">
             <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${os.status === OSStatus.IN_PROGRESS ? 'bg-blue-500 animate-pulse' : os.status === OSStatus.COMPLETED ? 'bg-clean-primary' : 'bg-slate-300'}`}></div>
-            
+
             <div className="pl-3">
                 <div className="flex justify-between items-start mb-2">
                     <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{os.number}</span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${getPriorityColor(os.priority)}`}>{translatePriority(os.priority)}</span>
                 </div>
-                
+
                 <h3 className="text-lg font-bold text-slate-900 leading-tight mb-1">{os.description}</h3>
-                <p className="text-xs font-bold text-clean-primary mb-4 uppercase tracking-wide truncate">{context.code} - {context.city}</p>
-                
+                <p className="text-xs font-bold text-clean-primary mb-2 uppercase tracking-wide truncate">{context.code} - {context.type}</p>
+
+                <div className="space-y-2 mb-4">
+                    <div className="flex items-center gap-2 text-xs bg-purple-50 border border-purple-100 p-2 rounded-lg">
+                        <i className="fas fa-wrench text-purple-600"></i>
+                        <span className="font-bold text-purple-900">{os.type}</span>
+                    </div>
+
+                    {context.equipment && (
+                        <div className="flex items-center gap-2 text-xs bg-blue-50 border border-blue-100 p-2 rounded-lg">
+                            <i className="fas fa-cogs text-blue-600"></i>
+                            <div className="flex-1">
+                                <span className="font-bold text-blue-900">{context.equipment.name}</span>
+                                <span className="text-blue-600 ml-2">• {context.equipment.code}</span>
+                                {context.equipment.location && (
+                                    <span className="text-blue-500 ml-2 text-[10px]">({context.equipment.location})</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {!context.equipment && context.city && (
+                        <div className="flex items-center gap-2 text-xs bg-slate-50 border border-slate-100 p-2 rounded-lg">
+                            <i className="fas fa-map-marker-alt text-slate-600"></i>
+                            <span className="font-medium text-slate-700">{context.city}</span>
+                        </div>
+                    )}
+                </div>
+
                 <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mb-4 bg-slate-50 p-3 rounded-lg">
                     <div className="flex items-center gap-1.5">
                         <i className="fas fa-calendar"></i>

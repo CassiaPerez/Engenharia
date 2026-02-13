@@ -252,13 +252,14 @@ const App: React.FC = () => {
   // Lógica Especial para EXECUTOR: Painel Simplificado
   if (currentUser.role === 'EXECUTOR') {
       return (
-        <ExecutorPanel 
-          user={currentUser} 
-          oss={oss} 
-          setOss={setOss} 
+        <ExecutorPanel
+          user={currentUser}
+          oss={oss}
+          setOss={setOss}
           projects={projects}
-          buildings={buildings} 
-          onLogout={handleLogout} 
+          buildings={buildings}
+          equipments={equipments}
+          onLogout={handleLogout}
           services={services}
           materials={materials}
         />
