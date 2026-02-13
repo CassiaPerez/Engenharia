@@ -46,12 +46,14 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   const [selectedMaterialForLoc, setSelectedMaterialForLoc] = useState<Material | null>(null);
   const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW'>('VIEW');
+  const [outType, setOutType] = useState<'OS' | 'PROJECT' | 'GENERAL'>('OS');
   const [locForm, setLocForm] = useState({
       location: '',
       toLocation: '',
       quantity: '',
       reason: '',
-      osNumber: ''
+      osNumber: '',
+      projectId: ''
   });
 
   useEffect(() => {
@@ -150,6 +152,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       }
       setLocAction('VIEW');
       setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '', osNumber: '' });
+      setOutType('OS');
   };
 
   const handleLocationSubmit = async (e: React.FormEvent) => {
@@ -223,8 +226,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                    let desc = locForm.reason || 'Baixa Manual';
                    let costCenter: string | undefined;
                    let projectId: string | undefined;
+                   let osId: string | undefined;
 
-                   if (locForm.osNumber) {
+                   if (outType === 'OS' && locForm.osNumber) {
+                       osId = locForm.osNumber;
                        const selectedOS = allOS.find(os => os.number === locForm.osNumber);
                        if (selectedOS) {
                            if (selectedOS.projectId) {
@@ -234,13 +239,22 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                projectId = selectedOS.projectId;
                            } else if (selectedOS.buildingId) {
                                const building = projects.find(p => p.id === selectedOS.buildingId);
-                               desc = `Baixa p/ Edifício: ${building?.code || 'N/A'} / OS: ${locForm.osNumber}`;
+                               desc = `Baixa p/ Edificio: ${building?.code || 'N/A'} / OS: ${locForm.osNumber}`;
                                costCenter = selectedOS.costCenter;
                            } else if (selectedOS.equipmentId) {
                                desc = `Baixa p/ Equipamento / OS: ${locForm.osNumber}`;
                                costCenter = selectedOS.costCenter;
                            }
                        }
+                   } else if (outType === 'PROJECT' && locForm.projectId) {
+                       const project = projects.find(p => p.id === locForm.projectId);
+                       if (project) {
+                           desc = `Baixa p/ Projeto: ${project.code} - ${locForm.reason || 'Consumo direto'}`;
+                           costCenter = project.costCenter;
+                           projectId = project.id;
+                       }
+                   } else if (outType === 'GENERAL') {
+                       desc = locForm.reason || 'Saida avulsa';
                    }
 
                    addMovementWithSync({
@@ -253,7 +267,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       description: desc,
                       fromLocation: locForm.location,
                       projectId: projectId,
-                      osId: locForm.osNumber || undefined,
+                      osId: osId,
                       costCenter: costCenter
                   });
 
@@ -310,8 +324,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           }
       }
 
-      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', osNumber: '' });
+      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', osNumber: '', projectId: '' });
       setLocAction('VIEW');
+      setOutType('OS');
   };
 
   const handleCreateMaterial = async (e: React.FormEvent) => {
@@ -786,7 +801,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                 <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
                                 <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
                                 <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
-                                <button onClick={() => { setLocAction('OUT'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa p/ OS</button>
+                                <button onClick={() => { setLocAction('OUT'); setOutType('OS'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa / Saida</button>
                             </div>
 
                             {locAction !== 'VIEW' && (
@@ -827,84 +842,149 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                         </div>
                                     )}
 
-                                    {/* SELEÇÃO DE OS PARA BAIXA */}
                                     {locAction === 'OUT' && (
-                                        <div className="bg-red-50 p-4 rounded-xl border border-red-100 space-y-4">
-                                            <div>
-                                                <label className="text-xs font-bold text-red-700 uppercase block mb-2">
-                                                    Ordem de Serviço <span className="text-red-600">*</span>
-                                                    {allOS.filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED').length > 0 && (
-                                                        <span className="ml-2 text-[10px] bg-red-100 px-2 py-0.5 rounded border border-red-200">
-                                                            {allOS.filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED').length} OS disponíveis
-                                                        </span>
-                                                    )}
-                                                </label>
-                                                <select
-                                                    required
-                                                    className="w-full h-12 px-4 rounded-xl border border-red-200 bg-white shadow-sm focus:border-red-400 focus:ring-0 transition-all text-slate-800"
-                                                    value={locForm.osNumber}
-                                                    onChange={e => setLocForm({...locForm, osNumber: e.target.value})}
-                                                >
-                                                    <option value="">Selecione a OS de destino...</option>
-                                                    {allOS
-                                                        .filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED')
-                                                        .map(os => {
-                                                            let context = '';
-                                                            if (os.projectId) {
-                                                                const proj = projects.find(p => p.id === os.projectId);
-                                                                context = proj ? ` | Projeto: ${proj.code}` : ' | Projeto';
-                                                            } else if (os.buildingId) {
-                                                                context = ' | Edifício';
-                                                            } else if (os.equipmentId) {
-                                                                context = ' | Equipamento';
-                                                            }
-                                                            return (
-                                                                <option key={os.id} value={os.number}>
-                                                                    {os.number} - {os.description}{context} ({os.status})
-                                                                </option>
-                                                            );
-                                                        })
-                                                    }
-                                                </select>
+                                        <div className="space-y-4">
+                                            <div className="flex bg-white p-1 rounded-xl border border-red-200 shadow-sm">
+                                                <button type="button" onClick={() => { setOutType('OS'); setLocForm({...locForm, osNumber: '', projectId: '', reason: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'OS' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-red-50'}`}>Baixa p/ OS</button>
+                                                <button type="button" onClick={() => { setOutType('PROJECT'); setLocForm({...locForm, osNumber: '', projectId: '', reason: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'PROJECT' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-amber-50'}`}>Baixa p/ Projeto</button>
+                                                <button type="button" onClick={() => { setOutType('GENERAL'); setLocForm({...locForm, osNumber: '', projectId: '', reason: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'GENERAL' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Saida Avulsa</button>
                                             </div>
-                                            <p className="text-[10px] text-red-600">A baixa será vinculada à OS selecionada e o custo alocado ao centro de custo correspondente.</p>
-                                            {(() => {
-                                                if (locForm.osNumber) {
-                                                    const selectedOS = allOS.find(os => os.number === locForm.osNumber);
-                                                    if (selectedOS) {
-                                                        let displayCostCenter = '';
-                                                        let osContext = '';
 
-                                                        if (selectedOS.projectId) {
-                                                            const project = projects.find(p => p.id === selectedOS.projectId);
-                                                            displayCostCenter = project?.costCenter || 'N/A';
-                                                            osContext = `Projeto: ${project?.code || 'N/A'}`;
-                                                        } else if (selectedOS.buildingId) {
-                                                            displayCostCenter = selectedOS.costCenter || 'N/A';
-                                                            osContext = 'Vinculada a Edifício';
-                                                        } else if (selectedOS.equipmentId) {
-                                                            displayCostCenter = selectedOS.costCenter || 'N/A';
-                                                            osContext = 'Vinculada a Equipamento';
-                                                        }
-
-                                                        return (
-                                                            <div className="mt-3 p-3 bg-white rounded-lg border border-red-200 space-y-2">
-                                                                <div>
-                                                                    <p className="text-[10px] font-bold text-red-800 uppercase mb-1">Contexto da OS</p>
-                                                                    <p className="text-sm font-bold text-red-900">{osContext}</p>
-                                                                </div>
-                                                                {displayCostCenter && (
-                                                                    <div>
-                                                                        <p className="text-[10px] font-bold text-red-800 uppercase mb-1">Centro de Custo</p>
-                                                                        <p className="text-sm font-bold text-red-900">{displayCostCenter}</p>
+                                            {outType === 'OS' && (
+                                                <div className="bg-red-50 p-4 rounded-xl border border-red-100 space-y-4">
+                                                    <div>
+                                                        <label className="text-xs font-bold text-red-700 uppercase block mb-2">
+                                                            Ordem de Servico <span className="text-red-600">*</span>
+                                                            {allOS.filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED').length > 0 && (
+                                                                <span className="ml-2 text-[10px] bg-red-100 px-2 py-0.5 rounded border border-red-200">
+                                                                    {allOS.filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED').length} OS disponiveis
+                                                                </span>
+                                                            )}
+                                                        </label>
+                                                        <select
+                                                            required
+                                                            className="w-full h-12 px-4 rounded-xl border border-red-200 bg-white shadow-sm focus:border-red-400 focus:ring-0 transition-all text-slate-800"
+                                                            value={locForm.osNumber}
+                                                            onChange={e => setLocForm({...locForm, osNumber: e.target.value})}
+                                                        >
+                                                            <option value="">Selecione a OS de destino...</option>
+                                                            {allOS
+                                                                .filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED')
+                                                                .map(os => {
+                                                                    let context = '';
+                                                                    if (os.projectId) {
+                                                                        const proj = projects.find(p => p.id === os.projectId);
+                                                                        context = proj ? ` | Projeto: ${proj.code}` : ' | Projeto';
+                                                                    } else if (os.buildingId) {
+                                                                        context = ' | Edificio';
+                                                                    } else if (os.equipmentId) {
+                                                                        context = ' | Equipamento';
+                                                                    }
+                                                                    return (
+                                                                        <option key={os.id} value={os.number}>
+                                                                            {os.number} - {os.description}{context} ({os.status})
+                                                                        </option>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </select>
+                                                    </div>
+                                                    <p className="text-[10px] text-red-600">A baixa sera vinculada a OS selecionada e o custo alocado ao centro de custo correspondente.</p>
+                                                    {(() => {
+                                                        if (locForm.osNumber) {
+                                                            const selectedOS = allOS.find(os => os.number === locForm.osNumber);
+                                                            if (selectedOS) {
+                                                                let displayCostCenter = '';
+                                                                let osContext = '';
+                                                                if (selectedOS.projectId) {
+                                                                    const project = projects.find(p => p.id === selectedOS.projectId);
+                                                                    displayCostCenter = project?.costCenter || 'N/A';
+                                                                    osContext = `Projeto: ${project?.code || 'N/A'}`;
+                                                                } else if (selectedOS.buildingId) {
+                                                                    displayCostCenter = selectedOS.costCenter || 'N/A';
+                                                                    osContext = 'Vinculada a Edificio';
+                                                                } else if (selectedOS.equipmentId) {
+                                                                    displayCostCenter = selectedOS.costCenter || 'N/A';
+                                                                    osContext = 'Vinculada a Equipamento';
+                                                                }
+                                                                return (
+                                                                    <div className="mt-3 p-3 bg-white rounded-lg border border-red-200 space-y-2">
+                                                                        <div>
+                                                                            <p className="text-[10px] font-bold text-red-800 uppercase mb-1">Contexto da OS</p>
+                                                                            <p className="text-sm font-bold text-red-900">{osContext}</p>
+                                                                        </div>
+                                                                        {displayCostCenter && (
+                                                                            <div>
+                                                                                <p className="text-[10px] font-bold text-red-800 uppercase mb-1">Centro de Custo</p>
+                                                                                <p className="text-sm font-bold text-red-900">{displayCostCenter}</p>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    }
-                                                }
-                                                return null;
-                                            })()}
+                                                                );
+                                                            }
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                </div>
+                                            )}
+
+                                            {outType === 'PROJECT' && (
+                                                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 space-y-4">
+                                                    <div>
+                                                        <label className="text-xs font-bold text-amber-700 uppercase block mb-2">
+                                                            Projeto <span className="text-amber-600">*</span>
+                                                        </label>
+                                                        <select
+                                                            required
+                                                            className="w-full h-12 px-4 rounded-xl border border-amber-200 bg-white shadow-sm focus:border-amber-400 focus:ring-0 transition-all text-slate-800"
+                                                            value={locForm.projectId}
+                                                            onChange={e => setLocForm({...locForm, projectId: e.target.value})}
+                                                        >
+                                                            <option value="">Selecione o projeto...</option>
+                                                            {projects
+                                                                .filter(p => p.status !== 'FINISHED' && p.status !== 'CANCELED')
+                                                                .map(p => (
+                                                                    <option key={p.id} value={p.id}>
+                                                                        {p.code} - {p.description} ({p.status === 'IN_PROGRESS' ? 'Em andamento' : p.status === 'PLANNED' ? 'Planejado' : p.status})
+                                                                    </option>
+                                                                ))
+                                                            }
+                                                        </select>
+                                                    </div>
+                                                    {(() => {
+                                                        if (locForm.projectId) {
+                                                            const project = projects.find(p => p.id === locForm.projectId);
+                                                            if (project) {
+                                                                return (
+                                                                    <div className="p-3 bg-white rounded-lg border border-amber-200 space-y-2">
+                                                                        <div className="flex gap-4">
+                                                                            <div>
+                                                                                <p className="text-[10px] font-bold text-amber-800 uppercase mb-1">Local</p>
+                                                                                <p className="text-sm font-bold text-amber-900">{project.location}</p>
+                                                                            </div>
+                                                                            {project.costCenter && (
+                                                                                <div>
+                                                                                    <p className="text-[10px] font-bold text-amber-800 uppercase mb-1">Centro de Custo</p>
+                                                                                    <p className="text-sm font-bold text-amber-900">{project.costCenter}</p>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                    <p className="text-[10px] text-amber-600">Baixa direta no projeto, sem necessidade de OS.</p>
+                                                </div>
+                                            )}
+
+                                            {outType === 'GENERAL' && (
+                                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                                                    <p className="text-xs font-bold text-slate-600 uppercase">Saida avulsa</p>
+                                                    <p className="text-[10px] text-slate-500">Saida sem vinculo com OS ou Projeto. Informe o motivo no campo de justificativa.</p>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -919,11 +999,11 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                             <input type="number" min="0" step="1" required={locAction !== 'ADD'} className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all font-bold text-slate-800" value={locForm.quantity} onChange={e => setLocForm({...locForm, quantity: e.target.value})} />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Justificativa</label>
-                                            {locAction === 'OUT' && locForm.osNumber ? (
-                                                <input disabled className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-100 shadow-sm text-slate-400 italic cursor-not-allowed" value="Baixa vinculada à OS (Automático)" />
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Justificativa {locAction === 'OUT' && outType === 'GENERAL' && <span className="text-red-500">*</span>}</label>
+                                            {locAction === 'OUT' && outType === 'OS' && locForm.osNumber ? (
+                                                <input disabled className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-100 shadow-sm text-slate-400 italic cursor-not-allowed" value="Baixa vinculada a OS (Automatico)" />
                                             ) : (
-                                                <input className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.reason} onChange={e => setLocForm({...locForm, reason: e.target.value})} placeholder="Motivo da operação..." />
+                                                <input required={locAction === 'OUT' && outType === 'GENERAL'} className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.reason} onChange={e => setLocForm({...locForm, reason: e.target.value})} placeholder={locAction === 'OUT' && outType === 'GENERAL' ? 'Informe o motivo da saida...' : 'Motivo da operacao...'} />
                                             )}
                                         </div>
                                     </div>
