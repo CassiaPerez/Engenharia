@@ -491,47 +491,12 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         m.code.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
-      // 2. Filtro de Perfil (Bio vs Fert)
-      if (currentUser.role === 'WAREHOUSE_BIO') {
-          return textFiltered.filter(m => 
-              (m.group && m.group.toLowerCase().includes('bio')) || 
-              (m.location && m.location.toLowerCase().includes('bio'))
-          );
-      }
-      if (currentUser.role === 'WAREHOUSE_FERT') {
-          return textFiltered.filter(m => 
-              (m.group && m.group.toLowerCase().includes('fert')) || 
-              (m.location && m.location.toLowerCase().includes('fert'))
-          );
-      }
-
-      // Admin e Warehouse Geral veem tudo
       return textFiltered;
   }, [materials, searchTerm, currentUser.role]);
 
   const filteredMovements = useMemo(() => {
       const sorted = movements.sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
       
-      if (currentUser.role === 'WAREHOUSE_BIO') {
-          // Filtrar movimentos de itens Bio
-          return sorted.filter(mov => {
-              const mat = materials.find(m => m.id === mov.materialId);
-              return mat && (
-                  (mat.group && mat.group.toLowerCase().includes('bio')) ||
-                  (mat.location && mat.location.toLowerCase().includes('bio'))
-              );
-          });
-      }
-      if (currentUser.role === 'WAREHOUSE_FERT') {
-          // Filtrar movimentos de itens Fert
-          return sorted.filter(mov => {
-              const mat = materials.find(m => m.id === mov.materialId);
-              return mat && (
-                  (mat.group && mat.group.toLowerCase().includes('fert')) ||
-                  (mat.location && mat.location.toLowerCase().includes('fert'))
-              );
-          });
-      }
       return sorted;
   }, [movements, materials, currentUser.role]);
 
