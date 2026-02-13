@@ -15,7 +15,7 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
   const [formData, setFormData] = useState<Partial<Equipment>>({ status: 'ACTIVE' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCompany, setFilterCompany] = useState('');
+  const [filterCompany, setFilterCompany] = useState(currentUser.role !== 'ADMIN' && currentUser.company ? currentUser.company : '');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterManufacturer, setFilterManufacturer] = useState('');
 
@@ -157,7 +157,12 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Empresa</label>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
+              Empresa
+              {currentUser.role !== 'ADMIN' && currentUser.company && (
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded-full normal-case font-bold">Filtro padrão</span>
+              )}
+            </label>
             <select
               value={filterCompany}
               onChange={e => setFilterCompany(e.target.value)}

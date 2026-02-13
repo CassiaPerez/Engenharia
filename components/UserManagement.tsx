@@ -67,6 +67,7 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                 password: formUser.password || '123456',
                 role: formUser.role || 'USER',
                 department: formUser.department || '',
+                company: formUser.company || undefined,
                 active: formUser.active ?? true,
                 avatar: formUser.name.substr(0, 2).toUpperCase()
             };
@@ -132,14 +133,15 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
   };
 
   const openNew = () => {
-      setFormUser({ 
-          active: true, 
-          role: 'USER', 
+      setFormUser({
+          active: true,
+          role: 'USER',
           avatar: 'US',
           name: '',
           email: '',
           department: '',
-          password: '' 
+          company: '',
+          password: ''
       });
       setIsEditing(false);
       setShowModal(true);
@@ -211,6 +213,7 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                     <th className="px-6 py-4">Email</th>
                     <th className="px-6 py-4">Cargo / Perfil</th>
                     <th className="px-6 py-4">Departamento</th>
+                    <th className="px-6 py-4">Empresa</th>
                     <th className="px-6 py-4 text-center">Status</th>
                     <th className="px-6 py-4 text-center">Ações</th>
                 </tr>
@@ -239,9 +242,16 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                             </span>
                         </td>
                         <td className="px-6 py-4 text-slate-600">{u.department || '---'}</td>
+                        <td className="px-6 py-4">
+                            {u.company ? (
+                                <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-bold border border-blue-200">{u.company}</span>
+                            ) : (
+                                <span className="text-slate-400 text-xs">---</span>
+                            )}
+                        </td>
                         <td className="px-6 py-4 text-center">
-                            {u.active ? 
-                                <span className="w-3 h-3 bg-emerald-500 rounded-full inline-block" title="Ativo"></span> : 
+                            {u.active ?
+                                <span className="w-3 h-3 bg-emerald-500 rounded-full inline-block" title="Ativo"></span> :
                                 <span className="w-3 h-3 bg-red-500 rounded-full inline-block" title="Inativo"></span>
                             }
                         </td>
@@ -294,10 +304,31 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                                   </div>
                               </div>
 
+                              <div>
+                                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Empresa</label>
+                                  <select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formUser.company || ''} onChange={e => setFormUser({...formUser, company: e.target.value})}>
+                                      <option value="">-- Nenhuma (Admin/Geral) --</option>
+                                      <option value="Cropbio">Cropbio</option>
+                                      <option value="Cropfert do Brasil">Cropfert do Brasil</option>
+                                      <option value="Cropfert Jandaia">Cropfert Jandaia</option>
+                                      <option value="Laboratório Apucarana">Laboratório Apucarana</option>
+                                  </select>
+                                  <p className="text-xs text-slate-500 mt-2">Usuários não-admin verão equipamentos da sua empresa por padrão</p>
+                              </div>
+
                               <div className="grid grid-cols-2 gap-6">
                                   <div>
                                       <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Email (Login)</label>
-                                      <input type="email" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formUser.email || ''} onChange={e => setFormUser({...formUser, email: e.target.value})} />
+                                      <input type="email" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary transition-all" value={formUser.email || ''} onChange={e => {
+                                          const email = e.target.value;
+                                          let suggestedCompany = formUser.company || '';
+                                          if (email.includes('@cropbio.com.br') || email.includes('@genomabio.com.br')) {
+                                              suggestedCompany = 'Cropbio';
+                                          } else if (email.includes('@cropfert.com.br')) {
+                                              suggestedCompany = 'Cropfert do Brasil';
+                                          }
+                                          setFormUser({...formUser, email, company: suggestedCompany});
+                                      }} />
                                   </div>
                                   <div>
                                       <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Senha</label>

@@ -223,9 +223,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  password: string; 
+  password: string;
   role: UserRole;
   department?: string;
+  company?: string; // Empresa do usuário (Cropbio, Cropfert, etc)
   active: boolean;
   avatar?: string;
 }
