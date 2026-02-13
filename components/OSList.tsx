@@ -28,7 +28,7 @@ const ITEMS_PER_PAGE = 9;
 const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments = [], materials, setMaterials, services, users, setUsers, movements, onStockChange, currentUser }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials' | 'withdrawals'>('services');
+  const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
@@ -857,7 +857,6 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                             <div className="flex border-b border-slate-200 bg-white px-6 gap-6 shrink-0">
                                 <button onClick={() => setActiveSubTab('services')} className={`py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeSubTab === 'services' ? 'border-clean-primary text-clean-primary' : 'border-transparent text-slate-500'}`}><i className="fas fa-tools"></i> Serviços & Mão de Obra</button>
                                 <button onClick={() => setActiveSubTab('materials')} className={`py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeSubTab === 'materials' ? 'border-clean-primary text-clean-primary' : 'border-transparent text-slate-500'}`}><i className="fas fa-boxes"></i> Materiais & Peças</button>
-                                <button onClick={() => setActiveSubTab('withdrawals')} className={`py-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${activeSubTab === 'withdrawals' ? 'border-clean-primary text-clean-primary' : 'border-transparent text-slate-500'}`}><i className="fas fa-truck-ramp-box"></i> Baixas do Almox</button>
                             </div>
 
                             <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
@@ -901,7 +900,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 )}
 
                                 {/* List of Items */}
-                                {activeSubTab !== 'withdrawals' ? (
+                                <div className="space-y-6">
                                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                                         <table className="w-full text-sm text-left">
                                             <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase"><tr className="border-b border-slate-100"><th className="p-4">Item</th><th className="p-4 text-right">Qtd</th><th className="p-4 text-right">Custo Unit.</th><th className="p-4 text-right">Total</th></tr></thead>
@@ -937,40 +936,48 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                             </tbody>
                                         </table>
                                     </div>
-                                ) : (
-                                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase">
-                                                <tr className="border-b border-slate-100">
-                                                    <th className="p-4">Data</th>
-                                                    <th className="p-4">Material</th>
-                                                    <th className="p-4 text-right">Qtd</th>
-                                                    <th className="p-4">Local Origem</th>
-                                                    <th className="p-4">Usuario</th>
-                                                    <th className="p-4">Descricao</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-50">
-                                                {movements.filter(mov => mov.osId === selectedOS.number && mov.type === 'OUT').map(mov => {
-                                                    const mat = materials.find(m => m.id === mov.materialId);
-                                                    return (
-                                                        <tr key={mov.id} className="hover:bg-slate-50">
-                                                            <td className="p-4 text-slate-600 font-mono text-xs">{new Date(mov.date).toLocaleString('pt-BR')}</td>
-                                                            <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluido'}</td>
-                                                            <td className="p-4 text-right font-mono font-bold text-lg">{mov.quantity} <span className="text-xs text-slate-400">{mat?.unit}</span></td>
-                                                            <td className="p-4 text-slate-600 text-sm">{mov.fromLocation || '-'}</td>
-                                                            <td className="p-4 text-slate-600 text-sm">{mov.userId}</td>
-                                                            <td className="p-4 text-slate-500 text-sm">{mov.description}</td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                                {movements.filter(mov => mov.osId === selectedOS.number && mov.type === 'OUT').length === 0 && (
-                                                    <tr><td colSpan={6} className="p-8 text-center text-slate-400 italic">Nenhuma baixa de almoxarifado registrada para esta OS.</td></tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
+
+                                    {/* Baixas do Almoxarifado - Only for Materials Tab */}
+                                    {activeSubTab === 'materials' && (
+                                        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                            <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
+                                                <h5 className="text-xs font-bold text-amber-900 uppercase flex items-center gap-2">
+                                                    <i className="fas fa-truck-ramp-box"></i> Baixas do Almoxarifado
+                                                </h5>
+                                            </div>
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase">
+                                                    <tr className="border-b border-slate-100">
+                                                        <th className="p-4">Data</th>
+                                                        <th className="p-4">Material</th>
+                                                        <th className="p-4 text-right">Qtd</th>
+                                                        <th className="p-4">Local Origem</th>
+                                                        <th className="p-4">Usuario</th>
+                                                        <th className="p-4">Descricao</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {movements.filter(mov => mov.osId === selectedOS.number && mov.type === 'OUT').map(mov => {
+                                                        const mat = materials.find(m => m.id === mov.materialId);
+                                                        return (
+                                                            <tr key={mov.id} className="hover:bg-slate-50">
+                                                                <td className="p-4 text-slate-600 font-mono text-xs">{new Date(mov.date).toLocaleString('pt-BR')}</td>
+                                                                <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluido'}</td>
+                                                                <td className="p-4 text-right font-mono font-bold text-lg">{mov.quantity} <span className="text-xs text-slate-400">{mat?.unit}</span></td>
+                                                                <td className="p-4 text-slate-600 text-sm">{mov.fromLocation || '-'}</td>
+                                                                <td className="p-4 text-slate-600 text-sm">{mov.userId}</td>
+                                                                <td className="p-4 text-slate-500 text-sm">{mov.description}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {movements.filter(mov => mov.osId === selectedOS.number && mov.type === 'OUT').length === 0 && (
+                                                        <tr><td colSpan={6} className="p-8 text-center text-slate-400 italic">Nenhuma baixa de almoxarifado registrada para esta OS.</td></tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
