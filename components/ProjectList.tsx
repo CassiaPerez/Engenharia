@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Project, OS, Material, ServiceType, ProjectStatus, Category, OSType, OSStatus, User } from '../types';
+import { Project, OS, Material, ServiceType, ProjectStatus, Category, OSType, OSStatus, User, StockMovement } from '../types';
 import { calculateProjectCosts, calculatePlannedCosts, formatDate } from '../services/engine';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -12,12 +12,13 @@ interface Props {
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
   oss: OS[];
   materials: Material[];
-  setMaterials?: React.Dispatch<React.SetStateAction<Material[]>>; 
+  setMaterials?: React.Dispatch<React.SetStateAction<Material[]>>;
   services: ServiceType[];
+  movements: StockMovement[];
   currentUser: User;
 }
 
-const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, setMaterials, services, currentUser }) => {
+const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, setMaterials, services, movements, currentUser }) => {
   const [showModal, setShowModal] = useState(false);
   const [modalTab, setModalTab] = useState<'DETAILS' | 'RESOURCES'>('DETAILS'); 
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -719,6 +720,50 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                                         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                                             <h4 className="text-sm font-bold text-slate-900 uppercase mb-5 border-b border-slate-200 pb-3 flex items-center gap-2"><i className="fas fa-clock text-clean-primary"></i> Serviços (Horas)</h4>
                                             <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider"><th className="text-left pb-3">Tipo</th><th className="text-right pb-3">Plan</th><th className="text-right pb-3">Real</th><th className="text-center pb-3">Var</th></tr></thead><tbody className="divide-y divide-slate-100">{showCostDetail.plannedServices.map(ps => { const actualHrs = getActualServiceHours(showCostDetail.id, ps.serviceTypeId); const srv = services.find(s => s.id === ps.serviceTypeId); const diff = actualHrs - ps.hours; return (<tr key={ps.serviceTypeId}><td className="py-3 text-slate-800 font-bold truncate max-w-[150px]" title={srv?.name}>{srv?.name || '---'}</td><td className="text-right text-slate-500 font-medium">{ps.hours}</td><td className="text-right text-slate-900 font-bold">{actualHrs}</td><td className="text-center"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${diff > 0 ? 'bg-red-100 text-red-700' : diff < 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{diff > 0 ? `+${diff}` : diff}</span></td></tr>) })} {(!showCostDetail.plannedServices || showCostDetail.plannedServices.length === 0) && (<tr><td colSpan={4} className="text-center py-4 text-slate-400 italic text-xs">Sem serviços planejados.</td></tr>)}</tbody></table></div>
+                                        </div>
+                                    </div>
+
+                                    {/* BAIXAS DE ALMOXARIFADO */}
+                                    <div className="mt-8 bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                                        <h4 className="text-sm font-bold text-slate-900 uppercase mb-5 border-b border-slate-200 pb-3 flex items-center gap-2"><i className="fas fa-truck-ramp-box text-amber-600"></i> Baixas do Almoxarifado</h4>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                                                        <th className="text-left pb-3">Data</th>
+                                                        <th className="text-left pb-3">Material</th>
+                                                        <th className="text-right pb-3">Qtd</th>
+                                                        <th className="text-left pb-3">Local Origem</th>
+                                                        <th className="text-left pb-3">Usuario</th>
+                                                        <th className="text-left pb-3">Tipo</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {movements.filter(mov => mov.projectId === showCostDetail.id && mov.type === 'OUT').map(mov => {
+                                                        const mat = materials.find(m => m.id === mov.materialId);
+                                                        const isDirectWithdrawal = !mov.osId;
+                                                        return (
+                                                            <tr key={mov.id} className="hover:bg-slate-50">
+                                                                <td className="py-3 text-slate-600 font-mono text-xs">{new Date(mov.date).toLocaleString('pt-BR')}</td>
+                                                                <td className="py-3 text-slate-800 font-bold truncate max-w-[180px]" title={mat?.description}>{mat?.description || 'Item Excluido'}</td>
+                                                                <td className="text-right font-mono font-bold text-base">{mov.quantity} <span className="text-xs text-slate-400">{mat?.unit}</span></td>
+                                                                <td className="py-3 text-slate-600 text-xs">{mov.fromLocation || '-'}</td>
+                                                                <td className="py-3 text-slate-600 text-xs">{mov.userId}</td>
+                                                                <td className="py-3">
+                                                                    {isDirectWithdrawal ? (
+                                                                        <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-bold border border-amber-200">Baixa Direta</span>
+                                                                    ) : (
+                                                                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold border border-blue-200">Via OS: {mov.osId}</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {movements.filter(mov => mov.projectId === showCostDetail.id && mov.type === 'OUT').length === 0 && (
+                                                        <tr><td colSpan={6} className="text-center py-6 text-slate-400 italic text-xs">Nenhuma baixa de almoxarifado registrada para este projeto.</td></tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
                                 </>

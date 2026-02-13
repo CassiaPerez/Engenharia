@@ -271,29 +271,31 @@ const App: React.FC = () => {
         return <Dashboard projects={projects} oss={oss} materials={materials} services={services} />;
       case 'projects': 
         return (
-          <ProjectList 
-            projects={projects} 
-            setProjects={setProjects} 
-            oss={oss} 
-            materials={materials} 
+          <ProjectList
+            projects={projects}
+            setProjects={setProjects}
+            oss={oss}
+            materials={materials}
             setMaterials={setMaterials}
-            services={services} 
-            currentUser={currentUser} 
+            services={services}
+            movements={movements}
+            currentUser={currentUser}
           />
         );
       case 'os': 
         return (
-          <OSList 
-            oss={oss} 
-            setOss={setOss} 
-            projects={projects} 
+          <OSList
+            oss={oss}
+            setOss={setOss}
+            projects={projects}
             buildings={buildings}
             equipments={equipments}
-            materials={materials} 
+            materials={materials}
             setMaterials={setMaterials}
             services={services}
             users={users}
             setUsers={setUsers}
+            movements={movements}
             onStockChange={handleStockChange}
             currentUser={currentUser}
           />
