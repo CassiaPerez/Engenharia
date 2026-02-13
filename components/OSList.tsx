@@ -63,6 +63,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
   const [isEditingSLA, setIsEditingSLA] = useState(false);
   const [editingSLAValue, setEditingSLAValue] = useState<number>(24);
+  const [equipmentCompanyFilter, setEquipmentCompanyFilter] = useState('');
 
   const executors = useMemo(() => users.filter(u => u.role === 'EXECUTOR'), [users]);
 
@@ -189,6 +190,15 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       return matchesSearch && matchesStatus && matchesPriority;
     });
   }, [oss, searchTerm, statusFilter, priorityFilter]);
+
+  const filteredEquipments = useMemo(() => {
+    if (!equipmentCompanyFilter) return equipments;
+    return equipments.filter(eq => eq.location === equipmentCompanyFilter);
+  }, [equipments, equipmentCompanyFilter]);
+
+  const uniqueEquipmentCompanies = useMemo(() => {
+    return Array.from(new Set(equipments.map(eq => eq.location).filter(Boolean)));
+  }, [equipments]);
 
   const currentOSs = filteredOSs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
@@ -343,6 +353,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       setAllocMatSearch(''); setAllocMatId('');
       setAllocSrvSearch(''); setAllocSrvId('');
       setCreationContext('PROJECT');
+      setEquipmentCompanyFilter('');
       setShowModal(true);
   };
 
@@ -1008,8 +1019,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Vínculo da OS (Centro de Custo)</label>
                                 <div className="flex gap-2 mb-4">
-                                    <button type="button" onClick={() => setCreationContext('PROJECT')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'PROJECT' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-folder-tree mr-2"></i> Projeto</button>
-                                    <button type="button" onClick={() => setCreationContext('BUILDING')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'BUILDING' ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-building mr-2"></i> Edifício</button>
+                                    <button type="button" onClick={() => { setCreationContext('PROJECT'); setEquipmentCompanyFilter(''); }} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'PROJECT' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-folder-tree mr-2"></i> Projeto</button>
+                                    <button type="button" onClick={() => { setCreationContext('BUILDING'); setEquipmentCompanyFilter(''); }} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'BUILDING' ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-building mr-2"></i> Edifício</button>
                                     <button type="button" onClick={() => setCreationContext('EQUIPMENT')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${creationContext === 'EQUIPMENT' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}><i className="fas fa-cogs mr-2"></i> Equip</button>
                                 </div>
                                 {creationContext === 'PROJECT' ? (
@@ -1017,7 +1028,22 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 ) : creationContext === 'BUILDING' ? (
                                     <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.buildingId || ''} onChange={e => setFormOS({...formOS, buildingId: e.target.value, projectId: undefined, equipmentId: undefined})}><option value="">Selecione o Edifício...</option>{buildings.map(b => <option key={b.id} value={b.id}>{b.name} ({b.city})</option>)}</select>
                                 ) : (
-                                    <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.equipmentId || ''} onChange={e => setFormOS({...formOS, equipmentId: e.target.value, projectId: undefined, buildingId: undefined})}><option value="">Selecione o Equipamento...</option>{equipments.map(e => <option key={e.id} value={e.id}>{e.name} - {e.code}</option>)}</select>
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Filtrar por Empresa</label>
+                                        <select
+                                          className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm text-slate-700"
+                                          value={equipmentCompanyFilter}
+                                          onChange={e => setEquipmentCompanyFilter(e.target.value)}
+                                        >
+                                          <option value="">Todas as empresas</option>
+                                          {uniqueEquipmentCompanies.map(company => (
+                                            <option key={company} value={company}>{company}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <select required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800" value={formOS.equipmentId || ''} onChange={e => setFormOS({...formOS, equipmentId: e.target.value, projectId: undefined, buildingId: undefined})}><option value="">Selecione o Equipamento...</option>{filteredEquipments.map(e => <option key={e.id} value={e.id}>{e.name} - {e.code} ({e.location})</option>)}</select>
+                                    </div>
                                 )}
                                 {creationContext !== 'PROJECT' && (
                                     <div className="mt-3">
