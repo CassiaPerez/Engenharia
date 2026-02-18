@@ -19,7 +19,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   const [allOS, setAllOS] = useState<OS[]>([]);
 
   const addMovementWithSync = async (mov: StockMovement) => {
-    addMovementWithSync(mov);
+    onAddMovement(mov);
     try {
       const { error } = await supabase.from('stock_movements').insert(mapToSupabase(mov));
       if (error) throw error;
@@ -339,7 +339,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   const handleCreateMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMaterial.code || !newMaterial.description) return;
+    if (!newMaterial.code || !newMaterial.description) {
+        alert('Erro: Código e Descrição são obrigatórios.');
+        return;
+    }
 
     if (materials.some(m => m.code === newMaterial.code)) {
         alert('Erro: Este código SKU já existe. O sistema irá gerar um novo.');
@@ -365,34 +368,39 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         status: 'ACTIVE'
     };
 
-    setMaterials(prev => [...prev, material]);
-
     try {
         const { error } = await supabase.from('materials').insert({
             id: material.id,
             json_content: material
         });
-        if (error) throw error;
-    } catch (e) {
+        if (error) {
+            console.error('Erro ao salvar material:', error);
+            alert(`Erro ao salvar no banco de dados: ${error.message}`);
+            return;
+        }
+
+        setMaterials(prev => [...prev, material]);
+
+        if (material.currentStock > 0) {
+            await addMovementWithSync({
+                id: Math.random().toString(36).substr(2, 9),
+                type: 'IN',
+                materialId: id,
+                quantity: material.currentStock,
+                date: new Date().toISOString(),
+                userId: currentUser.id,
+                description: 'Saldo Inicial (Cadastro Manual)',
+                toLocation: initialLoc
+            });
+        }
+
+        setShowModal(false);
+        setNewMaterial({ status: 'ACTIVE', minStock: 10, currentStock: 0, unitCost: 0, group: 'Geral', unit: 'Un', code: '' });
+        alert('Material cadastrado com sucesso!');
+    } catch (e: any) {
         console.error('Erro ao salvar material:', e);
-        alert('Erro ao salvar no banco de dados.');
+        alert(`Erro ao salvar no banco de dados: ${e.message || 'Erro desconhecido'}`);
     }
-
-    if (material.currentStock > 0) {
-        addMovementWithSync({
-            id: Math.random().toString(36).substr(2, 9),
-            type: 'IN',
-            materialId: id,
-            quantity: material.currentStock,
-            date: new Date().toISOString(),
-            userId: currentUser.id,
-            description: 'Saldo Inicial (Cadastro Manual)',
-            toLocation: initialLoc
-        });
-    }
-
-    setShowModal(false);
-    setNewMaterial({ status: 'ACTIVE', minStock: 10, currentStock: 0, unitCost: 0, group: 'Geral', unit: 'Un' });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
