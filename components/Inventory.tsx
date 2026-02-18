@@ -87,12 +87,20 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         if (m.location) locs.add(m.location);
         m.stockLocations?.forEach(l => locs.add(l.name));
     });
-    // Locais Padrão
-    locs.add('CD - Central');
-    locs.add('Almoxarifado CropBio');
-    locs.add('Almoxarifado CropFert');
+    // Locais por Empresa
+    if (currentUser.company === 'Cropbio') {
+      locs.add('Cropbio');
+      locs.add('Laboratório de defensivos');
+    } else if (currentUser.company === 'Cropfert') {
+      locs.add('Cropfert');
+    } else {
+      // Admin vê todos
+      locs.add('Cropbio');
+      locs.add('Cropfert');
+      locs.add('Laboratório de defensivos');
+    }
     return Array.from(locs).sort();
-  }, [materials]);
+  }, [materials, currentUser.company]);
 
   const generateUniqueSKU = () => {
       const prefix = 'MAT';
@@ -498,22 +506,39 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       XLSX.writeFile(wb, "Modelo_Importacao_Estoque.xlsx");
   };
 
-  // --- FILTRAGEM INTELIGENTE POR PERFIL ---
+  // --- FILTRAGEM INTELIGENTE POR PERFIL E EMPRESA ---
   const filteredMaterials = useMemo(() => {
       // 1. Filtro de Texto
-      const textFiltered = materials.filter(m => 
-        m.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      let textFiltered = materials.filter(m =>
+        m.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.code.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
+      // 2. Filtro por Empresa/Localização
+      if (currentUser.company === 'Cropbio') {
+        textFiltered = textFiltered.filter(m =>
+          m.location === 'Cropbio' || m.location === 'Laboratório de defensivos'
+        );
+      } else if (currentUser.company === 'Cropfert') {
+        textFiltered = textFiltered.filter(m =>
+          m.location === 'Cropfert'
+        );
+      }
+
       return textFiltered;
-  }, [materials, searchTerm, currentUser.role]);
+  }, [materials, searchTerm, currentUser.role, currentUser.company]);
 
   const filteredMovements = useMemo(() => {
-      const sorted = movements.sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
-      
+      // Filtrar IDs dos materiais permitidos para este usuário
+      const allowedMaterialIds = new Set(filteredMaterials.map(m => m.id));
+
+      // Filtrar movimentos apenas dos materiais permitidos
+      const filtered = movements.filter(mov => allowedMaterialIds.has(mov.materialId));
+
+      const sorted = filtered.sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
+
       return sorted;
-  }, [movements, materials, currentUser.role]);
+  }, [movements, materials, currentUser.role, filteredMaterials]);
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -521,11 +546,19 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     <div className="space-y-8">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Almoxarifado Central</h2>
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
+            {currentUser.company === 'Cropbio' && 'Almoxarifado Cropbio'}
+            {currentUser.company === 'Cropfert' && 'Almoxarifado Cropfert'}
+            {!currentUser.company && 'Almoxarifado Central'}
+          </h2>
           <div className="flex items-center gap-2">
-            <p className="text-slate-500 text-lg mt-1 font-medium">Controle físico de estoque e auditoria.</p>
-            {currentUser.role === 'WAREHOUSE_BIO' && <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200 uppercase">Unidade Bio</span>}
-            {currentUser.role === 'WAREHOUSE_FERT' && <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded border border-blue-200 uppercase">Unidade Fert</span>}
+            <p className="text-slate-500 text-lg mt-1 font-medium">
+              {currentUser.company === 'Cropbio' && 'Controle de estoque Cropbio e Laboratório de defensivos'}
+              {currentUser.company === 'Cropfert' && 'Controle de estoque Cropfert'}
+              {!currentUser.company && 'Controle físico de estoque e auditoria'}
+            </p>
+            {currentUser.role === 'WAREHOUSE_BIO' && <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200 uppercase">Cropbio</span>}
+            {currentUser.role === 'WAREHOUSE_FERT' && <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded border border-blue-200 uppercase">Cropfert</span>}
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
