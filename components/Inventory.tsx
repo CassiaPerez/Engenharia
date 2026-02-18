@@ -130,10 +130,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       // Preenchimento inteligente baseado no perfil
       if (currentUser.role === 'WAREHOUSE_BIO') {
           defaultGroup = 'CropBio';
-          defaultLoc = 'Almoxarifado CropBio';
+          defaultLoc = 'Cropbio';
       } else if (currentUser.role === 'WAREHOUSE_FERT') {
           defaultGroup = 'CropFert';
-          defaultLoc = 'Almoxarifado CropFert';
+          defaultLoc = 'Cropfert';
       }
 
       setNewMaterial({
@@ -143,8 +143,8 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         unitCost: 0,
         group: defaultGroup,
         unit: 'Un',
-        description: '', 
-        location: defaultLoc, 
+        description: '',
+        location: defaultLoc,
         code: generateUniqueSKU()
       });
       setShowModal(true);
@@ -339,12 +339,18 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   const handleCreateMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    console.log('=== INICIANDO CADASTRO DE MATERIAL ===');
+    console.log('Dados do formulário:', newMaterial);
+
     if (!newMaterial.code || !newMaterial.description) {
+        console.error('Validação falhou: campos obrigatórios vazios');
         alert('Erro: Código e Descrição são obrigatórios.');
         return;
     }
 
     if (materials.some(m => m.code === newMaterial.code)) {
+        console.warn('Código duplicado detectado:', newMaterial.code);
         alert('Erro: Este código SKU já existe. O sistema irá gerar um novo.');
         setNewMaterial({ ...newMaterial, code: generateUniqueSKU() });
         return;
@@ -368,20 +374,32 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         status: 'ACTIVE'
     };
 
+    console.log('Material preparado para inserção:', material);
+
     try {
-        const { error } = await supabase.from('materials').insert({
+        console.log('Tentando inserir no Supabase...');
+        const { data, error } = await supabase.from('materials').insert({
             id: material.id,
             json_content: material
-        });
+        }).select();
+
+        console.log('Resposta do Supabase:', { data, error });
+
         if (error) {
-            console.error('Erro ao salvar material:', error);
+            console.error('Erro do Supabase:', error);
             alert(`Erro ao salvar no banco de dados: ${error.message}`);
             return;
         }
 
-        setMaterials(prev => [...prev, material]);
+        console.log('Material salvo com sucesso no banco!');
+        setMaterials(prev => {
+            const updated = [...prev, material];
+            console.log('Estado materials atualizado. Total de itens:', updated.length);
+            return updated;
+        });
 
         if (material.currentStock > 0) {
+            console.log('Registrando movimento de estoque inicial...');
             await addMovementWithSync({
                 id: Math.random().toString(36).substr(2, 9),
                 type: 'IN',
@@ -392,13 +410,16 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                 description: 'Saldo Inicial (Cadastro Manual)',
                 toLocation: initialLoc
             });
+            console.log('Movimento registrado!');
         }
 
+        console.log('Fechando modal e limpando formulário...');
         setShowModal(false);
         setNewMaterial({ status: 'ACTIVE', minStock: 10, currentStock: 0, unitCost: 0, group: 'Geral', unit: 'Un', code: '' });
         alert('Material cadastrado com sucesso!');
+        console.log('=== CADASTRO CONCLUÍDO COM SUCESSO ===');
     } catch (e: any) {
-        console.error('Erro ao salvar material:', e);
+        console.error('Exceção capturada:', e);
         alert(`Erro ao salvar no banco de dados: ${e.message || 'Erro desconhecido'}`);
     }
   };
@@ -763,7 +784,13 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                 </div>
                                 <div>
                                     <label className="text-sm font-bold text-slate-700 mb-2 block">Local Padrão</label>
-                                    <input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="CD - Central" value={newMaterial.location} onChange={e => setNewMaterial({...newMaterial, location: e.target.value})} />
+                                    <select required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.location} onChange={e => setNewMaterial({...newMaterial, location: e.target.value})}>
+                                        <option value="">Selecione o local...</option>
+                                        {globalLocations.map(loc => (
+                                            <option key={loc} value={loc}>{loc}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-slate-400 mt-1.5 ml-1">O material só será visível neste local/empresa.</p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
