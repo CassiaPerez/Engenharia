@@ -669,8 +669,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         m.code.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
-      // 2. Filtro por Almoxarifado (baseado em permissões customizadas ou role)
-      if (allowedWarehouses.length > 0) {
+      // 2. Filtro por Almoxarifado (apenas para usuários com permissões específicas de warehouse)
+      const isWarehouseUser = currentUser.role.startsWith('WAREHOUSE') || allowedWarehouses.length > 0;
+
+      if (isWarehouseUser && allowedWarehouses.length > 0) {
         textFiltered = textFiltered.filter(m => {
           if (allowedWarehouses.includes('Cropbio') && (m.location === 'Cropbio' || m.location === 'Laboratório de defensivos')) {
             return true;
@@ -685,7 +687,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         });
       }
 
-      // 3. Filtro por Almoxarifado Selecionado
+      // 3. Filtro por Almoxarifado Selecionado (aplicado para todos que usam o filtro)
       if (warehouseFilter !== 'ALL') {
         if (warehouseFilter === 'Cropbio') {
           textFiltered = textFiltered.filter(m => m.location === 'Cropbio' || m.location === 'Laboratório de defensivos');
@@ -722,17 +724,18 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
             {allowedWarehouses.length === 1 && allowedWarehouses[0] === 'Cropfert' && 'Almoxarifado Cropfert'}
             {allowedWarehouses.length === 1 && allowedWarehouses[0] === 'Central' && 'Almoxarifado Central'}
             {allowedWarehouses.length > 1 && 'Controle de Almoxarifados'}
-            {allowedWarehouses.length === 0 && 'Sem Acesso a Almoxarifados'}
+            {allowedWarehouses.length === 0 && 'Almoxarifado'}
           </h2>
-          <div className="flex items-center gap-2 mt-2">
-            <p className="text-slate-500 text-sm font-medium">
-              Acesso a:
-            </p>
-            {canAccessCropbio && <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200 uppercase flex items-center gap-1"><i className="fas fa-leaf"></i> Cropbio</span>}
-            {canAccessCropfert && <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded border border-blue-200 uppercase flex items-center gap-1"><i className="fas fa-seedling"></i> Cropfert</span>}
-            {canAccessCentral && <span className="bg-slate-100 text-slate-800 text-xs font-bold px-2 py-1 rounded border border-slate-200 uppercase flex items-center gap-1"><i className="fas fa-building"></i> Central</span>}
-            {allowedWarehouses.length === 0 && <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded border border-red-200 uppercase">Nenhum</span>}
-          </div>
+          {allowedWarehouses.length > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              <p className="text-slate-500 text-sm font-medium">
+                Acesso a:
+              </p>
+              {canAccessCropbio && <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200 uppercase flex items-center gap-1"><i className="fas fa-leaf"></i> Cropbio</span>}
+              {canAccessCropfert && <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded border border-blue-200 uppercase flex items-center gap-1"><i className="fas fa-seedling"></i> Cropfert</span>}
+              {canAccessCentral && <span className="bg-slate-100 text-slate-800 text-xs font-bold px-2 py-1 rounded border border-slate-200 uppercase flex items-center gap-1"><i className="fas fa-building"></i> Central</span>}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-3">
             <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
@@ -771,22 +774,20 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
               />
             </div>
 
-            {allowedWarehouses.length > 1 && (
-              <div className="relative">
-                <i className="fas fa-warehouse absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none"></i>
-                <select
-                  value={warehouseFilter}
-                  onChange={e => setWarehouseFilter(e.target.value)}
-                  className="pl-12 pr-10 h-14 bg-white border border-slate-300 rounded-xl text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary font-medium transition-all appearance-none cursor-pointer min-w-[220px]"
-                >
-                  <option value="ALL">Todos os Almoxarifados</option>
-                  {canAccessCentral && <option value="Central">Central</option>}
-                  {canAccessCropbio && <option value="Cropbio">Cropbio</option>}
-                  {canAccessCropfert && <option value="Cropfert">Cropfert</option>}
-                </select>
-                <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
-              </div>
-            )}
+            <div className="relative">
+              <i className="fas fa-warehouse absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none"></i>
+              <select
+                value={warehouseFilter}
+                onChange={e => setWarehouseFilter(e.target.value)}
+                className="pl-12 pr-10 h-14 bg-white border border-slate-300 rounded-xl text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary font-medium transition-all appearance-none cursor-pointer min-w-[220px]"
+              >
+                <option value="ALL">Todos os Almoxarifados</option>
+                <option value="Central">Central</option>
+                <option value="Cropbio">Cropbio</option>
+                <option value="Cropfert">Cropfert</option>
+              </select>
+              <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+            </div>
           </div>
 
           {warehouseFilter !== 'ALL' && (
@@ -812,14 +813,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-600">
               Exibindo <span className="font-bold text-slate-900">{filteredMaterials.length}</span> {filteredMaterials.length === 1 ? 'item' : 'itens'}
-              {warehouseFilter !== 'ALL' && (
+              {warehouseFilter !== 'ALL' && materials.length > filteredMaterials.length && (
                 <span className="text-amber-600 ml-1">
-                  (filtrado de {materials.filter(m => {
-                    if (allowedWarehouses.includes('Cropbio') && (m.location === 'Cropbio' || m.location === 'Laboratório de defensivos')) return true;
-                    if (allowedWarehouses.includes('Cropfert') && m.location === 'Cropfert') return true;
-                    if (allowedWarehouses.includes('Central') && m.location === 'CD - Central') return true;
-                    return false;
-                  }).length})
+                  (filtrado de {materials.length})
                 </span>
               )}
             </p>
