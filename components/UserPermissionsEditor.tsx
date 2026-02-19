@@ -3,7 +3,6 @@ import { User } from '../types';
 import {
   ModuleId,
   ModulePermissions,
-  FieldPermissions,
   MODULE_LABELS,
   PERMISSIONS_MATRIX,
   loadUserPermissions,
@@ -11,8 +10,7 @@ import {
   deleteUserPermissions,
   resetUserPermissions,
   getUserCustomPermissions,
-  hasUserCustomPermissions,
-  getFieldPermissions
+  hasUserCustomPermissions
 } from '../services/permissions';
 
 interface Props {
@@ -25,9 +23,7 @@ const UserPermissionsEditor: React.FC<Props> = ({ user, onClose, onSave }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [customPermissions, setCustomPermissions] = useState<Record<string, ModulePermissions>>({});
-  const [fieldPermissions, setFieldPermissions] = useState<Record<string, FieldPermissions>>({});
   const [hasCustom, setHasCustom] = useState(false);
-  const [expandedModule, setExpandedModule] = useState<ModuleId | null>(null);
 
   useEffect(() => {
     loadPermissions();
@@ -38,12 +34,6 @@ const UserPermissionsEditor: React.FC<Props> = ({ user, onClose, onSave }) => {
     await loadUserPermissions(user.id);
     const userPerms = getUserCustomPermissions(user.id);
     setCustomPermissions(userPerms);
-
-    const osFieldPerms = getFieldPermissions(user.id, 'os');
-    if (osFieldPerms) {
-      setFieldPermissions({ os: osFieldPerms });
-    }
-
     setHasCustom(hasUserCustomPermissions(user.id));
     setLoading(false);
   };
@@ -84,39 +74,7 @@ const UserPermissionsEditor: React.FC<Props> = ({ user, onClose, onSave }) => {
       delete next[module];
       return next;
     });
-    setFieldPermissions(prev => {
-      const next = { ...prev };
-      delete next[module];
-      return next;
-    });
   };
-
-  const toggleFieldPermission = (module: ModuleId, fieldName: string) => {
-    setFieldPermissions(prev => {
-      const moduleFields = prev[module] || {};
-      const currentValue = moduleFields[fieldName]?.edit || false;
-
-      const newFields = {
-        ...moduleFields,
-        [fieldName]: { edit: !currentValue }
-      };
-
-      if (!currentValue === false) {
-        delete newFields[fieldName];
-      }
-
-      return {
-        ...prev,
-        [module]: newFields
-      };
-    });
-  };
-
-  const OS_FIELDS = [
-    { key: 'priority', label: 'Prioridade' },
-    { key: 'executor_id', label: 'Executor' },
-    { key: 'sla_date', label: 'SLA/Prazo' }
-  ];
 
   const handleSave = async () => {
     setSaving(true);
@@ -127,13 +85,12 @@ const UserPermissionsEditor: React.FC<Props> = ({ user, onClose, onSave }) => {
     for (const module of modules) {
       const customPerm = customPermissions[module];
       const rolePerm = rolePerms[module];
-      const fieldPerms = fieldPermissions[module];
 
       const isCustom = customPerm && JSON.stringify(customPerm) !== JSON.stringify(rolePerm);
 
-      if (isCustom || fieldPerms) {
-        await saveUserPermissions(user.id, module, customPerm || rolePerm, fieldPerms);
-      } else if (!customPerm && !fieldPerms) {
+      if (isCustom) {
+        await saveUserPermissions(user.id, module, customPerm);
+      } else if (!customPerm) {
         await deleteUserPermissions(user.id, module);
       }
     }
@@ -227,8 +184,7 @@ const UserPermissionsEditor: React.FC<Props> = ({ user, onClose, onSave }) => {
                 const customized = isCustomized(module);
 
                 return (
-                  <React.Fragment key={module}>
-                  <tr className={customized ? 'bg-amber-50' : ''}>
+                  <tr key={module} className={customized ? 'bg-amber-50' : ''}>
                     <td className="border p-3 font-medium">
                       {MODULE_LABELS[module]}
                       {customized && (
@@ -278,58 +234,16 @@ const UserPermissionsEditor: React.FC<Props> = ({ user, onClose, onSave }) => {
                       />
                     </td>
                     <td className="border p-3 text-center">
-                      <div className="flex gap-1 justify-center">
-                        {module === 'os' && (
-                          <button
-                            onClick={() => setExpandedModule(expandedModule === 'os' ? null : 'os')}
-                            className="text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 rounded text-blue-700"
-                          >
-                            {expandedModule === 'os' ? 'Ocultar Campos' : 'Configurar Campos'}
-                          </button>
-                        )}
-                        {customized && (
-                          <button
-                            onClick={() => resetModulePermissions(module)}
-                            className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded"
-                          >
-                            Resetar
-                          </button>
-                        )}
-                      </div>
+                      {customized && (
+                        <button
+                          onClick={() => resetModulePermissions(module)}
+                          className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded"
+                        >
+                          Resetar Módulo
+                        </button>
+                      )}
                     </td>
                   </tr>
-                  {module === 'os' && expandedModule === 'os' && (
-                    <tr>
-                      <td colSpan={7} className="border p-4 bg-blue-50">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-blue-900">Permissões de Campos Específicos - Ordens de Serviço</h4>
-                          <p className="text-sm text-blue-700 mb-3">
-                            Configure quais campos específicos o usuário pode editar nas OS
-                          </p>
-                          <div className="grid grid-cols-3 gap-4">
-                            {OS_FIELDS.map(field => {
-                              const hasPermission = fieldPermissions.os?.[field.key]?.edit || false;
-                              return (
-                                <label
-                                  key={field.key}
-                                  className="flex items-center gap-2 p-3 bg-white rounded border border-blue-200 cursor-pointer hover:bg-blue-50"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={hasPermission}
-                                    onChange={() => toggleFieldPermission('os', field.key)}
-                                    className="w-4 h-4"
-                                  />
-                                  <span className="text-sm font-medium">{field.label}</span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  </React.Fragment>
                 );
               })}
             </tbody>
