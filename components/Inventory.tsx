@@ -499,7 +499,16 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         console.log('Tentando inserir no Supabase...');
         const { data, error } = await supabase.from('materials').insert({
             id: material.id,
-            json_content: material
+            code: material.code,
+            description: material.description,
+            unit: material.unit,
+            group: material.group,
+            location: material.location,
+            status: material.status,
+            current_stock: material.currentStock || 0,
+            min_stock: material.minStock || 0,
+            unit_cost: material.unitCost || 0,
+            stock_locations: material.stockLocations || {}
         }).select();
 
         console.log('Resposta do Supabase:', { data, error });
