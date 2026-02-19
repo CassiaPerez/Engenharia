@@ -87,25 +87,42 @@ const App: React.FC = () => {
     const loadData = async () => {
       setSyncStatus('syncing');
       try {
+        console.log('🚀 Starting data load from Supabase...');
         await loadCustomPermissions();
 
         const [p, m, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
           supabase.from('projects').select('*'),
-          supabase.from('materials').select('*'),
+          supabase.from('materials').select('id, json_content').order('id', { ascending: false }).limit(500),
           supabase.from('services').select('*'),
-          supabase.from('oss').select('*'),
-          supabase.from('stock_movements').select('*'),
+          supabase.from('oss').select('id, json_content').order('id', { ascending: false }).limit(50),
+          supabase.from('stock_movements').select('id, json_content').order('id', { ascending: false }).limit(500),
           supabase.from('suppliers').select('*'),
           supabase.from('users').select('*'),
           supabase.from('purchases').select('*'),
           supabase.from('buildings').select('*'),
-          supabase.from('equipments').select('*')
+          supabase.from('equipments').select('id, json_content').order('id', { ascending: false }).limit(200)
         ]);
 
+        if (p.error) console.error("❌ Error loading projects:", p.error);
+        if (m.error) console.error("❌ Error loading materials:", m.error);
+        if (s.error) console.error("❌ Error loading services:", s.error);
+        if (o.error) console.error("❌ Error loading OSs:", o.error);
+        if (mov.error) console.error("❌ Error loading stock_movements:", mov.error);
+        if (eqp.error) console.error("❌ Error loading equipments:", eqp.error);
+        if (usr.error) console.error("❌ Error loading users:", usr.error);
+
         if (p.error || m.error || s.error || usr.error) {
-          console.error("Erro ao carregar dados:", { p: p.error, m: m.error, s: s.error, usr: usr.error });
+          console.error("Critical errors found. Check logs above.");
           throw new Error("Erro de conexão com Supabase");
         }
+
+        console.log('✅ Data loaded successfully:');
+        console.log('  - Projects:', p.data?.length || 0);
+        console.log('  - Materials:', m.data?.length || 0);
+        console.log('  - Services:', s.data?.length || 0);
+        console.log('  - OSs:', o.data?.length || 0);
+        console.log('  - Stock Movements:', mov.data?.length || 0);
+        console.log('  - Equipments:', eqp.data?.length || 0);
 
         setProjects(mapFromSupabase<Project>(p.data || []));
         setMaterials(mapFromSupabase<Material>(m.data || []));
@@ -120,12 +137,11 @@ const App: React.FC = () => {
 
         setSyncStatus('online');
       } catch (err) {
-        console.error("Falha ao conectar com Supabase:", err);
+        console.error("❌ Failed to connect to Supabase:", err);
         setSyncStatus('error');
         alert("Erro ao conectar com o banco de dados. Verifique sua conexão com a internet.");
       } finally {
         setFirstLoad(false);
-        // Verifica sessão persistida (apenas login fica no localStorage)
         const savedUser = localStorage.getItem('crop_user_session');
         if (savedUser) setCurrentUser(JSON.parse(savedUser));
       }
