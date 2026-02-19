@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 
 let customPermissionsCache: Record<string, ModulePermissions> = {};
 let userPermissionsCache: Record<string, Record<string, ModulePermissions>> = {};
+let userFieldPermissionsCache: Record<string, Record<string, Record<string, { edit: boolean }>>> = {};
 
 export type ModuleId =
   | 'dashboard'
@@ -190,16 +191,25 @@ export async function loadUserPermissions(userId?: string): Promise<void> {
 
     if (userId) {
       userPermissionsCache[userId] = {};
+      userFieldPermissionsCache[userId] = {};
       (data || []).forEach(item => {
         userPermissionsCache[userId][item.module] = item.permissions as ModulePermissions;
+        if (item.field_permissions) {
+          userFieldPermissionsCache[userId][item.module] = item.field_permissions;
+        }
       });
     } else {
       userPermissionsCache = {};
+      userFieldPermissionsCache = {};
       (data || []).forEach(item => {
         if (!userPermissionsCache[item.user_id]) {
           userPermissionsCache[item.user_id] = {};
+          userFieldPermissionsCache[item.user_id] = {};
         }
         userPermissionsCache[item.user_id][item.module] = item.permissions as ModulePermissions;
+        if (item.field_permissions) {
+          userFieldPermissionsCache[item.user_id][item.module] = item.field_permissions;
+        }
       });
     }
   } catch (e) {
@@ -210,16 +220,23 @@ export async function loadUserPermissions(userId?: string): Promise<void> {
 export async function saveUserPermissions(
   userId: string,
   module: ModuleId,
-  permissions: ModulePermissions
+  permissions: ModulePermissions,
+  fieldPermissions?: Record<string, { edit: boolean }>
 ): Promise<boolean> {
   try {
+    const payload: any = {
+      user_id: userId,
+      module,
+      permissions
+    };
+
+    if (fieldPermissions) {
+      payload.field_permissions = fieldPermissions;
+    }
+
     const { error } = await supabase
       .from('user_permissions')
-      .upsert({
-        user_id: userId,
-        module,
-        permissions
-      }, {
+      .upsert(payload, {
         onConflict: 'user_id,module'
       });
 
@@ -227,8 +244,12 @@ export async function saveUserPermissions(
 
     if (!userPermissionsCache[userId]) {
       userPermissionsCache[userId] = {};
+      userFieldPermissionsCache[userId] = {};
     }
     userPermissionsCache[userId][module] = permissions;
+    if (fieldPermissions) {
+      userFieldPermissionsCache[userId][module] = fieldPermissions;
+    }
 
     return true;
   } catch (e) {
@@ -253,6 +274,9 @@ export async function deleteUserPermissions(
     if (userPermissionsCache[userId]) {
       delete userPermissionsCache[userId][module];
     }
+    if (userFieldPermissionsCache[userId]) {
+      delete userFieldPermissionsCache[userId][module];
+    }
 
     return true;
   } catch (e) {
@@ -272,6 +296,9 @@ export async function resetUserPermissions(userId: string): Promise<boolean> {
 
     if (userPermissionsCache[userId]) {
       delete userPermissionsCache[userId];
+    }
+    if (userFieldPermissionsCache[userId]) {
+      delete userFieldPermissionsCache[userId];
     }
 
     return true;
@@ -327,6 +354,27 @@ export function getUserCustomPermissions(userId: string): Record<ModuleId, Modul
 
 export function hasUserCustomPermissions(userId: string): boolean {
   return !!userPermissionsCache[userId] && Object.keys(userPermissionsCache[userId]).length > 0;
+}
+
+export function canEditField(
+  userId: string,
+  module: ModuleId,
+  fieldName: string,
+  role: UserRole
+): boolean {
+  if (userFieldPermissionsCache[userId]?.[module]?.[fieldName]) {
+    return userFieldPermissionsCache[userId][module][fieldName].edit;
+  }
+
+  const modulePerms = getEffectivePermissions(role, module, userId);
+  return modulePerms.edit;
+}
+
+export function getUserFieldPermissions(
+  userId: string,
+  module: ModuleId
+): Record<string, { edit: boolean }> | undefined {
+  return userFieldPermissionsCache[userId]?.[module];
 }
 
 export function getAllowedModules(role: UserRole): ModuleId[] {
