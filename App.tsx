@@ -325,13 +325,15 @@ const App: React.FC = () => {
         return <EquipmentManager equipments={equipments} setEquipments={setEquipments} currentUser={currentUser} />;
       case 'inventory': 
         return (
-          <Inventory 
-            materials={materials} 
-            movements={movements} 
-            setMaterials={setMaterials} 
-            onAddMovement={(m) => setMovements(p => [...p, m])} 
+          <Inventory
+            materials={materials}
+            movements={movements}
+            setMaterials={setMaterials}
+            onAddMovement={(m) => setMovements(p => [...p, m])}
             currentUser={currentUser}
             projects={projects}
+            oss={oss}
+            setOss={setOss}
           />
         );
       case 'services':

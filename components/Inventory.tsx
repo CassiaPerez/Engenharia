@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Material, StockMovement, StockLocation, User, Project, OS } from '../types';
+import { Material, StockMovement, StockLocation, User, Project, OS, OSItem } from '../types';
 import * as XLSX from 'xlsx';
 import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
@@ -12,9 +12,11 @@ interface Props {
   onAddMovement: (mov: StockMovement) => void;
   currentUser: User;
   projects?: Project[];
+  oss?: OS[];
+  setOss?: React.Dispatch<React.SetStateAction<OS[]>>;
 }
 
-const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser, projects = [] }) => {
+const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser, projects = [], oss = [], setOss }) => {
   const [view, setView] = useState<'stock' | 'history'>('stock');
   const [allOS, setAllOS] = useState<OS[]>([]);
 
@@ -355,6 +357,32 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                       osId: osId,
                       costCenter: costCenter
                   });
+
+                  if (osId && setOss) {
+                      setOss(prevOss => prevOss.map(os => {
+                          if (os.number === locForm.osNumber) {
+                              const newMaterial: OSItem = {
+                                  materialId: m.id,
+                                  quantity: qty,
+                                  unitCost: m.unitCost,
+                                  timestamp: new Date().toISOString()
+                              };
+
+                              const updatedOS = {
+                                  ...os,
+                                  materials: [...(os.materials || []), newMaterial]
+                              };
+
+                              supabase.from('oss').upsert({
+                                  id: updatedOS.id,
+                                  json_content: updatedOS
+                              }).catch(e => console.error('Erro ao atualizar OS:', e));
+
+                              return updatedOS;
+                          }
+                          return os;
+                      }));
+                  }
 
               } else if (locAction === 'TRANSFER') {
                   const fromIndex = newLocations.findIndex(l => l.name === locForm.location);
