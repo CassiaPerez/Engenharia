@@ -204,6 +204,42 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       setOutType('OS');
   };
 
+  const handleDeleteMaterial = async (material: Material) => {
+      if (currentUser.role !== 'ADMIN') {
+          alert('Apenas administradores podem excluir materiais.');
+          return;
+      }
+
+      const confirm = window.confirm(
+          `Tem certeza que deseja excluir o material:\n\n` +
+          `Código: ${material.code}\n` +
+          `Descrição: ${material.description}\n\n` +
+          `Esta ação não pode ser desfeita.`
+      );
+
+      if (!confirm) return;
+
+      try {
+          const { error } = await supabase
+              .from('materials')
+              .delete()
+              .eq('id', material.id);
+
+          if (error) {
+              console.error('Erro ao excluir material:', error);
+              alert('Erro ao excluir material: ' + error.message);
+              return;
+          }
+
+          setMaterials(prev => prev.filter(m => m.id !== material.id));
+          alert('Material excluído com sucesso!');
+          console.log('✅ Material deleted:', material.code);
+      } catch (e) {
+          console.error('Erro ao excluir material:', e);
+          alert('Erro ao excluir material. Verifique o console para mais detalhes.');
+      }
+  };
+
   const handleLocationSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!selectedMaterialForLoc) return;
@@ -722,6 +758,15 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                        <button onClick={() => openLocationManager(m)} className="bg-white border border-slate-300 text-slate-600 hover:text-clean-primary hover:border-clean-primary font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2">
                                            <i className="fas fa-boxes-stacked"></i> Gerenciar
                                        </button>
+                                       {currentUser.role === 'ADMIN' && (
+                                           <button
+                                               onClick={() => handleDeleteMaterial(m)}
+                                               className="bg-white border border-red-300 text-red-600 hover:text-white hover:bg-red-600 hover:border-red-600 font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2"
+                                               title="Excluir material"
+                                           >
+                                               <i className="fas fa-trash"></i>
+                                           </button>
+                                       )}
                                    </div>
                                </td>
                            </tr>
