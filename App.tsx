@@ -91,16 +91,16 @@ const App: React.FC = () => {
         await loadCustomPermissions();
 
         const [p, m, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
-          supabase.from('projects').select('*'),
-          supabase.from('materials').select('id, json_content').order('id', { ascending: false }).limit(500),
-          supabase.from('services').select('*'),
-          supabase.from('oss').select('id, json_content').order('id', { ascending: false }).limit(50),
-          supabase.from('stock_movements').select('id, json_content').order('id', { ascending: false }).limit(500),
-          supabase.from('suppliers').select('*'),
+          supabase.from('projects').select('*').limit(100),
+          supabase.from('materials').select('id, json_content').order('id', { ascending: false }).limit(200),
+          supabase.from('services').select('*').limit(50),
+          supabase.from('oss').select('id, json_content').order('id', { ascending: false }).limit(30),
+          supabase.from('stock_movements').select('id, json_content').order('id', { ascending: false }).limit(200),
+          supabase.from('suppliers').select('*').limit(50),
           supabase.from('users').select('*'),
-          supabase.from('purchases').select('*'),
-          supabase.from('buildings').select('*'),
-          supabase.from('equipments').select('id, json_content').order('id', { ascending: false }).limit(200)
+          supabase.from('purchases').select('*').limit(100),
+          supabase.from('buildings').select('*').limit(50),
+          supabase.from('equipments').select('id, json_content').order('id', { ascending: false }).limit(100)
         ]);
 
         if (p.error) console.error("❌ Error loading projects:", p.error);

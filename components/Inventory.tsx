@@ -3,6 +3,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Material, StockMovement, StockLocation, User, Project, OS, OSItem } from '../types';
 import * as XLSX from 'xlsx';
 import { supabase, mapToSupabase } from '../services/supabase';
+import { useBatchSave } from '../hooks/useBatchSave';
 import ModalPortal from './ModalPortal';
 
 interface Props {
@@ -19,15 +20,11 @@ interface Props {
 const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser, projects = [], oss = [], setOss }) => {
   const [view, setView] = useState<'stock' | 'history'>('stock');
   const [allOS, setAllOS] = useState<OS[]>([]);
+  const { queueOperation, flush } = useBatchSave(1500);
 
   const addMovementWithSync = async (mov: StockMovement) => {
     onAddMovement(mov);
-    try {
-      const { error } = await supabase.from('stock_movements').insert(mapToSupabase(mov));
-      if (error) throw error;
-    } catch (e) {
-      console.error('Erro ao salvar movimento:', e);
-    }
+    queueOperation('stock_movements', 'insert', mov);
   };
   
   const [searchInput, setSearchInput] = useState(''); 
@@ -373,10 +370,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                   materials: [...(os.materials || []), newMaterial]
                               };
 
-                              supabase.from('oss').upsert({
-                                  id: updatedOS.id,
-                                  json_content: updatedOS
-                              }).catch(e => console.error('Erro ao atualizar OS:', e));
+                              queueOperation('oss', 'upsert', updatedOS, updatedOS.id);
 
                               return updatedOS;
                           }
@@ -426,15 +420,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       }));
 
       if (updatedMaterial) {
-          try {
-              const { error } = await supabase.from('materials').upsert({
-                  id: updatedMaterial.id,
-                  json_content: updatedMaterial
-              });
-              if (error) throw error;
-          } catch (e) {
-              console.error('Erro ao salvar alteração:', e);
-          }
+          queueOperation('materials', 'upsert', updatedMaterial, updatedMaterial.id);
       }
 
       setLocForm({ location: '', toLocation: '', quantity: '', reason: '', osNumber: '', projectId: '' });
@@ -528,6 +514,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         }
 
         console.log('Fechando modal e limpando formulário...');
+        await flush();
         setShowModal(false);
         setNewMaterial({ status: 'ACTIVE', minStock: 10, currentStock: 0, unitCost: 0, group: 'Geral', unit: 'Un', code: '' });
         alert('Material cadastrado com sucesso!');
