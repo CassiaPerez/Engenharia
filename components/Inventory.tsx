@@ -96,12 +96,12 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   const loadOS = async () => {
     try {
-      console.log('Loading OS with optimization (limit 100)...');
+      console.log('Loading OS with optimization (limit 20)...');
       const { data, error } = await supabase
         .from('oss')
         .select('id, json_content')
         .order('id', { ascending: false })
-        .limit(100);
+        .limit(20);
 
       if (error) {
         console.error('Error loading OS:', error);
