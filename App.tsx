@@ -18,7 +18,7 @@ import ExecutorPanel from './components/ExecutorPanel';
 import BuildingManager from './components/BuildingManager';
 import EquipmentManager from './components/EquipmentManager';
 import Reports from './components/Reports';
-import { supabase, mapFromSupabase, mapToSupabase } from './services/supabase';
+import { supabase, mapFromSupabase, mapToSupabase, mapToSupabaseJson } from './services/supabase';
 import { canAccessModule, ModuleId, loadCustomPermissions } from './services/permissions';
 
 // Definição da estrutura do Menu
@@ -240,7 +240,7 @@ const App: React.FC = () => {
       }
 
       if (newMovement) {
-        const { error: movError } = await supabase.from('stock_movements').insert(mapToSupabase(newMovement));
+        const { error: movError } = await supabase.from('stock_movements').insert(mapToSupabaseJson(newMovement));
         if (movError) throw movError;
       }
     } catch (e) {

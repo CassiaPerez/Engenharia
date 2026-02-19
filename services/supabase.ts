@@ -56,14 +56,13 @@ export const mapFromSupabase = <T extends { id: string }>(data: any[] | null): T
   });
 };
 
-// Helper para preparar dados para upsert no formato normalizado + JSONB
-// Salva dados tanto nas colunas normalizadas quanto no json_content para compatibilidade
+// Helper para preparar dados para upsert no formato normalizado
+// Converte camelCase para snake_case e mapeia para as colunas corretas
 // O app SEMPRE deve tratar `row.id` como fonte de verdade.
 export const mapToSupabase = <T extends { id: string }>(item: T) => {
-  const { id, created_at, updated_at, ...rest } = item as any;
+  const { id, createdAt, updatedAt, ...rest } = item as any;
 
   const normalizedData: any = { id };
-  const jsonData = { ...item };
 
   if ('name' in rest) normalizedData.name = rest.name;
   if ('email' in rest) normalizedData.email = rest.email;
@@ -132,7 +131,13 @@ export const mapToSupabase = <T extends { id: string }>(item: T) => {
   if ('phone' in rest) normalizedData.phone = rest.phone;
   if ('state' in rest) normalizedData.state = rest.state;
 
-  normalizedData.json_content = jsonData;
-
   return normalizedData;
+};
+
+// Legacy helper for tables that still use json_content (purchases, stock_movements)
+export const mapToSupabaseJson = <T extends { id: string }>(item: T) => {
+  return {
+    id: item.id,
+    json_content: { ...item, id: item.id },
+  };
 };
