@@ -131,13 +131,17 @@ const CalendarView: React.FC<Props> = ({ oss, projects, materials, services, use
                          <div className="space-y-1.5 overflow-y-auto max-h-[110px] custom-scrollbar pr-1">
                              {events.map(os => {
                                  const proj = projects.find(p => p.id === os.projectId);
-                                 const executor = users.find(u => u.id === os.executorId);
+                                 const legacyExecutor = users.find(u => u.id === os.executorId || u.email === os.executorId);
+                                 const multiExecutors = os.executorIds?.map(eid => users.find(u => u.id === eid || u.email === eid)).filter(Boolean) || [];
+                                 const allExecutors = multiExecutors.length > 0 ? multiExecutors : (legacyExecutor ? [legacyExecutor] : []);
+                                 const executorNames = allExecutors.map(e => e?.name.split(' ')[0]).join(', ');
+
                                  return (
-                                     <button 
+                                     <button
                                         key={os.id}
                                         onClick={() => setSelectedOS(os)}
                                         className={`w-full text-left px-2 py-1.5 rounded border text-xs font-bold truncate shadow-sm hover:opacity-80 transition-all flex flex-col gap-0.5 ${getStatusColor(os.status)}`}
-                                        title={`${os.number}: ${os.description}`}
+                                        title={`${os.number}: ${os.description}\n${allExecutors.length > 0 ? 'Executores: ' + allExecutors.map(e => e?.name).join(', ') : ''}`}
                                      >
                                         <div className="flex items-center gap-1.5">
                                             <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${os.priority === 'CRITICAL' ? 'bg-red-500' : os.priority === 'HIGH' ? 'bg-orange-500' : 'bg-slate-400'}`}></div>
@@ -147,9 +151,9 @@ const CalendarView: React.FC<Props> = ({ oss, projects, materials, services, use
                                             <div className="text-[10px] opacity-75 truncate font-medium">
                                                 {proj?.code}
                                             </div>
-                                            {executor && (
-                                                <div className="text-[9px] opacity-90 font-bold bg-black/10 px-1 rounded ml-1 truncate max-w-[60px]" title={executor.name}>
-                                                    {executor.name.split(' ')[0]}
+                                            {executorNames && (
+                                                <div className="text-[9px] opacity-90 font-bold bg-black/10 px-1 rounded ml-1 truncate max-w-[80px]" title={allExecutors.map(e => e?.name).join(', ')}>
+                                                    {executorNames}
                                                 </div>
                                             )}
                                         </div>

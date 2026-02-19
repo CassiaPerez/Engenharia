@@ -76,6 +76,33 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       }
   };
 
+  const handleFinishProject = async (id: string) => {
+      if (currentUser.role !== 'ADMIN') {
+          alert('Apenas administradores podem finalizar projetos.');
+          return;
+      }
+
+      if (confirm('Deseja finalizar este projeto? Esta ação marcará o projeto como concluído.')) {
+          const previousProjects = [...projects];
+          setProjects(prev => prev.map(p => p.id === id ? { ...p, status: ProjectStatus.FINISHED } : p));
+
+          try {
+              const project = projects.find(p => p.id === id);
+              if (!project) return;
+
+              const { error } = await supabase.from('projects').upsert({
+                  id: id,
+                  json_content: { ...project, status: ProjectStatus.FINISHED }
+              });
+              if (error) throw error;
+          } catch (e: any) {
+              console.error('Erro ao finalizar projeto:', e);
+              setProjects(previousProjects);
+              alert(`Erro ao finalizar projeto: ${e.message}`);
+          }
+      }
+  };
+
   const openNewProjectModal = () => {
     setEditingProject(null);
     setModalTab('DETAILS');
@@ -550,6 +577,9 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                     </div>
                     <div className="flex gap-2 shrink-0">
                         <button onClick={() => generateProjectDetailPDF(p)} className="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-slate-300 text-slate-600 hover:text-red-600 hover:bg-red-50 transition-all shadow-sm" title="Baixar PDF"><i className="fas fa-file-pdf"></i></button>
+                        {p.status !== ProjectStatus.FINISHED && currentUser.role === 'ADMIN' && (
+                          <button onClick={() => handleFinishProject(p.id)} className="px-4 py-2.5 rounded-lg border border-emerald-300 flex items-center justify-center gap-2 text-emerald-700 hover:text-white hover:bg-emerald-600 hover:border-emerald-600 bg-emerald-50 transition-all text-base font-bold shadow-sm" title="Finalizar Projeto"><i className="fas fa-check-circle"></i> Finalizar</button>
+                        )}
                         <button onClick={() => openEditProjectModal(p)} className="px-4 py-2.5 rounded-lg border border-slate-300 flex items-center justify-center gap-2 text-slate-600 hover:text-blue-700 hover:border-blue-400 bg-white hover:bg-blue-50 transition-all text-base font-bold shadow-sm"><i className="fas fa-pencil"></i> Editar</button>
                         <button onClick={() => setShowCostDetail(p)} className="px-4 py-2.5 rounded-lg border border-slate-300 flex items-center justify-center gap-2 text-slate-600 hover:text-clean-primary hover:border-clean-primary bg-white hover:bg-slate-50 transition-all text-base font-bold shadow-sm"><i className="fas fa-eye"></i> Detalhes</button>
                     </div>

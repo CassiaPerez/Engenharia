@@ -252,6 +252,46 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       setItemSearchTerm('');
   };
 
+  const handleRemoveService = async (index: number) => {
+      if (!selectedOS || !isEditable(selectedOS)) return;
+      if (!confirm('Deseja realmente remover este serviço da OS?')) return;
+
+      const updatedServices = selectedOS.services.filter((_, i) => i !== index);
+      const updatedOS = { ...selectedOS, services: updatedServices };
+      setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+      setSelectedOS(updatedOS);
+
+      try {
+          const { error } = await supabase.from('oss').upsert({
+              id: updatedOS.id,
+              json_content: updatedOS
+          });
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao remover serviço:', e);
+      }
+  };
+
+  const handleRemoveMaterial = async (index: number) => {
+      if (!selectedOS || !isEditable(selectedOS)) return;
+      if (!confirm('Deseja realmente remover este material da OS?')) return;
+
+      const updatedMaterials = selectedOS.materials.filter((_, i) => i !== index);
+      const updatedOS = { ...selectedOS, materials: updatedMaterials };
+      setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+      setSelectedOS(updatedOS);
+
+      try {
+          const { error } = await supabase.from('oss').upsert({
+              id: updatedOS.id,
+              json_content: updatedOS
+          });
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao remover material:', e);
+      }
+  };
+
   const handleQuickSaveMaterial = (e: React.FormEvent) => {
       e.preventDefault();
       if (!quickMat.description || !quickMat.cost || !setMaterials) return;
@@ -304,6 +344,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
           equipmentId: formOS.equipmentId,
           costCenter: formOS.costCenter,
           executorIds: selectedExecutors.length > 0 ? selectedExecutors : undefined,
+          requesterId: currentUser.id,
+          requesterName: currentUser.name,
           description: formOS.description || '',
           type: formOS.type || OSType.PREVENTIVE,
           priority: formOS.priority as any,
@@ -467,14 +509,48 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
     y = (doc as any).lastAutoTable.finalY + 10;
 
     doc.setFont("helvetica", "bold");
-    doc.text("DESCRIÇÃO DA ATIVIDADE", 14, y);
+    doc.text("DESCRIÇÃO DO PROBLEMA SOLICITADO", 14, y);
     doc.line(14, y + 2, 196, y + 2);
     y += 8;
-    
+
     doc.setFont("helvetica", "normal");
     const descLines = doc.splitTextToSize(os.description, 180);
     doc.text(descLines, 14, y);
     y += descLines.length * 5 + 10;
+
+    if (os.executionDescription) {
+        doc.setFont("helvetica", "bold");
+        doc.text("DESCRIÇÃO DO SERVIÇO REALIZADO", 14, y);
+        doc.line(14, y + 2, 196, y + 2);
+        y += 8;
+
+        doc.setFont("helvetica", "normal");
+        const execLines = doc.splitTextToSize(os.executionDescription, 180);
+        doc.text(execLines, 14, y);
+        y += execLines.length * 5 + 10;
+    }
+
+    if (os.completionImage) {
+        if (y > 200) {
+            doc.addPage();
+            y = 40;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.text("FOTO DO SERVIÇO REALIZADO", 14, y);
+        doc.line(14, y + 2, 196, y + 2);
+        y += 8;
+
+        try {
+            doc.addImage(os.completionImage, 'JPEG', 14, y, 90, 90);
+            y += 100;
+        } catch (e) {
+            doc.setFont("helvetica", "italic");
+            doc.setFontSize(9);
+            doc.text("(Foto não disponível ou formato inválido)", 14, y);
+            y += 10;
+        }
+    }
 
     if (os.materials.length > 0) {
         doc.setFont("helvetica", "bold");
@@ -679,6 +755,17 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                         {selectedOS.projectId && <p className="text-xs text-slate-500">Herdado do Projeto</p>}
                                     </div>
                                 </div>
+                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'EXECUTOR') && selectedOS.requesterName && (
+                                  <div>
+                                      <p className="text-xs font-bold text-slate-500 uppercase mb-1">Solicitante</p>
+                                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                          <p className="font-bold text-blue-900 flex items-center gap-2">
+                                              <i className="fas fa-user text-sm"></i>
+                                              {selectedOS.requesterName}
+                                          </p>
+                                      </div>
+                                  </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</p>
@@ -914,7 +1001,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 <div className="space-y-6">
                                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                                         <table className="w-full text-sm text-left">
-                                            <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase"><tr className="border-b border-slate-100"><th className="p-4">Item</th><th className="p-4 text-right">Qtd</th><th className="p-4 text-right">Custo Unit.</th><th className="p-4 text-right">Total</th></tr></thead>
+                                            <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase"><tr className="border-b border-slate-100"><th className="p-4">Item</th><th className="p-4 text-right">Qtd</th><th className="p-4 text-right">Custo Unit.</th><th className="p-4 text-right">Total</th><th className="p-4 text-center w-20">Ações</th></tr></thead>
                                             <tbody className="divide-y divide-slate-50">
                                                 {activeSubTab === 'services' ? (
                                                     selectedOS.services.map((s, i) => {
@@ -925,6 +1012,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                                                 <td className="p-4 text-right font-mono">{s.quantity} h</td>
                                                                 <td className="p-4 text-right text-slate-600">R$ {formatCurrency(s.unitCost)}</td>
                                                                 <td className="p-4 text-right font-bold text-slate-800">R$ {formatCurrency(s.quantity * s.unitCost)}</td>
+                                                                <td className="p-4 text-center"><button onClick={() => handleRemoveService(i)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Remover serviço"><i className="fas fa-trash-alt"></i></button></td>
                                                             </tr>
                                                         );
                                                     })
@@ -937,12 +1025,13 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                                                 <td className="p-4 text-right font-mono">{m.quantity} {mat?.unit}</td>
                                                                 <td className="p-4 text-right text-slate-600">R$ {formatCurrency(m.unitCost)}</td>
                                                                 <td className="p-4 text-right font-bold text-slate-800">R$ {formatCurrency(m.quantity * m.unitCost)}</td>
+                                                                <td className="p-4 text-center"><button onClick={() => handleRemoveMaterial(i)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Remover material"><i className="fas fa-trash-alt"></i></button></td>
                                                             </tr>
                                                         );
                                                     })
                                                 )}
                                                 {((activeSubTab === 'services' && selectedOS.services.length === 0) || (activeSubTab === 'materials' && selectedOS.materials.length === 0)) && (
-                                                    <tr><td colSpan={4} className="p-8 text-center text-slate-400 italic">Nenhum item registrado nesta categoria.</td></tr>
+                                                    <tr><td colSpan={5} className="p-8 text-center text-slate-400 italic">Nenhum item registrado nesta categoria.</td></tr>
                                                 )}
                                             </tbody>
                                         </table>

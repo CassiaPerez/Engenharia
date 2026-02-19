@@ -34,7 +34,8 @@ export enum OSType {
 
 export enum ServiceCostType {
   HOURLY = 'Por Hora',
-  FIXED = 'Valor Fixo'
+  FIXED = 'Valor Fixo',
+  VARIABLE = 'Valor Variável'
 }
 
 export interface Building {
@@ -142,6 +143,8 @@ export interface OS {
   costCenter?: string;
   executorIds?: string[];
   executorId?: string;
+  requesterId?: string;
+  requesterName?: string;
   startTime?: string;
   endTime?: string;
   pauseReason?: string;

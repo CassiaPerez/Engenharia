@@ -105,7 +105,7 @@ export const PERMISSIONS_MATRIX: Record<UserRole, Record<ModuleId, ModulePermiss
     projects: { view: false, create: false, edit: false, delete: false, export: false },
     os: { view: true, create: true, edit: false, delete: false, export: false },
     buildings: { view: false, create: false, edit: false, delete: false, export: false },
-    equipments: { view: true, create: true, edit: false, delete: false, export: false },
+    equipments: { view: false, create: false, edit: false, delete: false, export: false },
     inventory: { view: false, create: false, edit: false, delete: false, export: false },
     services: { view: false, create: false, edit: false, delete: false, export: false },
     suppliers: { view: false, create: false, edit: false, delete: false, export: false },

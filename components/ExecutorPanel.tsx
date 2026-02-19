@@ -147,19 +147,22 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
 
   const handleStart = async (e: React.MouseEvent, osId: string) => {
       e.stopPropagation();
-      const updated = { status: OSStatus.IN_PROGRESS, startTime: new Date().toISOString() };
+      const os = oss.find(o => o.id === osId);
+      if (!os) return;
+
+      const updated = {
+        status: OSStatus.IN_PROGRESS,
+        startTime: os.startTime || new Date().toISOString()
+      };
       setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
 
       try {
-          const os = oss.find(o => o.id === osId);
-          if (os) {
-              const { error } = await supabase.from('oss').upsert(mapToSupabase({
-                  id: osId,
-                  ...os,
-                  ...updated
-              }));
-              if (error) throw error;
-          }
+          const { error } = await supabase.from('oss').upsert(mapToSupabase({
+              id: osId,
+              ...os,
+              ...updated
+          }));
+          if (error) throw error;
       } catch (e) {
           console.error('Erro ao atualizar OS:', e);
       }

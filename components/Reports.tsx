@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Material, Project, StockMovement, OS, ServiceType, User, Building, Equipment } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -11,18 +11,51 @@ interface Props {
   movements: StockMovement[];
   oss: OS[];
   services: ServiceType[];
-  users?: User[]; // Opcional para manter compatibilidade, mas necessário para relatórios novos
+  users?: User[];
   buildings?: Building[];
   equipments?: Equipment[];
 }
 
 const Reports: React.FC<Props> = ({ materials, projects, movements, oss, services, users = [], buildings = [], equipments = [] }) => {
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [selectedEquipment, setSelectedEquipment] = useState('');
+  const [selectedBuilding, setSelectedBuilding] = useState('');
+  const [selectedProject, setSelectedProject] = useState('');
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const applyFilters = (data: any[]) => {
+    let filtered = [...data];
+
+    if (dateFrom || dateTo) {
+      filtered = filtered.filter((item: any) => {
+        const itemDate = new Date(item.openDate || item.date || item.startDate);
+        if (dateFrom && itemDate < new Date(dateFrom)) return false;
+        if (dateTo && itemDate > new Date(dateTo + 'T23:59:59')) return false;
+        return true;
+      });
+    }
+
+    if (selectedEquipment) {
+      filtered = filtered.filter((item: any) => item.equipmentId === selectedEquipment);
+    }
+
+    if (selectedBuilding) {
+      filtered = filtered.filter((item: any) => item.buildingId === selectedBuilding);
+    }
+
+    if (selectedProject) {
+      filtered = filtered.filter((item: any) => item.projectId === selectedProject);
+    }
+
+    return filtered;
+  };
 
   const generateMaterialReport = () => {
       const doc = new jsPDF();
       const today = new Date().toLocaleDateString('pt-BR');
+      const filteredMovements = applyFilters(movements);
 
       doc.setFillColor(71, 122, 127);
       doc.rect(0, 0, 210, 24, 'F');
@@ -34,9 +67,13 @@ const Reports: React.FC<Props> = ({ materials, projects, movements, oss, service
       doc.setFont("helvetica", "normal");
       doc.text(`Gerado em: ${today}`, 196, 16, { align: 'right' });
 
-      // Agrupar movimentações de SAÍDA (OUT) por Material
+      if (dateFrom || dateTo) {
+        doc.setFontSize(8);
+        doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, 196, 20, { align: 'right' });
+      }
+
       const materialStats = materials.map(mat => {
-          const outMovements = movements.filter(m => m.materialId === mat.id && m.type === 'OUT');
+          const outMovements = filteredMovements.filter(m => m.materialId === mat.id && m.type === 'OUT');
           const totalQtyOut = outMovements.reduce((acc, m) => acc + m.quantity, 0);
           const totalCostOut = totalQtyOut * mat.unitCost;
           return {
@@ -82,6 +119,9 @@ const Reports: React.FC<Props> = ({ materials, projects, movements, oss, service
   const generateProjectReport = () => {
       const doc = new jsPDF({ orientation: 'landscape' });
       const today = new Date().toLocaleDateString('pt-BR');
+      const filteredProjects = selectedProject ? projects.filter(p => p.id === selectedProject) : projects;
+      const filteredOSs = applyFilters(oss);
+      const filteredMovements = applyFilters(movements);
 
       doc.setFillColor(71, 122, 127);
       doc.rect(0, 0, 297, 24, 'F');
@@ -92,13 +132,17 @@ const Reports: React.FC<Props> = ({ materials, projects, movements, oss, service
       doc.setFontSize(10);
       doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
 
-      const projectStats = projects.map(proj => {
-          // 1. Custos via OS (Engine já calcula isso)
-          const osCosts = calculateProjectCosts(proj, oss, materials, services);
+      if (dateFrom || dateTo) {
+        doc.setFontSize(8);
+        doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, 280, 20, { align: 'right' });
+      }
+
+      const projectStats = filteredProjects.map(proj => {
+          const osCosts = calculateProjectCosts(proj, filteredOSs, materials, services);
           
           // 2. Custos via Baixa Direta (Inventory Direct Issue)
           // Procura movimentações do tipo OUT que tenham projectId igual ao projeto atual
-          const directMovements = movements.filter(m => m.projectId === proj.id && m.type === 'OUT');
+          const directMovements = filteredMovements.filter(m => m.projectId === proj.id && m.type === 'OUT');
           const directMaterialCost = directMovements.reduce((acc, m) => {
               const mat = materials.find(mt => mt.id === m.materialId);
               return acc + (m.quantity * (mat?.unitCost || 0));
@@ -327,6 +371,76 @@ const Reports: React.FC<Props> = ({ materials, projects, movements, oss, service
         <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Central de Relatórios</h2>
         <p className="text-slate-500 text-base mt-1">Exportação de dados para análise gerencial.</p>
       </header>
+
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+          <i className="fas fa-filter text-blue-600"></i>
+          Filtros de Período e Contexto
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data Inicial</label>
+            <input
+              type="date"
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data Final</label>
+            <input
+              type="date"
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Equipamento</label>
+            <select
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={selectedEquipment}
+              onChange={e => setSelectedEquipment(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {equipments.map(eq => (
+                <option key={eq.id} value={eq.id}>{eq.name} - {eq.code}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Edifício/Setor</label>
+            <select
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={selectedBuilding}
+              onChange={e => setSelectedBuilding(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {buildings.map(b => (
+                <option key={b.id} value={b.id}>{b.name} - {b.city}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Projeto</label>
+            <select
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={selectedProject}
+              onChange={e => setSelectedProject(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.code} - {p.description}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-2 text-sm text-slate-600">
+          <i className="fas fa-info-circle text-blue-500"></i>
+          <span>Os filtros serão aplicados aos relatórios que você gerar. Deixe em branco para considerar todos os dados.</span>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* MATERIAL REPORT */}
