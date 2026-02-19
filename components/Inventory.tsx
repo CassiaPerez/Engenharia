@@ -72,7 +72,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     console.log('- Key preview:', import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 30) + '...');
 
     testSupabaseConnection();
-    loadOS();
+
+    loadOS().catch(err => {
+      console.error('Failed to load OS in background:', err);
+    });
   }, []);
 
   const testSupabaseConnection = async () => {
@@ -94,14 +97,28 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   const loadOS = async () => {
     try {
-      const { data, error } = await supabase.from('oss').select('*');
-      if (error) throw error;
+      console.log('Loading OS with optimization (limit 100)...');
+      const { data, error } = await supabase
+        .from('oss')
+        .select('id, json_content')
+        .order('id', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Error loading OS:', error);
+        console.log('⚠️ Skipping OS loading due to error. OS features may be limited.');
+        setAllOS([]);
+        return;
+      }
+
       if (data) {
         const osList = data.map(item => item.json_content);
         setAllOS(osList);
+        console.log('✅ OS loaded successfully:', osList.length, 'items');
       }
     } catch (e) {
-      console.error('Erro ao carregar OS:', e);
+      console.error('❌ Exception loading OS:', e);
+      setAllOS([]);
     }
   };
 
