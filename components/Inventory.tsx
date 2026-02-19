@@ -34,9 +34,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     queueOperation('stock_movements', 'insert', mov);
   };
   
-  const [searchInput, setSearchInput] = useState(''); 
-  const [searchTerm, setSearchTerm] = useState('');   
-  
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [showModal, setShowModal] = useState(false);
@@ -684,8 +685,19 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         });
       }
 
+      // 3. Filtro por Almoxarifado Selecionado
+      if (warehouseFilter !== 'ALL') {
+        if (warehouseFilter === 'Cropbio') {
+          textFiltered = textFiltered.filter(m => m.location === 'Cropbio' || m.location === 'Laboratório de defensivos');
+        } else if (warehouseFilter === 'Cropfert') {
+          textFiltered = textFiltered.filter(m => m.location === 'Cropfert');
+        } else if (warehouseFilter === 'Central') {
+          textFiltered = textFiltered.filter(m => m.location === 'CD - Central');
+        }
+      }
+
       return textFiltered;
-  }, [materials, searchTerm, currentUser.role, currentUser.company, allowedWarehouses]);
+  }, [materials, searchTerm, currentUser.role, currentUser.company, allowedWarehouses, warehouseFilter]);
 
   const filteredMovements = useMemo(() => {
       // Filtrar IDs dos materiais permitidos para este usuário
@@ -747,15 +759,70 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
       {view === 'stock' ? (
         <>
-          <div className="relative max-w-lg group">
-            <i className={`fas ${searchInput !== searchTerm ? 'fa-spinner fa-spin text-clean-primary' : 'fa-search text-slate-400'} absolute left-4 top-1/2 -translate-y-1/2 text-lg transition-colors`}></i>
-            <input 
-                type="text" 
-                placeholder="Filtrar materiais por nome ou código..." 
-                className="w-full pl-12 pr-4 h-14 bg-white border border-slate-300 rounded-xl text-lg text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary placeholder:text-slate-400 font-medium transition-all" 
-                value={searchInput} 
-                onChange={e => setSearchInput(e.target.value)} 
-            />
+          <div className="flex gap-4 items-center">
+            <div className="relative flex-1 max-w-lg group">
+              <i className={`fas ${searchInput !== searchTerm ? 'fa-spinner fa-spin text-clean-primary' : 'fa-search text-slate-400'} absolute left-4 top-1/2 -translate-y-1/2 text-lg transition-colors`}></i>
+              <input
+                  type="text"
+                  placeholder="Filtrar materiais por nome ou código..."
+                  className="w-full pl-12 pr-4 h-14 bg-white border border-slate-300 rounded-xl text-lg text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary placeholder:text-slate-400 font-medium transition-all"
+                  value={searchInput}
+                  onChange={e => setSearchInput(e.target.value)}
+              />
+            </div>
+
+            {allowedWarehouses.length > 1 && (
+              <div className="relative">
+                <i className="fas fa-warehouse absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none"></i>
+                <select
+                  value={warehouseFilter}
+                  onChange={e => setWarehouseFilter(e.target.value)}
+                  className="pl-12 pr-10 h-14 bg-white border border-slate-300 rounded-xl text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary font-medium transition-all appearance-none cursor-pointer min-w-[220px]"
+                >
+                  <option value="ALL">Todos os Almoxarifados</option>
+                  {canAccessCentral && <option value="Central">Central</option>}
+                  {canAccessCropbio && <option value="Cropbio">Cropbio</option>}
+                  {canAccessCropfert && <option value="Cropfert">Cropfert</option>}
+                </select>
+                <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+              </div>
+            )}
+          </div>
+
+          {warehouseFilter !== 'ALL' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-3">
+              <i className="fas fa-filter text-amber-600"></i>
+              <div className="flex-1 text-sm">
+                <span className="font-bold text-amber-900">Filtro ativo:</span>{' '}
+                <span className="text-amber-800">
+                  Exibindo apenas itens do almoxarifado{' '}
+                  <span className="font-bold">{warehouseFilter}</span>
+                </span>
+              </div>
+              <button
+                onClick={() => setWarehouseFilter('ALL')}
+                className="px-3 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-2"
+              >
+                <i className="fas fa-times"></i>
+                Limpar Filtro
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-600">
+              Exibindo <span className="font-bold text-slate-900">{filteredMaterials.length}</span> {filteredMaterials.length === 1 ? 'item' : 'itens'}
+              {warehouseFilter !== 'ALL' && (
+                <span className="text-amber-600 ml-1">
+                  (filtrado de {materials.filter(m => {
+                    if (allowedWarehouses.includes('Cropbio') && (m.location === 'Cropbio' || m.location === 'Laboratório de defensivos')) return true;
+                    if (allowedWarehouses.includes('Cropfert') && m.location === 'Cropfert') return true;
+                    if (allowedWarehouses.includes('Central') && m.location === 'CD - Central') return true;
+                    return false;
+                  }).length})
+                </span>
+              )}
+            </p>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
