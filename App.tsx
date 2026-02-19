@@ -94,7 +94,7 @@ const App: React.FC = () => {
           supabase.from('projects').select('*').order('updated_at', { ascending: false }).limit(100),
           supabase.from('materials').select('id, json_content').order('updated_at', { ascending: false }).limit(200),
           supabase.from('services').select('*').order('updated_at', { ascending: false }).limit(50),
-          supabase.from('oss').select('id, json_content').order('updated_at', { ascending: false }).limit(30),
+          supabase.from('oss').select('id, json_content').order('id', { ascending: false }).limit(100),
           supabase.from('stock_movements').select('id, json_content').order('updated_at', { ascending: false }).limit(200),
           supabase.from('suppliers').select('*').order('updated_at', { ascending: false }).limit(50),
           supabase.from('users').select('*').order('updated_at', { ascending: false }),
