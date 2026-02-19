@@ -387,7 +387,13 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
         if (error) {
             console.error('Erro do Supabase:', error);
-            alert(`Erro ao salvar no banco de dados: ${error.message}`);
+            alert(`Erro ao salvar no banco de dados: ${error.message}\n\nDetalhes: ${error.hint || 'Verifique sua conexão com o banco de dados.'}`);
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            console.error('Nenhum dado retornado do Supabase após inserção');
+            alert('Erro: O material não foi salvo corretamente no banco de dados. Tente novamente.');
             return;
         }
 

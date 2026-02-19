@@ -1,9 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Credenciais fornecidas para conexão com Supabase
-// Em produção, utilize variáveis de ambiente como import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_URL = 'https://affnrlkacfqjxchlubww.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_uc3NgAk9YpxARRLGIPEz4w_Q9q_mXRr';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  throw new Error('Missing Supabase environment variables. Check your .env file.');
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
