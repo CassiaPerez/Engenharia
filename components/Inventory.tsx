@@ -4,6 +4,7 @@ import { Material, StockMovement, StockLocation, User, Project, OS, OSItem } fro
 import * as XLSX from 'xlsx';
 import { supabase, mapToSupabase } from '../services/supabase';
 import { useBatchSave } from '../hooks/useBatchSave';
+import { usePermissions } from '../hooks/usePermissions';
 import ModalPortal from './ModalPortal';
 
 interface Props {
@@ -21,6 +22,12 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   const [view, setView] = useState<'stock' | 'history'>('stock');
   const [allOS, setAllOS] = useState<OS[]>([]);
   const { queueOperation, flush } = useBatchSave(1500);
+  const { getWarehouses, canAccessWarehouse } = usePermissions(currentUser.role, 'inventory', currentUser.id);
+
+  const allowedWarehouses = getWarehouses();
+  const canAccessCropbio = canAccessWarehouse('Cropbio');
+  const canAccessCropfert = canAccessWarehouse('Cropfert');
+  const canAccessCentral = canAccessWarehouse('Central');
 
   const addMovementWithSync = async (mov: StockMovement) => {
     onAddMovement(mov);
@@ -661,19 +668,24 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         m.code.toLowerCase().includes(searchTerm.toLowerCase())
       );
 
-      // 2. Filtro por Empresa/Localização
-      if (currentUser.company === 'Cropbio') {
-        textFiltered = textFiltered.filter(m =>
-          m.location === 'Cropbio' || m.location === 'Laboratório de defensivos'
-        );
-      } else if (currentUser.company === 'Cropfert') {
-        textFiltered = textFiltered.filter(m =>
-          m.location === 'Cropfert'
-        );
+      // 2. Filtro por Almoxarifado (baseado em permissões customizadas ou role)
+      if (allowedWarehouses.length > 0) {
+        textFiltered = textFiltered.filter(m => {
+          if (allowedWarehouses.includes('Cropbio') && (m.location === 'Cropbio' || m.location === 'Laboratório de defensivos')) {
+            return true;
+          }
+          if (allowedWarehouses.includes('Cropfert') && m.location === 'Cropfert') {
+            return true;
+          }
+          if (allowedWarehouses.includes('Central') && m.location === 'CD - Central') {
+            return true;
+          }
+          return false;
+        });
       }
 
       return textFiltered;
-  }, [materials, searchTerm, currentUser.role, currentUser.company]);
+  }, [materials, searchTerm, currentUser.role, currentUser.company, allowedWarehouses]);
 
   const filteredMovements = useMemo(() => {
       // Filtrar IDs dos materiais permitidos para este usuário
@@ -694,18 +706,20 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
         <div>
           <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
-            {currentUser.company === 'Cropbio' && 'Almoxarifado Cropbio'}
-            {currentUser.company === 'Cropfert' && 'Almoxarifado Cropfert'}
-            {!currentUser.company && 'Almoxarifado Central'}
+            {allowedWarehouses.length === 1 && allowedWarehouses[0] === 'Cropbio' && 'Almoxarifado Cropbio'}
+            {allowedWarehouses.length === 1 && allowedWarehouses[0] === 'Cropfert' && 'Almoxarifado Cropfert'}
+            {allowedWarehouses.length === 1 && allowedWarehouses[0] === 'Central' && 'Almoxarifado Central'}
+            {allowedWarehouses.length > 1 && 'Controle de Almoxarifados'}
+            {allowedWarehouses.length === 0 && 'Sem Acesso a Almoxarifados'}
           </h2>
-          <div className="flex items-center gap-2">
-            <p className="text-slate-500 text-lg mt-1 font-medium">
-              {currentUser.company === 'Cropbio' && 'Controle de estoque Cropbio e Laboratório de defensivos'}
-              {currentUser.company === 'Cropfert' && 'Controle de estoque Cropfert'}
-              {!currentUser.company && 'Controle físico de estoque e auditoria'}
+          <div className="flex items-center gap-2 mt-2">
+            <p className="text-slate-500 text-sm font-medium">
+              Acesso a:
             </p>
-            {currentUser.role === 'WAREHOUSE_BIO' && <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200 uppercase">Cropbio</span>}
-            {currentUser.role === 'WAREHOUSE_FERT' && <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded border border-blue-200 uppercase">Cropfert</span>}
+            {canAccessCropbio && <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200 uppercase flex items-center gap-1"><i className="fas fa-leaf"></i> Cropbio</span>}
+            {canAccessCropfert && <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded border border-blue-200 uppercase flex items-center gap-1"><i className="fas fa-seedling"></i> Cropfert</span>}
+            {canAccessCentral && <span className="bg-slate-100 text-slate-800 text-xs font-bold px-2 py-1 rounded border border-slate-200 uppercase flex items-center gap-1"><i className="fas fa-building"></i> Central</span>}
+            {allowedWarehouses.length === 0 && <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded border border-red-200 uppercase">Nenhum</span>}
           </div>
         </div>
         <div className="flex flex-wrap gap-3">

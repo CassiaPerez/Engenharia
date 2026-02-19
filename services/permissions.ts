@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 let customPermissionsCache: Record<string, ModulePermissions> = {};
 let userPermissionsCache: Record<string, Record<string, ModulePermissions>> = {};
 let userFieldPermissionsCache: Record<string, Record<string, Record<string, { edit: boolean }>>> = {};
+let userWarehousesCache: Record<string, string[]> = {};
 
 export type ModuleId =
   | 'dashboard'
@@ -197,10 +198,14 @@ export async function loadUserPermissions(userId?: string): Promise<void> {
         if (item.field_permissions) {
           userFieldPermissionsCache[userId][item.module] = item.field_permissions;
         }
+        if (item.warehouses) {
+          userWarehousesCache[userId] = item.warehouses;
+        }
       });
     } else {
       userPermissionsCache = {};
       userFieldPermissionsCache = {};
+      userWarehousesCache = {};
       (data || []).forEach(item => {
         if (!userPermissionsCache[item.user_id]) {
           userPermissionsCache[item.user_id] = {};
@@ -209,6 +214,9 @@ export async function loadUserPermissions(userId?: string): Promise<void> {
         userPermissionsCache[item.user_id][item.module] = item.permissions as ModulePermissions;
         if (item.field_permissions) {
           userFieldPermissionsCache[item.user_id][item.module] = item.field_permissions;
+        }
+        if (item.warehouses) {
+          userWarehousesCache[item.user_id] = item.warehouses;
         }
       });
     }
@@ -375,6 +383,66 @@ export function getUserFieldPermissions(
   module: ModuleId
 ): Record<string, { edit: boolean }> | undefined {
   return userFieldPermissionsCache[userId]?.[module];
+}
+
+export function getUserWarehouses(userId: string, role: UserRole): string[] {
+  if (userWarehousesCache[userId]) {
+    return userWarehousesCache[userId];
+  }
+
+  if (role === 'WAREHOUSE') {
+    return ['Central', 'Cropbio', 'Cropfert'];
+  } else if (role === 'WAREHOUSE_BIO') {
+    return ['Cropbio'];
+  } else if (role === 'WAREHOUSE_FERT') {
+    return ['Cropfert'];
+  } else if (role === 'ADMIN') {
+    return ['Central', 'Cropbio', 'Cropfert'];
+  }
+
+  return [];
+}
+
+export function canAccessWarehouse(userId: string, role: UserRole, warehouse: string): boolean {
+  const allowedWarehouses = getUserWarehouses(userId, role);
+  return allowedWarehouses.includes(warehouse);
+}
+
+export async function saveUserWarehouses(userId: string, warehouses: string[]): Promise<boolean> {
+  try {
+    const { data: existing } = await supabase
+      .from('user_permissions')
+      .select('*')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase
+        .from('user_permissions')
+        .update({ warehouses })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('user_permissions')
+        .insert({
+          user_id: userId,
+          module: 'inventory',
+          permissions: { view: true, create: false, edit: false, delete: false, export: false },
+          warehouses
+        });
+
+      if (error) throw error;
+    }
+
+    userWarehousesCache[userId] = warehouses;
+    return true;
+  } catch (e) {
+    console.error('Erro ao salvar permissões de almoxarifado:', e);
+    return false;
+  }
 }
 
 export function getAllowedModules(role: UserRole): ModuleId[] {

@@ -1,5 +1,5 @@
 import { UserRole } from '../types';
-import { hasPermission, ModuleId, PermissionAction, getModulePermissions, canEditField as checkFieldEdit, getUserFieldPermissions } from '../services/permissions';
+import { hasPermission, ModuleId, PermissionAction, getModulePermissions, canEditField as checkFieldEdit, getUserFieldPermissions, getUserWarehouses, canAccessWarehouse } from '../services/permissions';
 
 export function usePermissions(role: UserRole, module: ModuleId, userId?: string) {
   const permissions = getModulePermissions(role, module, userId);
@@ -13,6 +13,8 @@ export function usePermissions(role: UserRole, module: ModuleId, userId?: string
     hasPermission: (action: PermissionAction) => hasPermission(role, module, action, userId),
     canEditField: (fieldName: string) => userId ? checkFieldEdit(userId, module, fieldName, role) : permissions.edit,
     getFieldPermissions: () => userId ? getUserFieldPermissions(userId, module) : undefined,
+    getWarehouses: () => userId ? getUserWarehouses(userId, role) : [],
+    canAccessWarehouse: (warehouse: string) => userId ? canAccessWarehouse(userId, role, warehouse) : false,
     permissions
   };
 }

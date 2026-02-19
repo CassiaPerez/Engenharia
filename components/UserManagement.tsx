@@ -6,6 +6,7 @@ import ModalPortal from './ModalPortal';
 import PermissionsMatrix from './PermissionsMatrix';
 import PermissionsEditor from './PermissionsEditor';
 import UserPermissionsEditor from './UserPermissionsEditor';
+import WarehousePermissionsEditor from './WarehousePermissionsEditor';
 
 interface Props {
   users: User[];
@@ -25,6 +26,8 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showUserPermissions, setShowUserPermissions] = useState(false);
   const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<User | null>(null);
+  const [showWarehousePermissions, setShowWarehousePermissions] = useState(false);
+  const [selectedUserForWarehouses, setSelectedUserForWarehouses] = useState<User | null>(null);
 
   const roles: { id: UserRole; label: string; desc: string }[] = [
     { id: 'ADMIN', label: 'Administrador', desc: 'Acesso total ao sistema e configurações.' },
@@ -160,6 +163,16 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
     setSelectedUserForPermissions(null);
   };
 
+  const openWarehousePermissions = (user: User) => {
+    setSelectedUserForWarehouses(user);
+    setShowWarehousePermissions(true);
+  };
+
+  const closeWarehousePermissions = () => {
+    setShowWarehousePermissions(false);
+    setSelectedUserForWarehouses(null);
+  };
+
   const handlePermissionsSaved = () => {
     closeUserPermissions();
     alert('Permissões salvas com sucesso!');
@@ -283,6 +296,11 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                                         <i className="fas fa-user-lock"></i>
                                     </button>
                                 )}
+                                {currentUser.role === 'ADMIN' && u.role.startsWith('WAREHOUSE') && (
+                                    <button onClick={() => openWarehousePermissions(u)} className="text-slate-500 hover:text-amber-600 font-bold text-sm px-2 py-1 transition-colors" title="Gerenciar Almoxarifados">
+                                        <i className="fas fa-warehouse"></i>
+                                    </button>
+                                )}
                                 {currentUser.role === 'ADMIN' && u.id !== currentUser.id && (
                                     <button onClick={() => handleDelete(u)} className="text-slate-500 hover:text-red-600 font-bold text-sm px-2 py-1 transition-colors" title="Excluir">
                                         <i className="fas fa-trash"></i>
@@ -400,6 +418,14 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
           user={selectedUserForPermissions}
           onClose={closeUserPermissions}
           onSave={handlePermissionsSaved}
+        />
+      )}
+
+      {showWarehousePermissions && selectedUserForWarehouses && (
+        <WarehousePermissionsEditor
+          user={selectedUserForWarehouses}
+          onClose={closeWarehousePermissions}
+          onSave={closeWarehousePermissions}
         />
       )}
     </div>
