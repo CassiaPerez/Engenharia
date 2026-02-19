@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Supabase Connection</title>
+</head>
+<body>
+    <h1>Teste de Conexão Supabase</h1>
+    <button onclick="testConnection()">Testar Conexão</button>
+    <button onclick="testInsert()">Testar Inserção</button>
+    <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;"></div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const SUPABASE_URL = 'https://affnrlkacfqjxchlubww.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZm5ybGthY2ZxanhjaGx1Ynd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1NTk3NjYsImV4cCI6MjA4NDEzNTc2Nn0.F2xfzJGh9-uRArKS7B3MO7tCgEZZxrfV-jznM7VOh3Q';
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        window.testConnection = async function() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Testando conexão...';
+
+            try {
+                const { data, error, count } = await supabase
+                    .from('materials')
+                    .select('*', { count: 'exact', head: true });
+
+                if (error) {
+                    result.innerHTML = `<strong style="color: red;">ERRO:</strong> ${error.message}<br><pre>${JSON.stringify(error, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<strong style="color: green;">SUCESSO!</strong><br>Total de materiais no banco: ${count}`;
+                }
+            } catch (e) {
+                result.innerHTML = `<strong style="color: red;">EXCEÇÃO:</strong> ${e.message}`;
+            }
+        };
+
+        window.testInsert = async function() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Testando inserção...';
+
+            const testMaterial = {
+                id: 'test-' + Date.now(),
+                json_content: {
+                    id: 'test-' + Date.now(),
+                    code: 'TEST-' + Date.now(),
+                    description: 'Material de Teste via HTML',
+                    group: 'Teste',
+                    unit: 'Un',
+                    unitCost: 10,
+                    minStock: 5,
+                    currentStock: 10,
+                    location: 'CD - Central',
+                    status: 'ACTIVE',
+                    stockLocations: [{ name: 'CD - Central', quantity: 10 }]
+                }
+            };
+
+            try {
+                const { data, error } = await supabase
+                    .from('materials')
+                    .insert(testMaterial)
+                    .select();
+
+                if (error) {
+                    result.innerHTML = `<strong style="color: red;">ERRO na inserção:</strong> ${error.message}<br><pre>${JSON.stringify(error, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<strong style="color: green;">INSERÇÃO BEM-SUCEDIDA!</strong><br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (e) {
+                result.innerHTML = `<strong style="color: red;">EXCEÇÃO:</strong> ${e.message}`;
+            }
+        };
+    </script>
+</body>
+</html>

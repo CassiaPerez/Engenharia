@@ -65,8 +65,32 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   }, [searchInput]);
 
   useEffect(() => {
+    console.log('=== INVENTORY COMPONENT MOUNTED ===');
+    console.log('Supabase config check:');
+    console.log('- URL:', import.meta.env.VITE_SUPABASE_URL);
+    console.log('- Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+    console.log('- Key preview:', import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 30) + '...');
+
+    testSupabaseConnection();
     loadOS();
   }, []);
+
+  const testSupabaseConnection = async () => {
+    try {
+      console.log('Testing Supabase connection...');
+      const { data, error, count } = await supabase
+        .from('materials')
+        .select('*', { count: 'exact', head: true });
+
+      if (error) {
+        console.error('❌ Supabase connection test FAILED:', error);
+      } else {
+        console.log('✅ Supabase connection test SUCCESS. Materials count:', count);
+      }
+    } catch (e) {
+      console.error('❌ Exception during Supabase connection test:', e);
+    }
+  };
 
   const loadOS = async () => {
     try {
@@ -342,6 +366,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
     console.log('=== INICIANDO CADASTRO DE MATERIAL ===');
     console.log('Dados do formulário:', newMaterial);
+    console.log('ENV Check - VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+    console.log('ENV Check - VITE_SUPABASE_ANON_KEY exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+    console.log('ENV Check - VITE_SUPABASE_ANON_KEY (primeiros 30 chars):', import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 30) + '...');
 
     if (!newMaterial.code || !newMaterial.description) {
         console.error('Validação falhou: campos obrigatórios vazios');
