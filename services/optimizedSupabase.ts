@@ -1,5 +1,6 @@
 import { supabase, mapFromSupabase, mapToSupabase } from './supabase';
 import { cacheService } from './cache';
+import { getTableColumns } from './tableColumns';
 
 interface QueryOptions {
   useCache?: boolean;
@@ -41,7 +42,8 @@ class OptimizedSupabaseService {
     }
 
     try {
-      let query = supabase.from(table).select('id, json_content');
+      const columns = getTableColumns(table);
+      let query = supabase.from(table).select(columns);
 
       if (orderBy) {
         query = query.order(orderBy, { ascending: orderAsc });

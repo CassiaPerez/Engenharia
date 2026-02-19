@@ -22,7 +22,7 @@ export const useLazyLoad = <T>({ table, pageSize = 50, orderBy = 'id', orderAsc 
     try {
       const { data: newData, error } = await supabase
         .from(table)
-        .select('id, json_content')
+        .select('*')
         .order(orderBy, { ascending: orderAsc })
         .range(offsetRef.current, offsetRef.current + pageSize - 1);
 

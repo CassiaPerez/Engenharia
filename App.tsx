@@ -92,15 +92,15 @@ const App: React.FC = () => {
 
         const [p, m, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
           supabase.from('projects').select('*').order('updated_at', { ascending: false }).limit(100),
-          supabase.from('materials').select('id, json_content').order('updated_at', { ascending: false }).limit(200),
+          supabase.from('materials').select('*').order('updated_at', { ascending: false }).limit(200),
           supabase.from('services').select('*').order('updated_at', { ascending: false }).limit(50),
-          supabase.from('oss').select('id, json_content').order('id', { ascending: false }).limit(20),
-          supabase.from('stock_movements').select('id, json_content').order('updated_at', { ascending: false }).limit(200),
+          supabase.from('oss').select('*').order('open_date', { ascending: false }).limit(20),
+          supabase.from('stock_movements').select('*').order('updated_at', { ascending: false }).limit(200),
           supabase.from('suppliers').select('*').order('updated_at', { ascending: false }).limit(50),
           supabase.from('users').select('*').order('updated_at', { ascending: false }),
           supabase.from('purchases').select('*').order('updated_at', { ascending: false }).limit(100),
           supabase.from('buildings').select('*').order('updated_at', { ascending: false }).limit(50),
-          supabase.from('equipments').select('id, json_content').order('updated_at', { ascending: false }).limit(100)
+          supabase.from('equipments').select('*').order('updated_at', { ascending: false }).limit(100)
         ]);
 
         if (p.error) console.error("❌ Error loading projects:", p.error);

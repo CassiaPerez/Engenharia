@@ -99,8 +99,8 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       console.log('Loading OS with optimization (limit 20)...');
       const { data, error } = await supabase
         .from('oss')
-        .select('id, json_content')
-        .order('id', { ascending: false })
+        .select('id, number, type, status, priority, description, equipment_id, cost_center, open_date, limit_date, close_date, sla_hours, executor_ids, requester_id, services, materials')
+        .order('open_date', { ascending: false })
         .limit(20);
 
       if (error) {
@@ -111,7 +111,24 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       }
 
       if (data) {
-        const osList = data.map(item => item.json_content);
+        const osList = data.map(item => ({
+          id: item.id,
+          number: item.number,
+          type: item.type,
+          status: item.status,
+          priority: item.priority,
+          description: item.description,
+          equipmentId: item.equipment_id,
+          costCenter: item.cost_center,
+          openDate: item.open_date,
+          limitDate: item.limit_date,
+          closeDate: item.close_date,
+          slaHours: item.sla_hours,
+          executorIds: item.executor_ids || [],
+          requesterId: item.requester_id,
+          services: item.services || [],
+          materials: item.materials || []
+        }));
         setAllOS(osList);
         console.log('✅ OS loaded successfully:', osList.length, 'items');
       }
