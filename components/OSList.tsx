@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
+import { loadUserPermissions, hasFieldPermission, hasPermission } from '../services/permissions';
 
 interface Props {
   oss: OS[];
@@ -67,6 +68,18 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
 
   const executors = useMemo(() => users.filter(u => u.role === 'EXECUTOR'), [users]);
 
+  const canEditPriority = () => {
+    return currentUser.role === 'ADMIN' || hasPermission(currentUser.role, 'os', 'edit', currentUser.id) && hasFieldPermission(currentUser.id, 'os', 'priority');
+  };
+
+  const canEditExecutor = () => {
+    return currentUser.role === 'ADMIN' || hasPermission(currentUser.role, 'os', 'edit', currentUser.id) && hasFieldPermission(currentUser.id, 'os', 'executor_id');
+  };
+
+  const canEditSLA = () => {
+    return currentUser.role === 'ADMIN' || hasPermission(currentUser.role, 'os', 'edit', currentUser.id) && hasFieldPermission(currentUser.id, 'os', 'sla_date');
+  };
+
   useEffect(() => { const timer = setTimeout(() => { setSearchTerm(searchInput); }, 300); return () => clearTimeout(timer); }, [searchInput]);
   useEffect(() => { setItemSearchTerm(''); setNewItem({ id: '', qty: '', cost: '' }); }, [activeSubTab]);
   useEffect(() => {
@@ -76,6 +89,9 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [showPriorityDropdown]);
+  useEffect(() => {
+    loadUserPermissions(currentUser.id);
+  }, [currentUser.id]);
 
   const handleDelete = async (id: string) => {
       if (currentUser.role !== 'ADMIN') {
@@ -769,7 +785,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</p>
-                                      {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
+                                      {canEditPriority() && isEditable(selectedOS) ? (
                                         <div className="relative">
                                           <button
                                             onClick={(e) => {
@@ -833,8 +849,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Tipo</p><span className="font-bold text-slate-800">{selectedOS.type}</span></div>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executores {currentUser.role !== 'ADMIN' && <i className="fas fa-lock text-amber-600 ml-1" title="Apenas administradores podem alterar"></i>}</p>
-                                    {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executores {!canEditExecutor() && <i className="fas fa-lock text-amber-600 ml-1" title="Sem permissão para alterar"></i>}</p>
+                                    {canEditExecutor() && isEditable(selectedOS) ? (
                                         <div className="space-y-2">
                                             <div className="max-h-32 overflow-y-auto custom-scrollbar bg-slate-50 border border-slate-200 rounded-lg p-2">
                                                 {executors.map(executor => {
@@ -902,7 +918,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
 
                                         <div className="flex justify-between items-center">
                                             <span className="text-slate-500">SLA (Horas):</span>
-                                            {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
+                                            {canEditSLA() && isEditable(selectedOS) ? (
                                                 isEditingSLA ? (
                                                     <div className="flex items-center gap-2">
                                                         <input

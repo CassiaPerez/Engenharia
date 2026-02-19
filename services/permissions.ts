@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 
 let customPermissionsCache: Record<string, ModulePermissions> = {};
 let userPermissionsCache: Record<string, Record<string, ModulePermissions>> = {};
+let userFieldPermissionsCache: Record<string, Record<string, FieldPermissions>> = {};
 
 export type ModuleId =
   | 'dashboard'
@@ -26,6 +27,14 @@ export interface ModulePermissions {
   edit: boolean;
   delete: boolean;
   export: boolean;
+}
+
+export interface FieldPermission {
+  edit: boolean;
+}
+
+export interface FieldPermissions {
+  [fieldName: string]: FieldPermission;
 }
 
 export const MODULE_LABELS: Record<ModuleId, string> = {
@@ -190,16 +199,25 @@ export async function loadUserPermissions(userId?: string): Promise<void> {
 
     if (userId) {
       userPermissionsCache[userId] = {};
+      userFieldPermissionsCache[userId] = {};
       (data || []).forEach(item => {
         userPermissionsCache[userId][item.module] = item.permissions as ModulePermissions;
+        if (item.field_permissions) {
+          userFieldPermissionsCache[userId][item.module] = item.field_permissions as FieldPermissions;
+        }
       });
     } else {
       userPermissionsCache = {};
+      userFieldPermissionsCache = {};
       (data || []).forEach(item => {
         if (!userPermissionsCache[item.user_id]) {
           userPermissionsCache[item.user_id] = {};
+          userFieldPermissionsCache[item.user_id] = {};
         }
         userPermissionsCache[item.user_id][item.module] = item.permissions as ModulePermissions;
+        if (item.field_permissions) {
+          userFieldPermissionsCache[item.user_id][item.module] = item.field_permissions as FieldPermissions;
+        }
       });
     }
   } catch (e) {
@@ -210,16 +228,23 @@ export async function loadUserPermissions(userId?: string): Promise<void> {
 export async function saveUserPermissions(
   userId: string,
   module: ModuleId,
-  permissions: ModulePermissions
+  permissions: ModulePermissions,
+  fieldPermissions?: FieldPermissions
 ): Promise<boolean> {
   try {
+    const data: any = {
+      user_id: userId,
+      module,
+      permissions
+    };
+
+    if (fieldPermissions !== undefined) {
+      data.field_permissions = fieldPermissions;
+    }
+
     const { error } = await supabase
       .from('user_permissions')
-      .upsert({
-        user_id: userId,
-        module,
-        permissions
-      }, {
+      .upsert(data, {
         onConflict: 'user_id,module'
       });
 
@@ -227,8 +252,12 @@ export async function saveUserPermissions(
 
     if (!userPermissionsCache[userId]) {
       userPermissionsCache[userId] = {};
+      userFieldPermissionsCache[userId] = {};
     }
     userPermissionsCache[userId][module] = permissions;
+    if (fieldPermissions) {
+      userFieldPermissionsCache[userId][module] = fieldPermissions;
+    }
 
     return true;
   } catch (e) {
@@ -332,6 +361,26 @@ export function hasUserCustomPermissions(userId: string): boolean {
 export function getAllowedModules(role: UserRole): ModuleId[] {
   const modules = Object.keys(PERMISSIONS_MATRIX[role]) as ModuleId[];
   return modules.filter(module => PERMISSIONS_MATRIX[role][module].view);
+}
+
+export function hasFieldPermission(
+  userId: string,
+  module: ModuleId,
+  fieldName: string,
+  action: 'edit' = 'edit'
+): boolean {
+  const fieldPerms = userFieldPermissionsCache[userId]?.[module];
+  if (!fieldPerms || !fieldPerms[fieldName]) {
+    return false;
+  }
+  return fieldPerms[fieldName][action] || false;
+}
+
+export function getFieldPermissions(
+  userId: string,
+  module: ModuleId
+): FieldPermissions | undefined {
+  return userFieldPermissionsCache[userId]?.[module];
 }
 
 export const ROLE_DESCRIPTIONS: Record<UserRole, { label: string; description: string; color: string }> = {
