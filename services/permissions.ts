@@ -2,6 +2,7 @@ import { UserRole } from '../types';
 import { supabase } from './supabase';
 
 let customPermissionsCache: Record<string, ModulePermissions> = {};
+let userPermissionsCache: Record<string, Record<string, ModulePermissions>> = {};
 
 export type ModuleId =
   | 'dashboard'
@@ -175,7 +176,116 @@ export async function loadCustomPermissions(): Promise<void> {
   }
 }
 
-function getEffectivePermissions(role: UserRole, module: ModuleId): ModulePermissions {
+export async function loadUserPermissions(userId?: string): Promise<void> {
+  try {
+    let query = supabase.from('user_permissions').select('*');
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    if (userId) {
+      userPermissionsCache[userId] = {};
+      (data || []).forEach(item => {
+        userPermissionsCache[userId][item.module] = item.permissions as ModulePermissions;
+      });
+    } else {
+      userPermissionsCache = {};
+      (data || []).forEach(item => {
+        if (!userPermissionsCache[item.user_id]) {
+          userPermissionsCache[item.user_id] = {};
+        }
+        userPermissionsCache[item.user_id][item.module] = item.permissions as ModulePermissions;
+      });
+    }
+  } catch (e) {
+    console.error('Erro ao carregar permissões de usuário:', e);
+  }
+}
+
+export async function saveUserPermissions(
+  userId: string,
+  module: ModuleId,
+  permissions: ModulePermissions
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('user_permissions')
+      .upsert({
+        user_id: userId,
+        module,
+        permissions
+      }, {
+        onConflict: 'user_id,module'
+      });
+
+    if (error) throw error;
+
+    if (!userPermissionsCache[userId]) {
+      userPermissionsCache[userId] = {};
+    }
+    userPermissionsCache[userId][module] = permissions;
+
+    return true;
+  } catch (e) {
+    console.error('Erro ao salvar permissões de usuário:', e);
+    return false;
+  }
+}
+
+export async function deleteUserPermissions(
+  userId: string,
+  module: ModuleId
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('user_permissions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('module', module);
+
+    if (error) throw error;
+
+    if (userPermissionsCache[userId]) {
+      delete userPermissionsCache[userId][module];
+    }
+
+    return true;
+  } catch (e) {
+    console.error('Erro ao deletar permissões de usuário:', e);
+    return false;
+  }
+}
+
+export async function resetUserPermissions(userId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('user_permissions')
+      .delete()
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    if (userPermissionsCache[userId]) {
+      delete userPermissionsCache[userId];
+    }
+
+    return true;
+  } catch (e) {
+    console.error('Erro ao resetar permissões de usuário:', e);
+    return false;
+  }
+}
+
+function getEffectivePermissions(role: UserRole, module: ModuleId, userId?: string): ModulePermissions {
+  if (userId && userPermissionsCache[userId]?.[module]) {
+    return userPermissionsCache[userId][module];
+  }
+
   const key = `${role}-${module}`;
   const custom = customPermissionsCache[key];
 
@@ -195,19 +305,28 @@ function getEffectivePermissions(role: UserRole, module: ModuleId): ModulePermis
 export function hasPermission(
   role: UserRole,
   module: ModuleId,
-  action: PermissionAction
+  action: PermissionAction,
+  userId?: string
 ): boolean {
-  const modulePerms = getEffectivePermissions(role, module);
+  const modulePerms = getEffectivePermissions(role, module, userId);
   if (!modulePerms) return false;
   return modulePerms[action];
 }
 
-export function canAccessModule(role: UserRole, module: ModuleId): boolean {
-  return hasPermission(role, module, 'view');
+export function canAccessModule(role: UserRole, module: ModuleId, userId?: string): boolean {
+  return hasPermission(role, module, 'view', userId);
 }
 
-export function getModulePermissions(role: UserRole, module: ModuleId): ModulePermissions {
-  return getEffectivePermissions(role, module);
+export function getModulePermissions(role: UserRole, module: ModuleId, userId?: string): ModulePermissions {
+  return getEffectivePermissions(role, module, userId);
+}
+
+export function getUserCustomPermissions(userId: string): Record<ModuleId, ModulePermissions> {
+  return (userPermissionsCache[userId] || {}) as Record<ModuleId, ModulePermissions>;
+}
+
+export function hasUserCustomPermissions(userId: string): boolean {
+  return !!userPermissionsCache[userId] && Object.keys(userPermissionsCache[userId]).length > 0;
 }
 
 export function getAllowedModules(role: UserRole): ModuleId[] {

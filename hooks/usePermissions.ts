@@ -1,8 +1,8 @@
 import { UserRole } from '../types';
 import { hasPermission, ModuleId, PermissionAction, getModulePermissions } from '../services/permissions';
 
-export function usePermissions(role: UserRole, module: ModuleId) {
-  const permissions = getModulePermissions(role, module);
+export function usePermissions(role: UserRole, module: ModuleId, userId?: string) {
+  const permissions = getModulePermissions(role, module, userId);
 
   return {
     canView: permissions.view,
@@ -10,15 +10,15 @@ export function usePermissions(role: UserRole, module: ModuleId) {
     canEdit: permissions.edit,
     canDelete: permissions.delete,
     canExport: permissions.export,
-    hasPermission: (action: PermissionAction) => hasPermission(role, module, action),
+    hasPermission: (action: PermissionAction) => hasPermission(role, module, action, userId),
     permissions
   };
 }
 
-export function useModulePermissions(role: UserRole) {
+export function useModulePermissions(role: UserRole, userId?: string) {
   return {
     hasPermission: (module: ModuleId, action: PermissionAction) =>
-      hasPermission(role, module, action),
-    getPermissions: (module: ModuleId) => getModulePermissions(role, module)
+      hasPermission(role, module, action, userId),
+    getPermissions: (module: ModuleId) => getModulePermissions(role, module, userId)
   };
 }

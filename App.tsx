@@ -19,7 +19,7 @@ import BuildingManager from './components/BuildingManager';
 import EquipmentManager from './components/EquipmentManager';
 import Reports from './components/Reports';
 import { supabase, mapFromSupabase, mapToSupabase, mapToSupabaseJson } from './services/supabase';
-import { canAccessModule, ModuleId, loadCustomPermissions } from './services/permissions';
+import { canAccessModule, ModuleId, loadCustomPermissions, loadUserPermissions } from './services/permissions';
 
 // Definição da estrutura do Menu
 const MENU_GROUPS = [
@@ -89,6 +89,7 @@ const App: React.FC = () => {
       try {
         console.log('🚀 Starting data load from Supabase...');
         await loadCustomPermissions();
+        await loadUserPermissions();
 
         const [p, m, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
           supabase.from('projects').select('*').order('updated_at', { ascending: false }).limit(100),

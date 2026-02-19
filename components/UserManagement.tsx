@@ -5,6 +5,7 @@ import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
 import PermissionsMatrix from './PermissionsMatrix';
 import PermissionsEditor from './PermissionsEditor';
+import UserPermissionsEditor from './UserPermissionsEditor';
 
 interface Props {
   users: User[];
@@ -22,6 +23,8 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
     avatar: 'US'
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [showUserPermissions, setShowUserPermissions] = useState(false);
+  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<User | null>(null);
 
   const roles: { id: UserRole; label: string; desc: string }[] = [
     { id: 'ADMIN', label: 'Administrador', desc: 'Acesso total ao sistema e configurações.' },
@@ -147,6 +150,21 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
       setShowModal(true);
   };
 
+  const openUserPermissions = (user: User) => {
+    setSelectedUserForPermissions(user);
+    setShowUserPermissions(true);
+  };
+
+  const closeUserPermissions = () => {
+    setShowUserPermissions(false);
+    setSelectedUserForPermissions(null);
+  };
+
+  const handlePermissionsSaved = () => {
+    closeUserPermissions();
+    alert('Permissões salvas com sucesso!');
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-6">
@@ -260,6 +278,11 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
                                 <button onClick={() => openEdit(u)} className="text-slate-500 hover:text-blue-600 font-bold text-sm px-2 py-1 transition-colors" title="Editar">
                                     <i className="fas fa-pencil-alt"></i>
                                 </button>
+                                {currentUser.role === 'ADMIN' && (
+                                    <button onClick={() => openUserPermissions(u)} className="text-slate-500 hover:text-purple-600 font-bold text-sm px-2 py-1 transition-colors" title="Gerenciar Permissões">
+                                        <i className="fas fa-user-lock"></i>
+                                    </button>
+                                )}
                                 {currentUser.role === 'ADMIN' && u.id !== currentUser.id && (
                                     <button onClick={() => handleDelete(u)} className="text-slate-500 hover:text-red-600 font-bold text-sm px-2 py-1 transition-colors" title="Excluir">
                                         <i className="fas fa-trash"></i>
@@ -370,6 +393,14 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
               </div>
             </div>
           </ModalPortal>
+      )}
+
+      {showUserPermissions && selectedUserForPermissions && (
+        <UserPermissionsEditor
+          user={selectedUserForPermissions}
+          onClose={closeUserPermissions}
+          onSave={handlePermissionsSaved}
+        />
       )}
     </div>
   );

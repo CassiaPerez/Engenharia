@@ -9,7 +9,8 @@ export const TABLE_COLUMNS = {
   suppliers: 'id, name, cnpj, contact, phone, email, address, city, state, notes, active, created_at, updated_at',
   purchases: 'id, json_content, updated_at',
   stock_movements: 'id, json_content, updated_at',
-  role_permissions: '*'
+  role_permissions: '*',
+  user_permissions: '*'
 } as const;
 
 export function getTableColumns(table: string): string {
