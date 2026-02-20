@@ -131,6 +131,14 @@ const App: React.FC = () => {
         console.log('  - Stock Movements:', mov.data?.length || 0);
         console.log('  - Equipments:', eqp.data?.length || 0);
 
+        // Log detalhado de materiais por localização
+        const materialsByLocation = (m.data || []).reduce((acc, mat) => {
+          const loc = mat.location || 'Sem localização';
+          acc[loc] = (acc[loc] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        console.log('📦 Materiais por localização:', materialsByLocation);
+
         // Análise ANTES do mapeamento
         console.log('📊 ANÁLISE DOS DADOS BRUTOS:');
         if (m.data) {
