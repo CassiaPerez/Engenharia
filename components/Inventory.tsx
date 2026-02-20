@@ -29,6 +29,16 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   const canAccessCropfert = canAccessWarehouse('Cropfert');
   const canAccessCentral = canAccessWarehouse('Central');
 
+  console.log('👤 Usuário atual:', {
+    id: currentUser.id,
+    name: currentUser.name,
+    role: currentUser.role,
+    allowedWarehouses,
+    canAccessCropbio,
+    canAccessCropfert,
+    canAccessCentral
+  });
+
   const addMovementWithSync = async (mov: StockMovement) => {
     onAddMovement(mov);
     queueOperation('stock_movements', 'insert', mov);
@@ -73,6 +83,15 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   useEffect(() => {
     console.log('=== INVENTORY COMPONENT MOUNTED ===');
+    console.log('📦 Materials recebidos como prop:', materials.length);
+
+    const propLocationBreakdown = materials.reduce((acc, mat) => {
+      const loc = mat.location || 'NULL';
+      acc[loc] = (acc[loc] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log('📦 Por localização (props):', propLocationBreakdown);
+
     console.log('Supabase config check:');
     console.log('- URL:', import.meta.env.VITE_SUPABASE_URL);
     console.log('- Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
@@ -84,6 +103,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       console.error('Failed to load OS in background:', err);
     });
   }, []);
+
+  useEffect(() => {
+    console.log('🔄 Materials prop ATUALIZADO:', materials.length);
+  }, [materials]);
 
   const testSupabaseConnection = async () => {
     try {

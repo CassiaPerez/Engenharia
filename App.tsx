@@ -125,6 +125,17 @@ const App: React.FC = () => {
         console.log('  - Stock Movements:', mov.data?.length || 0);
         console.log('  - Equipments:', eqp.data?.length || 0);
 
+        // Análise ANTES do mapeamento
+        console.log('📊 ANÁLISE DOS DADOS BRUTOS:');
+        if (m.data) {
+          const rawLocationBreakdown = m.data.reduce((acc, mat) => {
+            const loc = mat.location || 'NULL';
+            acc[loc] = (acc[loc] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+          console.log('  - Contagem por location (ANTES do mapeamento):', rawLocationBreakdown);
+        }
+
         const mappedMaterials = mapFromSupabase<Material>(m.data || []);
         console.log('🔍 DIAGNÓSTICO DE MATERIAIS:');
         console.log('  - Total carregado do Supabase:', m.data?.length || 0);
@@ -135,7 +146,7 @@ const App: React.FC = () => {
           acc[loc] = (acc[loc] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
-        console.log('  - Por localização:', locationBreakdown);
+        console.log('  - Por localização (DEPOIS do mapeamento):', locationBreakdown);
 
         setProjects(mapFromSupabase<Project>(p.data || []));
         setMaterials(mappedMaterials);
