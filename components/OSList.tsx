@@ -844,10 +844,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                                                     setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
                                                                     setSelectedOS(updatedOS);
                                                                     try {
-                                                                        const { error } = await supabase.from('oss').upsert({
-                                                                            id: updatedOS.id,
-                                                                            json_content: updatedOS
-                                                                        });
+                                                                        const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
                                                                         if (error) throw error;
                                                                     } catch (e) {
                                                                         console.error('Erro ao atualizar executores:', e);
