@@ -7,6 +7,7 @@ import PermissionsMatrix from './PermissionsMatrix';
 import PermissionsEditor from './PermissionsEditor';
 import UserPermissionsEditor from './UserPermissionsEditor';
 import WarehousePermissionsEditor from './WarehousePermissionsEditor';
+import { loadUserPermissions } from '../services/permissions';
 
 interface Props {
   users: User[];
@@ -168,12 +169,14 @@ const UserManagement: React.FC<Props> = ({ users, setUsers, currentUser }) => {
     setShowWarehousePermissions(true);
   };
 
-  const closeWarehousePermissions = () => {
+  const closeWarehousePermissions = async () => {
+    await loadUserPermissions();
     setShowWarehousePermissions(false);
     setSelectedUserForWarehouses(null);
   };
 
-  const handlePermissionsSaved = () => {
+  const handlePermissionsSaved = async () => {
+    await loadUserPermissions();
     closeUserPermissions();
     alert('Permissões salvas com sucesso!');
   };

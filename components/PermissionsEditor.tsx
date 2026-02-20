@@ -6,7 +6,8 @@ import {
   ROLE_DESCRIPTIONS,
   ModuleId,
   PermissionAction,
-  ModulePermissions
+  ModulePermissions,
+  loadCustomPermissions as reloadCustomPermissionsCache
 } from '../services/permissions';
 import { supabase } from '../services/supabase';
 
@@ -128,8 +129,9 @@ const PermissionsEditor: React.FC = () => {
       }
 
       await loadCustomPermissions();
+      await reloadCustomPermissionsCache();
       setEditedPermissions({});
-      alert('Permissões salvas com sucesso! As alterações serão aplicadas no próximo login dos usuários.');
+      alert('Permissões salvas com sucesso!');
     } catch (e: any) {
       console.error('Erro ao salvar:', e);
       alert('Erro ao salvar permissões: ' + e.message);
@@ -161,6 +163,7 @@ const PermissionsEditor: React.FC = () => {
       setEditedPermissions(newEdited);
 
       await loadCustomPermissions();
+      await reloadCustomPermissionsCache();
       alert('Permissões restauradas ao padrão!');
     } catch (e: any) {
       console.error('Erro ao restaurar:', e);
