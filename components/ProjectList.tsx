@@ -4,7 +4,7 @@ import { Project, OS, Material, ServiceType, ProjectStatus, Category, OSType, OS
 import { calculateProjectCosts, calculatePlannedCosts, formatDate } from '../services/engine';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { supabase } from '../services/supabase';
+import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
 
 interface Props {
@@ -90,10 +90,8 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
               const project = projects.find(p => p.id === id);
               if (!project) return;
 
-              const { error } = await supabase.from('projects').upsert({
-                  id: id,
-                  json_content: { ...project, status: ProjectStatus.FINISHED }
-              });
+              const updatedProject = { ...project, status: ProjectStatus.FINISHED };
+              const { error } = await supabase.from('projects').upsert(mapToSupabase(updatedProject));
               if (error) throw error;
           } catch (e: any) {
               console.error('Erro ao finalizar projeto:', e);
@@ -255,10 +253,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
           } as Project;
           setProjects(prev => prev.map(p => p.id === editingProject.id ? updated : p));
 
-          const { error } = await supabase.from('projects').upsert({
-              id: updated.id,
-              json_content: updated
-          });
+          const { error } = await supabase.from('projects').upsert(mapToSupabase(updated));
           if (error) throw error;
         } else {
           const project: Project = {
@@ -286,10 +281,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
           };
           setProjects([...projects, project]);
 
-          const { error } = await supabase.from('projects').insert({
-              id: project.id,
-              json_content: project
-          });
+          const { error } = await supabase.from('projects').insert(mapToSupabase(project));
           if (error) throw error;
         }
         setShowModal(false);

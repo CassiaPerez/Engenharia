@@ -288,10 +288,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       try {
           const os = oss.find(o => o.id === osId);
           if (os) {
-              const { error } = await supabase.from('oss').upsert({
-                  id: osId,
-                  json_content: { ...os, priority: p }
-              });
+              const { error } = await supabase.from('oss').upsert(mapToSupabase({ ...os, priority: p }));
               if (error) throw error;
           }
       } catch (e) {

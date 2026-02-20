@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Equipment, User } from '../types';
-import { supabase } from '../services/supabase';
+import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
 
 interface Props {
@@ -26,10 +26,7 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
             const updated = { ...formData, id: editingId } as Equipment;
             setEquipments(prev => prev.map(eq => eq.id === editingId ? updated : eq));
 
-            const { error } = await supabase.from('equipments').upsert({
-                id: editingId,
-                json_content: updated
-            });
+            const { error } = await supabase.from('equipments').upsert(mapToSupabase(updated));
             if (error) throw error;
         } else {
             const newEquipment: Equipment = {
@@ -46,10 +43,7 @@ const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentU
             };
             setEquipments(prev => [...prev, newEquipment]);
 
-            const { error } = await supabase.from('equipments').insert({
-                id: newEquipment.id,
-                json_content: newEquipment
-            });
+            const { error } = await supabase.from('equipments').insert(mapToSupabase(newEquipment));
             if (error) throw error;
         }
         setShowModal(false);

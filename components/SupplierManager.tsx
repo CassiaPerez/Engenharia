@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Supplier, PurchaseRecord, Material, SupplierDoc, User } from '../types';
-import { supabase } from '../services/supabase';
+import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
 
 interface Props {
@@ -51,10 +51,7 @@ const SupplierManager: React.FC<Props> = ({ suppliers, setSuppliers, currentUser
         };
         setSuppliers(prev => [...prev, newSupplier]);
 
-        const { error } = await supabase.from('suppliers').insert({
-            id: newSupplier.id,
-            json_content: newSupplier
-        });
+        const { error } = await supabase.from('suppliers').insert(mapToSupabase(newSupplier));
         if (error) throw error;
 
         setShowModal(false);

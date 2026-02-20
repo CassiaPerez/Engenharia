@@ -4,7 +4,7 @@ import { OS, OSStatus, Project, Material, ServiceType, OSService, OSItem, OSType
 import { calculateOSCosts } from '../services/engine';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { supabase } from '../services/supabase';
+import { supabase, mapToSupabase } from '../services/supabase';
 import { canEditField } from '../services/permissions';
 import ModalPortal from './ModalPortal';
 
@@ -116,10 +116,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       setShowPriorityDropdown(false);
 
       try {
-          const { error } = await supabase.from('oss').upsert({
-              id: updatedOS.id,
-              json_content: updatedOS
-          });
+          const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
           if (error) throw error;
 
           const toast = document.createElement('div');
@@ -153,10 +150,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       setIsEditingSLA(false);
 
       try {
-          const { error } = await supabase.from('oss').upsert({
-              id: updatedOS.id,
-              json_content: updatedOS
-          });
+          const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
           if (error) throw error;
 
           const toast = document.createElement('div');
@@ -243,10 +237,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       }
 
       try {
-          const { error } = await supabase.from('oss').upsert({
-              id: updatedOS.id,
-              json_content: updatedOS
-          });
+          const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
           if (error) throw error;
       } catch (e) {
           console.error('Erro ao salvar item na OS:', e);
@@ -266,10 +257,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       setSelectedOS(updatedOS);
 
       try {
-          const { error } = await supabase.from('oss').upsert({
-              id: updatedOS.id,
-              json_content: updatedOS
-          });
+          const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
           if (error) throw error;
       } catch (e) {
           console.error('Erro ao remover serviço:', e);
@@ -286,10 +274,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       setSelectedOS(updatedOS);
 
       try {
-          const { error } = await supabase.from('oss').upsert({
-              id: updatedOS.id,
-              json_content: updatedOS
-          });
+          const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
           if (error) throw error;
       } catch (e) {
           console.error('Erro ao remover material:', e);
@@ -364,10 +349,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
       setOss(prev => [...prev, newOS]);
 
       try {
-          const { error } = await supabase.from('oss').insert({
-              id: newOS.id,
-              json_content: newOS
-          });
+          const { error } = await supabase.from('oss').insert(mapToSupabase(newOS));
           if (error) throw error;
       } catch (e) {
           console.error('Erro ao salvar OS:', e);

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Building, User } from '../types';
-import { supabase } from '../services/supabase';
+import { supabase, mapToSupabase } from '../services/supabase';
 import ModalPortal from './ModalPortal';
 
 interface Props {
@@ -22,10 +22,7 @@ const BuildingManager: React.FC<Props> = ({ buildings, setBuildings, currentUser
             const updated = { ...formData, id: editingId } as Building;
             setBuildings(prev => prev.map(b => b.id === editingId ? updated : b));
 
-            const { error } = await supabase.from('buildings').upsert({
-                id: editingId,
-                json_content: updated
-            });
+            const { error } = await supabase.from('buildings').upsert(mapToSupabase(updated));
             if (error) throw error;
         } else {
             const newBuilding: Building = {
@@ -39,10 +36,7 @@ const BuildingManager: React.FC<Props> = ({ buildings, setBuildings, currentUser
             };
             setBuildings(prev => [...prev, newBuilding]);
 
-            const { error } = await supabase.from('buildings').insert({
-                id: newBuilding.id,
-                json_content: newBuilding
-            });
+            const { error } = await supabase.from('buildings').insert(mapToSupabase(newBuilding));
             if (error) throw error;
         }
         setShowModal(false);
