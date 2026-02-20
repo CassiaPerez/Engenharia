@@ -672,14 +672,20 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   // --- FILTRAGEM INTELIGENTE POR PERFIL E EMPRESA ---
   const filteredMaterials = useMemo(() => {
+      console.log('=== FILTRO DE MATERIAIS ===');
+      console.log('Total de materiais recebidos:', materials.length);
+
       // 1. Filtro de Texto
       let textFiltered = materials.filter(m =>
         m.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.code.toLowerCase().includes(searchTerm.toLowerCase())
       );
+      console.log('Após filtro de texto:', textFiltered.length);
 
       // 2. Filtro por Almoxarifado (apenas para usuários com permissões específicas de warehouse)
       const isWarehouseUser = currentUser.role.startsWith('WAREHOUSE') || allowedWarehouses.length > 0;
+      console.log('É usuário de warehouse?', isWarehouseUser);
+      console.log('Almoxarifados permitidos:', allowedWarehouses);
 
       if (isWarehouseUser && allowedWarehouses.length > 0) {
         textFiltered = textFiltered.filter(m => {
@@ -694,10 +700,12 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           }
           return false;
         });
+        console.log('Após filtro de warehouse do usuário:', textFiltered.length);
       }
 
       // 3. Filtro por Almoxarifado Selecionado (aplicado para todos que usam o filtro)
       if (warehouseFilter !== 'ALL') {
+        console.log('Filtro de warehouse selecionado:', warehouseFilter);
         if (warehouseFilter === 'Cropbio') {
           textFiltered = textFiltered.filter(m => m.location === 'Cropbio' || m.location === 'Laboratório de defensivos');
         } else if (warehouseFilter === 'Cropfert') {
@@ -705,7 +713,16 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         } else if (warehouseFilter === 'Central') {
           textFiltered = textFiltered.filter(m => m.location === 'CD - Central');
         }
+        console.log('Após filtro de warehouse selecionado:', textFiltered.length);
       }
+
+      // Diagnóstico: Contar itens por localização
+      const locationCounts = textFiltered.reduce((acc, m) => {
+        acc[m.location] = (acc[m.location] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log('Itens por localização:', locationCounts);
+      console.log('Total final filtrado:', textFiltered.length);
 
       return textFiltered;
   }, [materials, searchTerm, currentUser.role, currentUser.company, allowedWarehouses, warehouseFilter]);
