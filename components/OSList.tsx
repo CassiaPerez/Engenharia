@@ -70,6 +70,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
 
   const canEditPriority = currentUser.role === 'ADMIN' || canEditField(currentUser.id, 'os', 'priority', currentUser.role);
   const canEditExecutors = currentUser.role === 'ADMIN' || canEditField(currentUser.id, 'os', 'executorIds', currentUser.role);
+  const canEditSLA = currentUser.role === 'ADMIN' || canEditField(currentUser.id, 'os', 'slaHours', currentUser.role);
 
   useEffect(() => { const timer = setTimeout(() => { setSearchTerm(searchInput); }, 300); return () => clearTimeout(timer); }, [searchInput]);
   useEffect(() => { setItemSearchTerm(''); setNewItem({ id: '', qty: '', cost: '' }); }, [activeSubTab]);
@@ -888,7 +889,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
 
                                         <div className="flex justify-between items-center">
                                             <span className="text-slate-500">SLA (Horas):</span>
-                                            {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
+                                            {canEditSLA && isEditable(selectedOS) ? (
                                                 isEditingSLA ? (
                                                     <div className="flex items-center gap-2">
                                                         <input
