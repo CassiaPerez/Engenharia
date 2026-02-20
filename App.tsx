@@ -92,17 +92,23 @@ const App: React.FC = () => {
         await loadUserPermissions();
 
         const [p, m, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
-          supabase.from('projects').select('*').order('updated_at', { ascending: false }),
-          supabase.from('materials').select('*').order('updated_at', { ascending: false }),
-          supabase.from('services').select('*').order('updated_at', { ascending: false }),
-          supabase.from('oss').select('*').order('open_date', { ascending: false }),
-          supabase.from('stock_movements').select('*').order('updated_at', { ascending: false }),
-          supabase.from('suppliers').select('*').order('updated_at', { ascending: false }),
-          supabase.from('users').select('*').order('updated_at', { ascending: false }),
-          supabase.from('purchases').select('*').order('updated_at', { ascending: false }),
-          supabase.from('buildings').select('*').order('updated_at', { ascending: false }),
-          supabase.from('equipments').select('*').order('updated_at', { ascending: false })
+          supabase.from('projects').select('*', { count: 'exact' }).order('updated_at', { ascending: false }).limit(10000),
+          supabase.from('materials').select('*', { count: 'exact' }).order('updated_at', { ascending: false }).limit(10000),
+          supabase.from('services').select('*', { count: 'exact' }).order('updated_at', { ascending: false }).limit(10000),
+          supabase.from('oss').select('*', { count: 'exact' }).order('open_date', { ascending: false }).limit(10000),
+          supabase.from('stock_movements').select('*', { count: 'exact' }).order('updated_at', { ascending: false }).limit(10000),
+          supabase.from('suppliers').select('*', { count: 'exact' }).order('updated_at', { ascending: false }).limit(10000),
+          supabase.from('users').select('*', { count: 'exact' }).order('updated_at', { ascending: false }).limit(10000),
+          supabase.from('purchases').select('*', { count: 'exact' }).order('updated_at', { ascending: false }).limit(10000),
+          supabase.from('buildings').select('*', { count: 'exact' }).order('updated_at', { ascending: false }).limit(10000),
+          supabase.from('equipments').select('*', { count: 'exact' }).order('updated_at', { ascending: false }).limit(10000)
         ]);
+
+        console.log('📊 CONTAGEM TOTAL (count):', {
+          materials: m.count,
+          projects: p.count,
+          oss: o.count
+        });
 
         if (p.error) console.error("❌ Error loading projects:", p.error);
         if (m.error) console.error("❌ Error loading materials:", m.error);
