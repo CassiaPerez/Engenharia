@@ -5,6 +5,7 @@ import { calculateOSCosts } from '../services/engine';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '../services/supabase';
+import { canEditField } from '../services/permissions';
 import ModalPortal from './ModalPortal';
 
 interface Props {
@@ -66,6 +67,9 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
   const [equipmentCompanyFilter, setEquipmentCompanyFilter] = useState('');
 
   const executors = useMemo(() => users.filter(u => u.role === 'EXECUTOR'), [users]);
+
+  const canEditPriority = currentUser.role === 'ADMIN' || canEditField(currentUser.id, 'os', 'priority', currentUser.role);
+  const canEditExecutors = currentUser.role === 'ADMIN' || canEditField(currentUser.id, 'os', 'executorIds', currentUser.role);
 
   useEffect(() => { const timer = setTimeout(() => { setSearchTerm(searchInput); }, 300); return () => clearTimeout(timer); }, [searchInput]);
   useEffect(() => { setItemSearchTerm(''); setNewItem({ id: '', qty: '', cost: '' }); }, [activeSubTab]);
@@ -769,7 +773,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</p>
-                                      {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
+                                      {canEditPriority && isEditable(selectedOS) ? (
                                         <div className="relative">
                                           <button
                                             onClick={(e) => {
@@ -833,8 +837,8 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     <div><p className="text-xs font-bold text-slate-500 uppercase mb-1">Tipo</p><span className="font-bold text-slate-800">{selectedOS.type}</span></div>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executores {currentUser.role !== 'ADMIN' && <i className="fas fa-lock text-amber-600 ml-1" title="Apenas administradores podem alterar"></i>}</p>
-                                    {currentUser.role === 'ADMIN' && isEditable(selectedOS) ? (
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executores {!canEditExecutors && <i className="fas fa-lock text-amber-600 ml-1" title="Você não tem permissão para alterar executores"></i>}</p>
+                                    {canEditExecutors && isEditable(selectedOS) ? (
                                         <div className="space-y-2">
                                             <div className="max-h-32 overflow-y-auto custom-scrollbar bg-slate-50 border border-slate-200 rounded-lg p-2">
                                                 {executors.map(executor => {
