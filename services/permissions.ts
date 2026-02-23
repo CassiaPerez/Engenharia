@@ -386,7 +386,7 @@ export function getUserFieldPermissions(
 }
 
 export function getUserWarehouses(userId: string, role: UserRole): string[] {
-  if (userWarehousesCache[userId]) {
+  if (userWarehousesCache[userId] && userWarehousesCache[userId].length > 0) {
     return userWarehousesCache[userId];
   }
 
