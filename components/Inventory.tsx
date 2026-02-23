@@ -715,7 +715,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           if (allowedWarehouses.includes('Cropbio') && (m.location === 'Cropbio' || m.location === 'Laboratório de defensivos')) {
             return true;
           }
-          if (allowedWarehouses.includes('Cropfert') && m.location === 'Cropfert') {
+          if (allowedWarehouses.includes('Cropfert') && (m.location === 'Cropfert' || m.location === 'Cropfert Jandaia')) {
             return true;
           }
           if (allowedWarehouses.includes('Central') && m.location === 'CD - Central') {
@@ -732,7 +732,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         if (warehouseFilter === 'Cropbio') {
           textFiltered = textFiltered.filter(m => m.location === 'Cropbio' || m.location === 'Laboratório de defensivos');
         } else if (warehouseFilter === 'Cropfert') {
-          textFiltered = textFiltered.filter(m => m.location === 'Cropfert');
+          textFiltered = textFiltered.filter(m => m.location === 'Cropfert' || m.location === 'Cropfert Jandaia');
         } else if (warehouseFilter === 'Central') {
           textFiltered = textFiltered.filter(m => m.location === 'CD - Central');
         }
