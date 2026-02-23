@@ -30,10 +30,7 @@ const snakeToCamel = (obj: any): any => {
 
 export const mapFromSupabase = <T extends { id: string }>(data: any[] | null): T[] => {
   if (!data) return [];
-
-  console.log('🔧 mapFromSupabase - Input length:', data.length);
-
-  const mapped = data.map((row) => {
+  return data.map((row) => {
     const { id, json_content, created_at, updated_at, ...normalizedColumns } = row;
 
     const hasNormalizedData = Object.keys(normalizedColumns).length > 0 &&
@@ -57,11 +54,6 @@ export const mapFromSupabase = <T extends { id: string }>(data: any[] | null): T
       updatedAt: updated_at,
     };
   });
-
-  console.log('🔧 mapFromSupabase - Output length:', mapped.length);
-  console.log('🔧 mapFromSupabase - Perda de dados:', data.length - mapped.length);
-
-  return mapped;
 };
 
 // Helper para preparar dados para upsert no formato normalizado

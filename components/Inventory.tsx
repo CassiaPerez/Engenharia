@@ -24,25 +24,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   const { queueOperation, flush } = useBatchSave(1500);
   const { getWarehouses, canAccessWarehouse } = usePermissions(currentUser.role, 'inventory', currentUser.id);
 
-  // Log para ver quantos materiais chegaram ao componente
-  console.log('🏭 INVENTORY COMPONENT - Materiais recebidos:', materials.length);
-  const cropbioInProps = materials.filter(m => m.location === 'Cropbio').length;
-  console.log('🏭 INVENTORY COMPONENT - Cropbio nos props:', cropbioInProps);
-
   const allowedWarehouses = getWarehouses();
   const canAccessCropbio = canAccessWarehouse('Cropbio');
   const canAccessCropfert = canAccessWarehouse('Cropfert');
   const canAccessCentral = canAccessWarehouse('Central');
-
-  console.log('👤 Usuário atual:', {
-    id: currentUser.id,
-    name: currentUser.name,
-    role: currentUser.role,
-    allowedWarehouses,
-    canAccessCropbio,
-    canAccessCropfert,
-    canAccessCentral
-  });
 
   const addMovementWithSync = async (mov: StockMovement) => {
     onAddMovement(mov);
@@ -87,52 +72,13 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   }, [searchInput]);
 
   useEffect(() => {
-    console.log('=== INVENTORY COMPONENT MOUNTED ===');
-    console.log('📦 Materials recebidos como prop:', materials.length);
-
-    const propLocationBreakdown = materials.reduce((acc, mat) => {
-      const loc = mat.location || 'NULL';
-      acc[loc] = (acc[loc] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    console.log('📦 Por localização (props):', propLocationBreakdown);
-
-    console.log('Supabase config check:');
-    console.log('- URL:', import.meta.env.VITE_SUPABASE_URL);
-    console.log('- Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-    console.log('- Key preview:', import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 30) + '...');
-
-    testSupabaseConnection();
-
     loadOS().catch(err => {
       console.error('Failed to load OS in background:', err);
     });
   }, []);
 
-  useEffect(() => {
-    console.log('🔄 Materials prop ATUALIZADO:', materials.length);
-  }, [materials]);
-
-  const testSupabaseConnection = async () => {
-    try {
-      console.log('Testing Supabase connection...');
-      const { data, error, count } = await supabase
-        .from('materials')
-        .select('*', { count: 'exact', head: true });
-
-      if (error) {
-        console.error('❌ Supabase connection test FAILED:', error);
-      } else {
-        console.log('✅ Supabase connection test SUCCESS. Materials count:', count);
-      }
-    } catch (e) {
-      console.error('❌ Exception during Supabase connection test:', e);
-    }
-  };
-
   const loadOS = async () => {
     try {
-      console.log('Loading OS with optimization (limit 20)...');
       const { data, error } = await supabase
         .from('oss')
         .select('id, number, type, status, priority, description, equipment_id, cost_center, open_date, limit_date, close_date, sla_hours, executor_ids, requester_id, services, materials')
@@ -141,7 +87,6 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
       if (error) {
         console.error('Error loading OS:', error);
-        console.log('⚠️ Skipping OS loading due to error. OS features may be limited.');
         setAllOS([]);
         return;
       }
@@ -166,10 +111,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           materials: item.materials || []
         }));
         setAllOS(osList);
-        console.log('✅ OS loaded successfully:', osList.length, 'items');
       }
     } catch (e) {
-      console.error('❌ Exception loading OS:', e);
+      console.error('Error loading OS:', e);
       setAllOS([]);
     }
   };
@@ -700,30 +644,17 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
   // --- FILTRAGEM INTELIGENTE POR PERFIL E EMPRESA ---
   const filteredMaterials = useMemo(() => {
-      console.log('=== FILTRO DE MATERIAIS ===');
-      console.log('Total de materiais recebidos:', materials.length);
-      const cropbioTotal = materials.filter(m => m.location === 'Cropbio').length;
-      console.log('Total de Cropbio recebidos:', cropbioTotal);
-      console.log('Role do usuário:', currentUser.role);
-      console.log('Almoxarifados permitidos:', allowedWarehouses);
-      console.log('Filtro de warehouse selecionado:', warehouseFilter);
-
       // 1. Filtro de Texto
       let textFiltered = materials.filter(m =>
         m.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.code.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      console.log('Após filtro de texto:', textFiltered.length);
-      const cropbioAfterText = textFiltered.filter(m => m.location === 'Cropbio').length;
-      console.log('Cropbio após filtro de texto:', cropbioAfterText);
 
       // 2. Filtro por Permissões de Warehouse (apenas para usuários warehouse específicos)
       // APENAS restringe se o usuário tem permissões limitadas (WAREHOUSE_BIO ou WAREHOUSE_FERT)
       const isRestrictedWarehouseUser = currentUser.role === 'WAREHOUSE_BIO' || currentUser.role === 'WAREHOUSE_FERT';
-      console.log('É usuário restrito?', isRestrictedWarehouseUser);
 
       if (isRestrictedWarehouseUser) {
-        console.log('Aplicando filtro restrito. Almoxarifados permitidos:', allowedWarehouses);
         textFiltered = textFiltered.filter(m => {
           // Verifica se o material está em um dos almoxarifados permitidos
           if (allowedWarehouses.includes('Cropbio') && (m.location === 'Cropbio' || m.location === 'Laboratório de defensivos')) {
@@ -737,50 +668,17 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           }
           return false;
         });
-        console.log('Após filtro de warehouse do usuário:', textFiltered.length);
-      } else {
-        console.log('Usuário NÃO restrito - pode ver todos os almoxarifados');
       }
 
       // 3. Filtro por Almoxarifado Selecionado no Dropdown (aplicado para todos)
       if (warehouseFilter !== 'ALL') {
-        console.log('Filtro de warehouse selecionado:', warehouseFilter);
-        const beforeWarehouseFilter = textFiltered.length;
-        const cropbioBeforeFilter = textFiltered.filter(m => m.location === 'Cropbio').length;
-        console.log('Antes do filtro de warehouse - Total:', beforeWarehouseFilter, 'Cropbio:', cropbioBeforeFilter);
-
         if (warehouseFilter === 'Cropbio') {
-          console.log('Filtrando por Cropbio...');
-          const allCropbioMaterials = textFiltered.filter(m => m.location === 'Cropbio' || m.location === 'Laboratório de defensivos');
-          console.log('Materiais encontrados com location="Cropbio":', allCropbioMaterials.length);
-
-          // Debug: mostrar primeiros 5 materiais Cropbio
-          console.log('Amostra dos materiais Cropbio:', allCropbioMaterials.slice(0, 5).map(m => ({ code: m.code, desc: m.description, loc: m.location })));
-
-          textFiltered = allCropbioMaterials;
+          textFiltered = textFiltered.filter(m => m.location === 'Cropbio' || m.location === 'Laboratório de defensivos');
         } else if (warehouseFilter === 'Cropfert') {
           textFiltered = textFiltered.filter(m => m.location === 'Cropfert' || m.location === 'Cropfert Jandaia');
         } else if (warehouseFilter === 'Central') {
           textFiltered = textFiltered.filter(m => m.location === 'CD - Central');
         }
-        console.log('Após filtro de warehouse selecionado:', textFiltered.length);
-        const cropbioAfterFilter = textFiltered.filter(m => m.location === 'Cropbio').length;
-        console.log('Cropbio após filtro:', cropbioAfterFilter);
-      }
-
-      // Diagnóstico: Contar itens por localização
-      const locationCounts = textFiltered.reduce((acc, m) => {
-        acc[m.location] = (acc[m.location] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      console.log('Itens por localização:', locationCounts);
-      console.log('Total final filtrado:', textFiltered.length);
-
-      // Debug final: mostrar breakdown de perda
-      const finalCropbio = textFiltered.filter(m => m.location === 'Cropbio').length;
-      console.log('🔴 FINAL - Cropbio no resultado:', finalCropbio);
-      if (cropbioTotal !== finalCropbio && warehouseFilter === 'Cropbio') {
-        console.error(`⚠️ PERDA DETECTADA: Esperados ${cropbioTotal}, obtidos ${finalCropbio}, perdidos ${cropbioTotal - finalCropbio}`);
       }
 
       return textFiltered;

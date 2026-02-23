@@ -92,23 +92,17 @@ const App: React.FC = () => {
         await loadUserPermissions();
 
         const [p, m, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
-          supabase.from('projects').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).limit(10000),
-          supabase.from('materials').select('*', { count: 'exact' }).order('code', { ascending: true }).limit(10000),
-          supabase.from('services').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).limit(10000),
-          supabase.from('oss').select('*', { count: 'exact' }).order('open_date', { ascending: false, nullsFirst: false }).limit(10000),
-          supabase.from('stock_movements').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).limit(10000),
-          supabase.from('suppliers').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).limit(10000),
-          supabase.from('users').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).limit(10000),
-          supabase.from('purchases').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).limit(10000),
-          supabase.from('buildings').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).limit(10000),
-          supabase.from('equipments').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).limit(10000)
+          supabase.from('projects').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
+          supabase.from('materials').select('*', { count: 'exact' }).order('code', { ascending: true }).range(0, 9999),
+          supabase.from('services').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
+          supabase.from('oss').select('*', { count: 'exact' }).order('open_date', { ascending: false, nullsFirst: false }).range(0, 9999),
+          supabase.from('stock_movements').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
+          supabase.from('suppliers').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
+          supabase.from('users').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
+          supabase.from('purchases').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
+          supabase.from('buildings').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
+          supabase.from('equipments').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999)
         ]);
-
-        console.log('📊 CONTAGEM TOTAL (count):', {
-          materials: m.count,
-          projects: p.count,
-          oss: o.count
-        });
 
         if (p.error) console.error("❌ Error loading projects:", p.error);
         if (m.error) console.error("❌ Error loading materials:", m.error);
@@ -123,60 +117,7 @@ const App: React.FC = () => {
           throw new Error("Erro de conexão com Supabase");
         }
 
-        console.log('✅ Data loaded successfully:');
-        console.log('  - Projects:', p.data?.length || 0);
-        console.log('  - Materials:', m.data?.length || 0);
-        console.log('  - Services:', s.data?.length || 0);
-        console.log('  - OSs:', o.data?.length || 0);
-        console.log('  - Stock Movements:', mov.data?.length || 0);
-        console.log('  - Equipments:', eqp.data?.length || 0);
-
-        // Log detalhado de materiais por localização
-        const materialsByLocation = (m.data || []).reduce((acc, mat) => {
-          const loc = mat.location || 'Sem localização';
-          acc[loc] = (acc[loc] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        console.log('📦 Materiais por localização:', materialsByLocation);
-
-        // Análise ANTES do mapeamento
-        console.log('📊 ANÁLISE DOS DADOS BRUTOS:');
-        if (m.data) {
-          console.log('  - Total de rows retornadas do Supabase:', m.data.length);
-          const rawLocationBreakdown = m.data.reduce((acc, mat) => {
-            const loc = mat.location || 'NULL';
-            acc[loc] = (acc[loc] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>);
-          console.log('  - Contagem por location (ANTES do mapeamento):', rawLocationBreakdown);
-
-          // Contar Cropbio especificamente
-          const cropbioCount = m.data.filter(mat => mat.location === 'Cropbio').length;
-          console.log('  - Total de Cropbio nos dados brutos:', cropbioCount);
-        }
-
         const mappedMaterials = mapFromSupabase<Material>(m.data || []);
-        console.log('🔍 DIAGNÓSTICO DE MATERIAIS:');
-        console.log('  - Total carregado do Supabase:', m.data?.length || 0);
-        console.log('  - Total após mapeamento:', mappedMaterials.length);
-
-        const locationBreakdown = mappedMaterials.reduce((acc, mat) => {
-          const loc = mat.location || 'SEM LOCALIZAÇÃO';
-          acc[loc] = (acc[loc] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        console.log('  - Por localização (DEPOIS do mapeamento):', locationBreakdown);
-
-        // Contagem específica de Cropbio após o mapeamento
-        const cropbioMapped = mappedMaterials.filter(mat => mat.location === 'Cropbio').length;
-        console.log('  - Total de Cropbio APÓS mapeamento:', cropbioMapped);
-
-        if (m.data) {
-          const cropbioRaw = m.data.filter(mat => mat.location === 'Cropbio').length;
-          if (cropbioRaw !== cropbioMapped) {
-            console.warn(`⚠️ ALERTA: Perda de dados! Cropbio raw: ${cropbioRaw}, após mapeamento: ${cropbioMapped}`);
-          }
-        }
 
         setProjects(mapFromSupabase<Project>(p.data || []));
         setMaterials(mappedMaterials);
