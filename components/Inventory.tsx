@@ -440,10 +440,11 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         return;
     }
 
-    if (materials.some(m => m.code === newMaterial.code)) {
-        console.warn('Código duplicado detectado:', newMaterial.code);
-        alert('Erro: Este código SKU já existe. O sistema irá gerar um novo.');
-        setNewMaterial({ ...newMaterial, code: generateUniqueSKU() });
+    const code = (newMaterial.code || '').trim().toUpperCase();
+
+    if (materials.some(m => m.code === code)) {
+        console.warn('Código duplicado detectado:', code);
+        alert('Erro: Este código SKU já existe. Edite o código e tente novamente.');
         return;
     }
 
@@ -453,7 +454,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
 
     const material: Material = {
         id,
-        code: newMaterial.code,
+        code: code,
         description: newMaterial.description,
         group: newMaterial.group || 'Geral',
         unit: newMaterial.unit || 'Un',
@@ -964,11 +965,19 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                 <div>
                                     <label className="text-sm font-bold text-slate-700 mb-2 block">Código (SKU) <span className="text-xs font-normal text-emerald-600 ml-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100"><i className="fas fa-lock text-[10px]"></i> Sistema</span></label>
                                     <div className="relative">
-                                        <input 
-                                            readOnly
-                                            className="w-full h-12 px-4 bg-slate-100 border border-slate-200 rounded-xl text-base text-slate-500 font-bold shadow-sm focus:outline-none cursor-not-allowed uppercase" 
-                                            value={newMaterial.code} 
-                                            title="Gerado automaticamente pelo sistema"
+                                        <input
+                                            className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-bold shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all uppercase"
+                                            value={newMaterial.code || ''}
+                                            placeholder="Ex: MAT-26-1234"
+                                            onChange={(e) => {
+                                              const v = e.target.value
+                                                .toUpperCase()
+                                                .replace(/\s+/g, '-')
+                                                .replace(/[^A-Z0-9-]/g, '')
+                                                .slice(0, 30);
+
+                                              setNewMaterial({ ...newMaterial, code: v });
+                                            }}
                                         />
                                     </div>
                                 </div>
