@@ -396,11 +396,11 @@ export function getUserWarehouses(userId: string, role: UserRole): string[] {
     return ['Cropbio'];
   } else if (role === 'WAREHOUSE_FERT') {
     return ['Cropfert'];
-  } else if (role === 'ADMIN') {
+  } else if (role === 'ADMIN' || role === 'MANAGER' || role === 'OPERATOR' || role === 'ENGINEER') {
     return ['Central', 'Cropbio', 'Cropfert'];
   }
 
-  return [];
+  return ['Central', 'Cropbio', 'Cropfert'];
 }
 
 export function canAccessWarehouse(userId: string, role: UserRole, warehouse: string): boolean {

@@ -697,6 +697,9 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   const filteredMaterials = useMemo(() => {
       console.log('=== FILTRO DE MATERIAIS ===');
       console.log('Total de materiais recebidos:', materials.length);
+      console.log('Role do usuário:', currentUser.role);
+      console.log('Almoxarifados permitidos:', allowedWarehouses);
+      console.log('Filtro de warehouse selecionado:', warehouseFilter);
 
       // 1. Filtro de Texto
       let textFiltered = materials.filter(m =>
@@ -708,9 +711,10 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       // 2. Filtro por Permissões de Warehouse (apenas para usuários warehouse específicos)
       // APENAS restringe se o usuário tem permissões limitadas (WAREHOUSE_BIO ou WAREHOUSE_FERT)
       const isRestrictedWarehouseUser = currentUser.role === 'WAREHOUSE_BIO' || currentUser.role === 'WAREHOUSE_FERT';
+      console.log('É usuário restrito?', isRestrictedWarehouseUser);
 
-      if (isRestrictedWarehouseUser && allowedWarehouses.length > 0) {
-        console.log('Usuário restrito. Almoxarifados permitidos:', allowedWarehouses);
+      if (isRestrictedWarehouseUser) {
+        console.log('Aplicando filtro restrito. Almoxarifados permitidos:', allowedWarehouses);
         textFiltered = textFiltered.filter(m => {
           // Verifica se o material está em um dos almoxarifados permitidos
           if (allowedWarehouses.includes('Cropbio') && (m.location === 'Cropbio' || m.location === 'Laboratório de defensivos')) {
@@ -725,6 +729,8 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
           return false;
         });
         console.log('Após filtro de warehouse do usuário:', textFiltered.length);
+      } else {
+        console.log('Usuário NÃO restrito - pode ver todos os almoxarifados');
       }
 
       // 3. Filtro por Almoxarifado Selecionado no Dropdown (aplicado para todos)
@@ -859,6 +865,27 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
               </button>
             </div>
           )}
+
+          {/* DEBUG INFO */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <h4 className="font-bold text-blue-900 mb-2">🔍 Informações de Debug</h4>
+            <div className="text-sm text-blue-800 space-y-1">
+              <p><strong>Role:</strong> {currentUser.role}</p>
+              <p><strong>Total de materiais carregados:</strong> {materials.length}</p>
+              <p><strong>Almoxarifados permitidos:</strong> {allowedWarehouses.join(', ') || 'Nenhum'}</p>
+              <p><strong>Filtro ativo:</strong> {warehouseFilter}</p>
+              <p><strong>Materiais após filtro:</strong> {filteredMaterials.length}</p>
+              <p><strong>Materiais por localização:</strong></p>
+              <ul className="ml-4">
+                {Object.entries(materials.reduce((acc, m) => {
+                  acc[m.location] = (acc[m.location] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>)).map(([loc, count]) => (
+                  <li key={loc}>• {loc}: {count}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
 
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-600">
