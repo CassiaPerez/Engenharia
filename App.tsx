@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Project, OS, Material, ServiceType, StockMovement,
@@ -59,7 +58,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabId>('dash');
-  
+
   // Dados do Sistema (Sempre vazio no início - carregados do Supabase)
   const [projects, setProjects] = useState<Project[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -71,7 +70,7 @@ const App: React.FC = () => {
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
-  
+
   // Estado de Layout Mobile
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -82,6 +81,45 @@ const App: React.FC = () => {
   // Refs para debounce de salvamento
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ✅ FIX 1: Buscar todos os registros em páginas (evita limite do PostgREST / Max Rows)
+  const fetchAllRows = async <T,>(
+    table: string,
+    params?: {
+      select?: string;
+      orderBy?: string;
+      ascending?: boolean;
+      pageSize?: number;
+    }
+  ): Promise<T[]> => {
+    const select = params?.select ?? '*';
+    const orderBy = params?.orderBy ?? 'updated_at';
+    const ascending = params?.ascending ?? false;
+    const pageSize = Math.min(Math.max(params?.pageSize ?? 1000, 1), 5000);
+
+    const all: T[] = [];
+    let from = 0;
+
+    while (true) {
+      const to = from + pageSize - 1;
+
+      const { data, error } = await supabase
+        .from(table)
+        .select(select)
+        .order(orderBy, { ascending })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const batch = (data ?? []) as T[];
+      all.push(...batch);
+
+      if (batch.length < pageSize) break; // acabou
+      from += pageSize;
+    }
+
+    return all;
+  };
+
   // Carregamento Inicial do Supabase (Única Fonte de Dados)
   useEffect(() => {
     const loadData = async () => {
@@ -91,9 +129,10 @@ const App: React.FC = () => {
         await loadCustomPermissions();
         await loadUserPermissions();
 
-        const [p, m, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
+        // ⚠️ Mantém tudo como estava, só tiramos "materials" do Promise.all
+        // para não sofrer corte por limite de linhas.
+        const [p, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
           supabase.from('projects').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
-          supabase.from('materials').select('*', { count: 'exact' }).order('code', { ascending: true }).range(0, 9999),
           supabase.from('services').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
           supabase.from('oss').select('*', { count: 'exact' }).order('open_date', { ascending: false, nullsFirst: false }).range(0, 9999),
           supabase.from('stock_movements').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
@@ -104,20 +143,33 @@ const App: React.FC = () => {
           supabase.from('equipments').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999)
         ]);
 
+        // ✅ FIX 2: materials paginado para garantir que puxe TODOS
+        let allMaterialsRows: any[] = [];
+        try {
+          allMaterialsRows = await fetchAllRows<any>('materials', {
+            select: '*',
+            orderBy: 'code',
+            ascending: true,
+            pageSize: 1000
+          });
+        } catch (mErr) {
+          console.error("❌ Error loading materials:", mErr);
+          throw mErr;
+        }
+
         if (p.error) console.error("❌ Error loading projects:", p.error);
-        if (m.error) console.error("❌ Error loading materials:", m.error);
         if (s.error) console.error("❌ Error loading services:", s.error);
         if (o.error) console.error("❌ Error loading OSs:", o.error);
         if (mov.error) console.error("❌ Error loading stock_movements:", mov.error);
         if (eqp.error) console.error("❌ Error loading equipments:", eqp.error);
         if (usr.error) console.error("❌ Error loading users:", usr.error);
 
-        if (p.error || m.error || s.error || usr.error) {
+        if (p.error || s.error || usr.error) {
           console.error("Critical errors found. Check logs above.");
           throw new Error("Erro de conexão com Supabase");
         }
 
-        const mappedMaterials = mapFromSupabase<Material>(m.data || []);
+        const mappedMaterials = mapFromSupabase<Material>(allMaterialsRows || []);
 
         setProjects(mapFromSupabase<Project>(p.data || []));
         setMaterials(mappedMaterials);
@@ -145,7 +197,6 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
-
   // Função para gerenciar baixa de estoque via OS
   // Agora suporta múltiplos locais (FIFO de locais: consome do primeiro com saldo)
   const handleStockChange = async (mId: string, qty: number, osNumber: string) => {
@@ -161,29 +212,29 @@ const App: React.FC = () => {
 
         // Lógica de consumo inteligente de locais
         newLocations = newLocations.map(loc => {
-            if (remainingToDeduct <= 0) return loc;
+          if (remainingToDeduct <= 0) return loc;
 
-            if (loc.quantity >= remainingToDeduct) {
-                loc.quantity -= remainingToDeduct;
-                remainingToDeduct = 0;
-            } else {
-                remainingToDeduct -= loc.quantity;
-                loc.quantity = 0;
-            }
-            return loc;
+          if (loc.quantity >= remainingToDeduct) {
+            loc.quantity -= remainingToDeduct;
+            remainingToDeduct = 0;
+          } else {
+            remainingToDeduct -= loc.quantity;
+            loc.quantity = 0;
+          }
+          return loc;
         }).filter(l => l.quantity > 0 || newLocations.length === 1); // Mantém pelo menos um local mesmo se zero
 
         // Se ainda sobrou algo pra deduzir (estoque negativo global), tira do primeiro local
         if (remainingToDeduct > 0 && newLocations.length > 0) {
-            newLocations[0].quantity -= remainingToDeduct;
+          newLocations[0].quantity -= remainingToDeduct;
         }
 
         const newTotal = newLocations.reduce((acc, l) => acc + l.quantity, 0);
 
         updatedMaterial = {
-            ...m,
-            currentStock: newTotal,
-            stockLocations: newLocations
+          ...m,
+          currentStock: newTotal,
+          stockLocations: newLocations
         };
         return updatedMaterial;
       }
@@ -262,26 +313,26 @@ const App: React.FC = () => {
 
   // Lógica Especial para EXECUTOR: Painel Simplificado
   if (currentUser.role === 'EXECUTOR') {
-      return (
-        <ExecutorPanel
-          user={currentUser}
-          oss={oss}
-          setOss={setOss}
-          projects={projects}
-          buildings={buildings}
-          equipments={equipments}
-          onLogout={handleLogout}
-          services={services}
-          materials={materials}
-        />
-      );
+    return (
+      <ExecutorPanel
+        user={currentUser}
+        oss={oss}
+        setOss={setOss}
+        projects={projects}
+        buildings={buildings}
+        equipments={equipments}
+        onLogout={handleLogout}
+        services={services}
+        materials={materials}
+      />
+    );
   }
 
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard projects={projects} oss={oss} materials={materials} services={services} />;
-      case 'projects': 
+      case 'projects':
         return (
           <ProjectList
             projects={projects}
@@ -294,7 +345,7 @@ const App: React.FC = () => {
             currentUser={currentUser}
           />
         );
-      case 'os': 
+      case 'os':
         return (
           <OSList
             oss={oss}
@@ -313,12 +364,23 @@ const App: React.FC = () => {
           />
         );
       case 'calendar':
-        return <CalendarView oss={oss} projects={projects} materials={materials} services={services} users={users} />;
+        // ✅ FIX 3: passa equipments/buildings (evita .find em undefined dentro do CalendarView)
+        return (
+          <CalendarView
+            oss={oss}
+            projects={projects}
+            materials={materials}
+            services={services}
+            users={users}
+            equipments={equipments as any}
+            buildings={buildings as any}
+          />
+        );
       case 'buildings':
         return <BuildingManager buildings={buildings} setBuildings={setBuildings} currentUser={currentUser} />;
       case 'equipments':
         return <EquipmentManager equipments={equipments} setEquipments={setEquipments} currentUser={currentUser} />;
-      case 'inventory': 
+      case 'inventory':
         return (
           <Inventory
             materials={materials}
@@ -340,13 +402,13 @@ const App: React.FC = () => {
       case 'reports':
         // Agora passamos os users, buildings e equipments para gerar os nomes corretos nos relatórios
         return (
-          <Reports 
-            materials={materials} 
-            projects={projects} 
-            movements={movements} 
-            oss={oss} 
-            services={services} 
-            users={users} 
+          <Reports
+            materials={materials}
+            projects={projects}
+            movements={movements}
+            oss={oss}
+            services={services}
+            users={users}
             buildings={buildings}
             equipments={equipments}
           />
@@ -372,17 +434,17 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
-      
+
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* Sidebar Navigation - CUSTOM COLOR #001529 */}
-      <aside 
+      <aside
         className={`
           fixed inset-y-0 left-0 z-50 w-72 bg-[#001529] text-white flex flex-col border-r border-white/10 transition-transform duration-300 ease-in-out shadow-2xl
           md:relative md:translate-x-0 md:shadow-none
@@ -393,17 +455,17 @@ const App: React.FC = () => {
         {/* Brand Header */}
         <div className="h-20 flex items-center px-6 border-b border-white/10 bg-[#001529] shrink-0 justify-between md:justify-center lg:justify-start relative overflow-hidden group">
           <div className="flex items-center gap-3 relative z-10">
-             {/* Logo Icon Style - imitating the fingerprint logo */}
-             <div className="w-10 h-10 flex items-center justify-center text-clean-primary text-2xl group-hover:scale-110 transition-transform">
-               <i className="fas fa-fingerprint"></i>
-             </div>
-             <div className="block md:hidden lg:block">
-               <h1 className="text-xl font-black text-white tracking-tighter leading-none">CropService</h1>
-               <span className="text-[10px] text-clean-primary font-bold uppercase tracking-widest block -mt-1">Engineering</span>
-             </div>
+            {/* Logo Icon Style - imitating the fingerprint logo */}
+            <div className="w-10 h-10 flex items-center justify-center text-clean-primary text-2xl group-hover:scale-110 transition-transform">
+              <i className="fas fa-fingerprint"></i>
+            </div>
+            <div className="block md:hidden lg:block">
+              <h1 className="text-xl font-black text-white tracking-tighter leading-none">CropService</h1>
+              <span className="text-[10px] text-clean-primary font-bold uppercase tracking-widest block -mt-1">Engineering</span>
+            </div>
           </div>
           <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-white hover:text-clean-primary transition-colors">
-             <i className="fas fa-times text-xl"></i>
+            <i className="fas fa-times text-xl"></i>
           </button>
         </div>
 
@@ -447,7 +509,7 @@ const App: React.FC = () => {
             </div>
           </div>
           <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors uppercase tracking-wider">
-             <i className="fas fa-sign-out-alt"></i> Sair
+            <i className="fas fa-sign-out-alt"></i> Sair
           </button>
         </div>
       </aside>
@@ -457,34 +519,34 @@ const App: React.FC = () => {
         {/* Top Header */}
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 shrink-0 z-30 shadow-sm relative">
           <div className="flex items-center gap-4 text-base text-slate-600 overflow-hidden">
-             <button 
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-sm transition-all"
-             >
-                <i className="fas fa-bars text-lg"></i>
-             </button>
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-sm transition-all"
+            >
+              <i className="fas fa-bars text-lg"></i>
+            </button>
 
-             <div className="flex items-center gap-2 truncate">
-               <span className="font-bold text-slate-400 hidden sm:block">CropService <span className="text-clean-primary">/</span></span>
-               <span className="font-bold text-slate-900 text-lg sm:text-xl truncate">
-                 {MENU_GROUPS.reduce((acc, g) => [...acc, ...g.items], [] as any[]).find(i => i.id === activeTab)?.label || 'Bem-vindo'}
-               </span>
-             </div>
+            <div className="flex items-center gap-2 truncate">
+              <span className="font-bold text-slate-400 hidden sm:block">CropService <span className="text-clean-primary">/</span></span>
+              <span className="font-bold text-slate-900 text-lg sm:text-xl truncate">
+                {MENU_GROUPS.reduce((acc, g) => [...acc, ...g.items], [] as any[]).find(i => i.id === activeTab)?.label || 'Bem-vindo'}
+              </span>
+            </div>
           </div>
-          
+
           <div className="flex items-center gap-3 sm:gap-6">
-             {/* Status Sync */}
-             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
-                <span className={`w-2 h-2 rounded-full ${syncStatus === 'online' ? 'bg-clean-primary' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                    {syncStatus === 'online' ? 'Online' : syncStatus === 'syncing' ? 'Sync...' : syncStatus === 'error' ? 'Erro' : 'Offline'}
-                </span>
-             </div>
-             
-             <button className="w-10 h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-clean-primary transition-all relative shadow-sm hover:shadow active:scale-95">
-                <i className="fas fa-bell"></i>
-                <span className="absolute top-2.5 right-3 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-             </button>
+            {/* Status Sync */}
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
+              <span className={`w-2 h-2 rounded-full ${syncStatus === 'online' ? 'bg-clean-primary' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                {syncStatus === 'online' ? 'Online' : syncStatus === 'syncing' ? 'Sync...' : syncStatus === 'error' ? 'Erro' : 'Offline'}
+              </span>
+            </div>
+
+            <button className="w-10 h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-clean-primary transition-all relative shadow-sm hover:shadow active:scale-95">
+              <i className="fas fa-bell"></i>
+              <span className="absolute top-2.5 right-3 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+            </button>
           </div>
         </header>
 
@@ -507,11 +569,11 @@ interface SidebarLinkProps {
 }
 
 const SidebarLink: React.FC<SidebarLinkProps> = ({ active, onClick, icon, label }) => (
-  <button 
+  <button
     onClick={onClick}
     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group relative ${
-      active 
-        ? 'bg-clean-primary text-white font-bold border border-white shadow-md' 
+      active
+        ? 'bg-clean-primary text-white font-bold border border-white shadow-md'
         : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
     }`}
     title={label}
@@ -520,7 +582,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ active, onClick, icon, label 
       <i className={`fas ${icon} text-lg`}></i>
     </div>
     <span className="block md:hidden lg:block text-sm tracking-tight truncate">{label}</span>
-    
+
     {/* Tooltip for collapsed state on Desktop */}
     <div className="hidden md:block lg:hidden absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-xl border border-slate-700 font-bold">
       {label}
