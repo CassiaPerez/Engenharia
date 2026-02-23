@@ -142,12 +142,17 @@ const App: React.FC = () => {
         // Análise ANTES do mapeamento
         console.log('📊 ANÁLISE DOS DADOS BRUTOS:');
         if (m.data) {
+          console.log('  - Total de rows retornadas do Supabase:', m.data.length);
           const rawLocationBreakdown = m.data.reduce((acc, mat) => {
             const loc = mat.location || 'NULL';
             acc[loc] = (acc[loc] || 0) + 1;
             return acc;
           }, {} as Record<string, number>);
           console.log('  - Contagem por location (ANTES do mapeamento):', rawLocationBreakdown);
+
+          // Contar Cropbio especificamente
+          const cropbioCount = m.data.filter(mat => mat.location === 'Cropbio').length;
+          console.log('  - Total de Cropbio nos dados brutos:', cropbioCount);
         }
 
         const mappedMaterials = mapFromSupabase<Material>(m.data || []);
@@ -161,6 +166,17 @@ const App: React.FC = () => {
           return acc;
         }, {} as Record<string, number>);
         console.log('  - Por localização (DEPOIS do mapeamento):', locationBreakdown);
+
+        // Contagem específica de Cropbio após o mapeamento
+        const cropbioMapped = mappedMaterials.filter(mat => mat.location === 'Cropbio').length;
+        console.log('  - Total de Cropbio APÓS mapeamento:', cropbioMapped);
+
+        if (m.data) {
+          const cropbioRaw = m.data.filter(mat => mat.location === 'Cropbio').length;
+          if (cropbioRaw !== cropbioMapped) {
+            console.warn(`⚠️ ALERTA: Perda de dados! Cropbio raw: ${cropbioRaw}, após mapeamento: ${cropbioMapped}`);
+          }
+        }
 
         setProjects(mapFromSupabase<Project>(p.data || []));
         setMaterials(mappedMaterials);
