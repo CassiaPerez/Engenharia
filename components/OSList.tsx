@@ -480,6 +480,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
         ["Status", os.status],
         ["Prioridade", translatePriority(os.priority)],
         ["Tipo", os.type],
+        ["Solicitante", os.requesterName || 'Não informado'],
         ["Executor(es)", executorNames],
         ["Abertura", new Date(os.openDate).toLocaleString()],
         ["Prazo Limite", new Date(os.limitDate).toLocaleString()]
@@ -594,10 +595,38 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
         y = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    doc.setFontSize(12);
-    doc.setTextColor(71, 122, 127);
-    doc.text(`CUSTO TOTAL ESTIMADO: R$ ${formatCurrency(costs.totalCost)}`, 196, y, { align: 'right' });
-    y += 20;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("RESUMO DE CUSTOS", 14, y);
+    doc.line(14, y + 2, 196, y + 2);
+    y += 8;
+
+    const costSummary = [
+      ["Materiais", `R$ ${formatCurrency(costs.materialCost)}${costs.isManualMaterial ? ' (Manual)' : ''}`],
+      ["Serviços", `R$ ${formatCurrency(costs.serviceCost)}${costs.isManualService ? ' (Manual)' : ''}`],
+      ["TOTAL", `R$ ${formatCurrency(costs.totalCost)}`]
+    ];
+
+    autoTable(doc, {
+      startY: y,
+      body: costSummary,
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 2 },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 40 },
+        1: { cellWidth: 100, halign: 'right' }
+      },
+      didParseCell: (data: any) => {
+        if (data.row.index === 2) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 12;
+          data.cell.styles.textColor = [71, 122, 127];
+        }
+      }
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 15;
 
     if (y > 250) {
         doc.addPage();
@@ -931,6 +960,89 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                         {selectedOS.endTime && <div className="flex justify-between"><span className="text-slate-500">Conclusão:</span><span className="font-mono font-bold text-emerald-600">{new Date(selectedOS.endTime).toLocaleString()}</span></div>}
                                     </div>
                                 </div>
+
+                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') && (
+                                  <div className="pt-6 border-t border-slate-100">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                                      <i className="fas fa-dollar-sign"></i>
+                                      Valores Manuais
+                                    </p>
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Materiais</label>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-slate-500">R$</span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
+                                            placeholder="Deixe vazio para calcular automaticamente"
+                                            value={selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null ? selectedOS.manualMaterialCost : ''}
+                                            onChange={async (e) => {
+                                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                              const updatedOS = { ...selectedOS, manualMaterialCost: value };
+                                              setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+                                              setSelectedOS(updatedOS);
+                                              try {
+                                                const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
+                                                if (error) throw error;
+                                              } catch (e) {
+                                                console.error('Erro ao atualizar valor manual:', e);
+                                              }
+                                            }}
+                                          />
+                                        </div>
+                                        {selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null && (
+                                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                            <i className="fas fa-info-circle"></i>
+                                            Valor manual ativo
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Serviços</label>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-slate-500">R$</span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
+                                            placeholder="Deixe vazio para calcular automaticamente"
+                                            value={selectedOS.manualServiceCost !== undefined && selectedOS.manualServiceCost !== null ? selectedOS.manualServiceCost : ''}
+                                            onChange={async (e) => {
+                                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                              const updatedOS = { ...selectedOS, manualServiceCost: value };
+                                              setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+                                              setSelectedOS(updatedOS);
+                                              try {
+                                                const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
+                                                if (error) throw error;
+                                              } catch (e) {
+                                                console.error('Erro ao atualizar valor manual:', e);
+                                              }
+                                            }}
+                                          />
+                                        </div>
+                                        {selectedOS.manualServiceCost !== undefined && selectedOS.manualServiceCost !== null && (
+                                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                            <i className="fas fa-info-circle"></i>
+                                            Valor manual ativo
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div className="pt-2 border-t border-slate-100">
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-sm font-bold text-slate-700">Custo Total:</span>
+                                          <span className="text-lg font-bold text-clean-primary">
+                                            R$ {formatCurrency(calculateOSCosts(selectedOS, materials, services).totalCost)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                             </div>
                         </div>
 

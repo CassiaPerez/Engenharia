@@ -125,6 +125,8 @@ export interface Project {
   status: ProjectStatus;
   postponementHistory: { date: string; justification: string; user: string }[];
   auditLogs: { date: string; action: string; user: string }[];
+  manualMaterialCost?: number;
+  manualServiceCost?: number;
 }
 
 export interface OS {
@@ -153,6 +155,8 @@ export interface OS {
   executionDescription?: string;
   materials: OSItem[];
   services: OSService[];
+  manualMaterialCost?: number;
+  manualServiceCost?: number;
 }
 
 export interface OSItem {

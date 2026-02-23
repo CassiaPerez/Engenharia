@@ -609,6 +609,41 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                                 <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
                                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h4 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-6">Informações Básicas</h4><div className="grid grid-cols-1 gap-6"><div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Título</label><input required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all focus:bg-white" value={formProject.description} onChange={e => setFormProject({...formProject, description: e.target.value})} /></div><div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Escopo</label><textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 shadow-sm h-28 custom-scrollbar transition-all focus:bg-white" value={formProject.detailedDescription} onChange={e => setFormProject({...formProject, detailedDescription: e.target.value})} /></div></div></div>
                                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><h4 className="text-sm font-black text-slate-800 uppercase tracking-wide mb-6">Orçamento & Prazos</h4><div className="grid grid-cols-2 gap-6"><div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Budget (R$)</label><input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all focus:bg-white" value={formProject.estimatedValue} onChange={e => setFormProject({...formProject, estimatedValue: Number(e.target.value)})} /></div><div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Prazo (Dias)</label><input type="number" required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all focus:bg-white" value={formProject.slaDays} onChange={e => setFormProject({...formProject, slaDays: Number(e.target.value)})} /></div></div></div>
+                                    {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') && (
+                                      <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-2xl border-2 border-amber-200 shadow-sm">
+                                        <div className="flex items-center gap-2 mb-4">
+                                          <i className="fas fa-dollar-sign text-amber-600"></i>
+                                          <h4 className="text-sm font-black text-amber-900 uppercase tracking-wide">Custos Manuais (Opcional)</h4>
+                                        </div>
+                                        <p className="text-xs text-amber-700 mb-4">Adicione valores extras que não estão vinculados a OSs específicas</p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <div>
+                                            <label className="text-xs font-bold text-slate-600 uppercase mb-2 block">Materiais Extras (R$)</label>
+                                            <input
+                                              type="number"
+                                              step="0.01"
+                                              min="0"
+                                              className="w-full h-12 px-4 bg-white border border-amber-300 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                                              placeholder="0,00"
+                                              value={formProject.manualMaterialCost !== undefined && formProject.manualMaterialCost !== null ? formProject.manualMaterialCost : ''}
+                                              onChange={e => setFormProject({...formProject, manualMaterialCost: e.target.value === '' ? undefined : Number(e.target.value)})}
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="text-xs font-bold text-slate-600 uppercase mb-2 block">Serviços Extras (R$)</label>
+                                            <input
+                                              type="number"
+                                              step="0.01"
+                                              min="0"
+                                              className="w-full h-12 px-4 bg-white border border-amber-300 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                                              placeholder="0,00"
+                                              value={formProject.manualServiceCost !== undefined && formProject.manualServiceCost !== null ? formProject.manualServiceCost : ''}
+                                              onChange={e => setFormProject({...formProject, manualServiceCost: e.target.value === '' ? undefined : Number(e.target.value)})}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                                 </div>
                             )}
                             {modalTab === 'RESOURCES' && (

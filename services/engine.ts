@@ -2,26 +2,35 @@
 import { OS, Material, ServiceType, Project, OSStatus, ServiceCostType } from '../types';
 
 export const calculateOSCosts = (os: OS, materials: Material[], services: ServiceType[]) => {
-  // Materiais apropriados na OS (Usa o unitCost gravado no momento da OS, não o do cadastro atual)
-  const materialCost = os.materials.reduce((acc, item) => {
+  // Usa valor manual se definido, senão calcula pela soma dos itens
+  const calculatedMaterialCost = os.materials.reduce((acc, item) => {
     return acc + (item.quantity * item.unitCost);
   }, 0);
 
-  // Serviços lançados na OS (Usa o unitCost gravado no momento da OS)
-  const serviceCost = os.services.reduce((acc, srvEntry) => {
+  const calculatedServiceCost = os.services.reduce((acc, srvEntry) => {
     return acc + (srvEntry.quantity * srvEntry.unitCost);
   }, 0);
+
+  const materialCost = os.manualMaterialCost !== undefined && os.manualMaterialCost !== null
+    ? os.manualMaterialCost
+    : calculatedMaterialCost;
+
+  const serviceCost = os.manualServiceCost !== undefined && os.manualServiceCost !== null
+    ? os.manualServiceCost
+    : calculatedServiceCost;
 
   return {
     materialCost,
     serviceCost,
-    totalCost: materialCost + serviceCost
+    totalCost: materialCost + serviceCost,
+    isManualMaterial: os.manualMaterialCost !== undefined && os.manualMaterialCost !== null,
+    isManualService: os.manualServiceCost !== undefined && os.manualServiceCost !== null
   };
 };
 
 export const calculateProjectCosts = (project: Project, oss: OS[], materials: Material[], services: ServiceType[]) => {
   const projectOSs = oss.filter(os => os.projectId === project.id);
-  
+
   let totalMaterials = 0;
   let totalServices = 0;
 
@@ -30,6 +39,14 @@ export const calculateProjectCosts = (project: Project, oss: OS[], materials: Ma
     totalMaterials += costs.materialCost;
     totalServices += costs.serviceCost;
   });
+
+  // Adiciona valores manuais do projeto se definidos
+  if (project.manualMaterialCost !== undefined && project.manualMaterialCost !== null) {
+    totalMaterials += project.manualMaterialCost;
+  }
+  if (project.manualServiceCost !== undefined && project.manualServiceCost !== null) {
+    totalServices += project.manualServiceCost;
+  }
 
   const totalReal = totalMaterials + totalServices;
 
