@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Project, OS, Material, ServiceType, StockMovement,
@@ -81,45 +82,6 @@ const App: React.FC = () => {
   // Refs para debounce de salvamento
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Busca paginada para evitar limites do PostgREST/Supabase (ex: Max Rows)
-  // Mantém o comportamento atual (mesmas colunas/ordenação), apenas garantindo que traga TUDO.
-  const fetchAllRows = async <T,>(
-    table: string,
-    options?: {
-      select?: string;
-      orderBy?: string;
-      ascending?: boolean;
-      pageSize?: number;
-    }
-  ): Promise<T[]> => {
-    const select = options?.select ?? '*';
-    const orderBy = options?.orderBy ?? 'updated_at';
-    const ascending = options?.ascending ?? false;
-    const pageSize = Math.min(Math.max(options?.pageSize ?? 1000, 1), 5000);
-
-    const all: T[] = [];
-    let from = 0;
-
-    while (true) {
-      const to = from + pageSize - 1;
-      const { data, error } = await supabase
-        .from(table)
-        .select(select)
-        .order(orderBy, { ascending })
-        .range(from, to);
-
-      if (error) throw error;
-
-      const batch = (data || []) as T[];
-      all.push(...batch);
-
-      if (batch.length < pageSize) break;
-      from += pageSize;
-    }
-
-    return all;
-  };
-
   // Carregamento Inicial do Supabase (Única Fonte de Dados)
   useEffect(() => {
     const loadData = async () => {
@@ -129,10 +91,9 @@ const App: React.FC = () => {
         await loadCustomPermissions();
         await loadUserPermissions();
 
-        // OBS: materials (almoxarifado) é o único que tende a estourar limites de paginação.
-        // Por isso ele é carregado em paginação dedicada logo abaixo.
-        const [p, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
+        const [p, m, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
           supabase.from('projects').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
+          supabase.from('materials').select('*', { count: 'exact' }).order('code', { ascending: true }).range(0, 9999),
           supabase.from('services').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
           supabase.from('oss').select('*', { count: 'exact' }).order('open_date', { ascending: false, nullsFirst: false }).range(0, 9999),
           supabase.from('stock_movements').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
@@ -143,26 +104,20 @@ const App: React.FC = () => {
           supabase.from('equipments').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999)
         ]);
 
-        const allMaterialsRows = await fetchAllRows<any>('materials', {
-          select: '*',
-          orderBy: 'code',
-          ascending: true,
-          pageSize: 1000
-        });
-
         if (p.error) console.error("❌ Error loading projects:", p.error);
+        if (m.error) console.error("❌ Error loading materials:", m.error);
         if (s.error) console.error("❌ Error loading services:", s.error);
         if (o.error) console.error("❌ Error loading OSs:", o.error);
         if (mov.error) console.error("❌ Error loading stock_movements:", mov.error);
         if (eqp.error) console.error("❌ Error loading equipments:", eqp.error);
         if (usr.error) console.error("❌ Error loading users:", usr.error);
 
-        if (p.error || s.error || usr.error) {
+        if (p.error || m.error || s.error || usr.error) {
           console.error("Critical errors found. Check logs above.");
           throw new Error("Erro de conexão com Supabase");
         }
 
-        const mappedMaterials = mapFromSupabase<Material>(allMaterialsRows || []);
+        const mappedMaterials = mapFromSupabase<Material>(m.data || []);
 
         setProjects(mapFromSupabase<Project>(p.data || []));
         setMaterials(mappedMaterials);
@@ -197,657 +152,203 @@ const App: React.FC = () => {
     let updatedMaterial: Material | null = null;
     let newMovement: StockMovement | null = null;
 
-    try {
-      // Buscar material atual no state (fonte oficial no front)
-      const material = materials.find(m => m.id === mId);
-      if (!material) {
-        alert("Material não encontrado.");
-        return;
-      }
+    const relatedOS = oss.find(os => os.number === osNumber);
 
-      // Normaliza locais (compatibilidade: caso não exista stock_locations)
-      const stockLocations: StockLocation[] = Array.isArray(material.stock_locations)
-        ? material.stock_locations
-        : [];
+    setMaterials(prev => prev.map(m => {
+      if (m.id === mId) {
+        let remainingToDeduct = qty;
+        let newLocations: StockLocation[] = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'Geral', quantity: m.currentStock }];
 
-      // Se não tiver locais, mantém comportamento antigo (current_stock)
-      if (!stockLocations.length) {
-        const newStock = (material.current_stock || 0) - qty;
-        if (newStock < 0) {
-          alert("Estoque insuficiente.");
-          return;
+        // Lógica de consumo inteligente de locais
+        newLocations = newLocations.map(loc => {
+            if (remainingToDeduct <= 0) return loc;
+
+            if (loc.quantity >= remainingToDeduct) {
+                loc.quantity -= remainingToDeduct;
+                remainingToDeduct = 0;
+            } else {
+                remainingToDeduct -= loc.quantity;
+                loc.quantity = 0;
+            }
+            return loc;
+        }).filter(l => l.quantity > 0 || newLocations.length === 1); // Mantém pelo menos um local mesmo se zero
+
+        // Se ainda sobrou algo pra deduzir (estoque negativo global), tira do primeiro local
+        if (remainingToDeduct > 0 && newLocations.length > 0) {
+            newLocations[0].quantity -= remainingToDeduct;
         }
 
+        const newTotal = newLocations.reduce((acc, l) => acc + l.quantity, 0);
+
         updatedMaterial = {
-          ...material,
-          current_stock: newStock
+            ...m,
+            currentStock: newTotal,
+            stockLocations: newLocations
         };
+        return updatedMaterial;
+      }
+      return m;
+    }));
 
-        const movement: StockMovement = {
-          id: crypto.randomUUID(),
-          material_id: mId,
-          movement_type: 'saida_os',
-          quantity: qty,
-          date: new Date().toISOString(),
-          responsible: currentUser?.name || 'Sistema',
-          os_number: osNumber
-        };
+    let description = `Baixa via ${osNumber}`;
+    let costCenter: string | undefined;
+    let projectId: string | undefined;
 
-        newMovement = movement;
+    if (relatedOS) {
+      if (relatedOS.projectId) {
+        const project = projects.find(p => p.id === relatedOS.projectId);
+        description = `Baixa p/ Projeto: ${project?.code || 'N/A'} / OS: ${osNumber}`;
+        costCenter = project?.costCenter;
+        projectId = relatedOS.projectId;
+      } else if (relatedOS.buildingId) {
+        const building = buildings.find(b => b.id === relatedOS.buildingId);
+        description = `Baixa p/ Edifício: ${building?.name || 'N/A'} / OS: ${osNumber}`;
+        costCenter = relatedOS.costCenter;
+      } else if (relatedOS.equipmentId) {
+        const equipment = equipments.find(e => e.id === relatedOS.equipmentId);
+        description = `Baixa p/ Equipamento: ${equipment?.name || 'N/A'} / OS: ${osNumber}`;
+        costCenter = relatedOS.costCenter;
+      }
+    }
 
-        // Salvar em materiais
-        const { error: matErr } = await supabase
-          .from('materials')
-          .update(mapToSupabase(updatedMaterial))
-          .eq('id', mId);
+    newMovement = {
+      id: Math.random().toString(36).substr(2, 9),
+      type: 'OUT',
+      materialId: mId,
+      quantity: qty,
+      date: new Date().toISOString(),
+      userId: currentUser?.id || 'SYSTEM',
+      osId: osNumber,
+      description: description,
+      fromLocation: 'Automático',
+      projectId: projectId,
+      costCenter: costCenter
+    };
 
-        if (matErr) throw matErr;
+    setMovements(prev => [...prev, newMovement!]);
 
-        // Salvar movimento
-        const { error: movErr } = await supabase
-          .from('stock_movements')
-          .insert(mapToSupabase(newMovement));
-
-        if (movErr) throw movErr;
-
-        // Atualizar state
-        setMaterials(prev => prev.map(m => (m.id === mId ? updatedMaterial! : m)));
-        setMovements(prev => [newMovement!, ...prev]);
-        return;
+    // Salvar no Supabase
+    try {
+      if (updatedMaterial) {
+        const { error: matError } = await supabase.from('materials').upsert(mapToSupabase(updatedMaterial));
+        if (matError) throw matError;
       }
 
-      // FIFO: consumir dos locais com saldo
-      let remaining = qty;
-      const updatedLocations = stockLocations.map(loc => ({ ...loc }));
-
-      for (const loc of updatedLocations) {
-        if (remaining <= 0) break;
-        const available = loc.quantity || 0;
-        if (available <= 0) continue;
-
-        const take = Math.min(available, remaining);
-        loc.quantity = available - take;
-        remaining -= take;
+      if (newMovement) {
+        const { error: movError } = await supabase.from('stock_movements').insert(mapToSupabaseJson(newMovement));
+        if (movError) throw movError;
       }
-
-      if (remaining > 0) {
-        alert("Estoque insuficiente (considerando os locais).");
-        return;
-      }
-
-      // Atualiza total (current_stock) como soma dos locais
-      const newTotal = updatedLocations.reduce((sum, l) => sum + (l.quantity || 0), 0);
-
-      updatedMaterial = {
-        ...material,
-        stock_locations: updatedLocations,
-        current_stock: newTotal
-      };
-
-      const movement: StockMovement = {
-        id: crypto.randomUUID(),
-        material_id: mId,
-        movement_type: 'saida_os',
-        quantity: qty,
-        date: new Date().toISOString(),
-        responsible: currentUser?.name || 'Sistema',
-        os_number: osNumber
-      };
-
-      newMovement = movement;
-
-      // Salvar em materiais (json)
-      const { error: matErr } = await supabase
-        .from('materials')
-        .update(mapToSupabaseJson(updatedMaterial, ['stock_locations']))
-        .eq('id', mId);
-
-      if (matErr) throw matErr;
-
-      // Salvar movimento
-      const { error: movErr } = await supabase
-        .from('stock_movements')
-        .insert(mapToSupabase(newMovement));
-
-      if (movErr) throw movErr;
-
-      // Atualizar state
-      setMaterials(prev => prev.map(m => (m.id === mId ? updatedMaterial! : m)));
-      setMovements(prev => [newMovement!, ...prev]);
-    } catch (err) {
-      console.error("Erro ao dar baixa no estoque:", err);
-      alert("Erro ao dar baixa no estoque. Verifique logs.");
+    } catch (e) {
+      console.error('Erro ao salvar movimento de estoque:', e);
     }
   };
 
-  // Função de login
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('crop_user_session', JSON.stringify(user));
+    const defaultTab = user.role === 'USER' ? 'calendar' : 'dashboard';
+    setActiveTab(defaultTab);
   };
 
-  // Função de logout
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('crop_user_session');
   };
 
-  // Funções de salvamento (debounce)
-  const debounceSave = (fn: () => Promise<void>) => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      fn().catch(err => console.error("Erro ao salvar:", err));
-    }, 500);
-  };
+  // Se não estiver logado, mostra Login
+  if (!currentUser) {
+    return <Login users={users} onLogin={handleLogin} />;
+  }
 
-  // CRUD Projects
-  const addProject = (project: Project) => {
-    const newProject = { ...project, id: crypto.randomUUID(), updated_at: new Date().toISOString() };
-    setProjects(prev => [newProject, ...prev]);
-    debounceSave(async () => {
-      const { error } = await supabase.from('projects').insert(mapToSupabase(newProject));
-      if (error) {
-        console.error("Erro ao adicionar projeto:", error);
-        alert("Erro ao salvar projeto.");
-      }
-    });
-  };
+  // Lógica Especial para EXECUTOR: Painel Simplificado
+  if (currentUser.role === 'EXECUTOR') {
+      return (
+        <ExecutorPanel
+          user={currentUser}
+          oss={oss}
+          setOss={setOss}
+          projects={projects}
+          buildings={buildings}
+          equipments={equipments}
+          onLogout={handleLogout}
+          services={services}
+          materials={materials}
+        />
+      );
+  }
 
-  const updateProject = (project: Project) => {
-    const updated = { ...project, updated_at: new Date().toISOString() };
-    setProjects(prev => prev.map(p => (p.id === updated.id ? updated : p)));
-    debounceSave(async () => {
-      const { error } = await supabase.from('projects').update(mapToSupabase(updated)).eq('id', updated.id);
-      if (error) {
-        console.error("Erro ao atualizar projeto:", error);
-        alert("Erro ao atualizar projeto.");
-      }
-    });
-  };
-
-  const deleteProject = (id: string) => {
-    if (!confirm("Excluir projeto?")) return;
-    setProjects(prev => prev.filter(p => p.id !== id));
-    debounceSave(async () => {
-      const { error } = await supabase.from('projects').delete().eq('id', id);
-      if (error) {
-        console.error("Erro ao excluir projeto:", error);
-        alert("Erro ao excluir projeto.");
-      }
-    });
-  };
-
-  // CRUD OS
-  const addOS = (os: OS) => {
-    const newOS: OS = {
-      ...os,
-      id: crypto.randomUUID(),
-      open_date: os.open_date || new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setOss(prev => [newOS, ...prev]);
-    debounceSave(async () => {
-      const { error } = await supabase.from('oss').insert(mapToSupabase(newOS));
-      if (error) {
-        console.error("Erro ao adicionar OS:", error);
-        alert("Erro ao salvar OS.");
-      }
-    });
-  };
-
-  const updateOS = (os: OS) => {
-    const updated = { ...os, updated_at: new Date().toISOString() };
-    setOss(prev => prev.map(o => (o.id === updated.id ? updated : o)));
-    debounceSave(async () => {
-      const { error } = await supabase.from('oss').update(mapToSupabase(updated)).eq('id', updated.id);
-      if (error) {
-        console.error("Erro ao atualizar OS:", error);
-        alert("Erro ao atualizar OS.");
-      }
-    });
-  };
-
-  const deleteOS = (id: string) => {
-    if (!confirm("Excluir OS?")) return;
-    setOss(prev => prev.filter(o => o.id !== id));
-    debounceSave(async () => {
-      const { error } = await supabase.from('oss').delete().eq('id', id);
-      if (error) {
-        console.error("Erro ao excluir OS:", error);
-        alert("Erro ao excluir OS.");
-      }
-    });
-  };
-
-  // CRUD Materials
-  const addMaterial = (material: Material) => {
-    const newMaterial: Material = {
-      ...material,
-      id: crypto.randomUUID(),
-      updated_at: new Date().toISOString()
-    };
-    setMaterials(prev => [newMaterial, ...prev]);
-    debounceSave(async () => {
-      const { error } = await supabase.from('materials').insert(mapToSupabase(newMaterial));
-      if (error) {
-        console.error("Erro ao adicionar material:", error);
-        alert("Erro ao salvar material.");
-      }
-    });
-  };
-
-  const updateMaterial = (material: Material) => {
-    const updated = { ...material, updated_at: new Date().toISOString() };
-    setMaterials(prev => prev.map(m => (m.id === updated.id ? updated : m)));
-    debounceSave(async () => {
-      const { error } = await supabase.from('materials').update(mapToSupabase(updated)).eq('id', updated.id);
-      if (error) {
-        console.error("Erro ao atualizar material:", error);
-        alert("Erro ao atualizar material.");
-      }
-    });
-  };
-
-  const deleteMaterial = (id: string) => {
-    if (!confirm("Excluir material?")) return;
-    setMaterials(prev => prev.filter(m => m.id !== id));
-    debounceSave(async () => {
-      const { error } = await supabase.from('materials').delete().eq('id', id);
-      if (error) {
-        console.error("Erro ao excluir material:", error);
-        alert("Erro ao excluir material.");
-      }
-    });
-  };
-
-  // CRUD Services
-  const addServiceType = (service: ServiceType) => {
-    const newService: ServiceType = {
-      ...service,
-      id: crypto.randomUUID(),
-      updated_at: new Date().toISOString()
-    };
-    setServices(prev => [newService, ...prev]);
-    debounceSave(async () => {
-      const { error } = await supabase.from('services').insert(mapToSupabase(newService));
-      if (error) {
-        console.error("Erro ao adicionar serviço:", error);
-        alert("Erro ao salvar serviço.");
-      }
-    });
-  };
-
-  const updateServiceType = (service: ServiceType) => {
-    const updated = { ...service, updated_at: new Date().toISOString() };
-    setServices(prev => prev.map(s => (s.id === updated.id ? updated : s)));
-    debounceSave(async () => {
-      const { error } = await supabase.from('services').update(mapToSupabase(updated)).eq('id', updated.id);
-      if (error) {
-        console.error("Erro ao atualizar serviço:", error);
-        alert("Erro ao atualizar serviço.");
-      }
-    });
-  };
-
-  const deleteServiceType = (id: string) => {
-    if (!confirm("Excluir serviço?")) return;
-    setServices(prev => prev.filter(s => s.id !== id));
-    debounceSave(async () => {
-      const { error } = await supabase.from('services').delete().eq('id', id);
-      if (error) {
-        console.error("Erro ao excluir serviço:", error);
-        alert("Erro ao excluir serviço.");
-      }
-    });
-  };
-
-  // CRUD Suppliers
-  const addSupplier = (supplier: any) => {
-    const newSupplier = { ...supplier, id: crypto.randomUUID(), updated_at: new Date().toISOString() };
-    setSuppliers(prev => [newSupplier, ...prev]);
-    debounceSave(async () => {
-      const { error } = await supabase.from('suppliers').insert(mapToSupabase(newSupplier));
-      if (error) {
-        console.error("Erro ao adicionar fornecedor:", error);
-        alert("Erro ao salvar fornecedor.");
-      }
-    });
-  };
-
-  const updateSupplier = (supplier: any) => {
-    const updated = { ...supplier, updated_at: new Date().toISOString() };
-    setSuppliers(prev => prev.map(s => (s.id === updated.id ? updated : s)));
-    debounceSave(async () => {
-      const { error } = await supabase.from('suppliers').update(mapToSupabase(updated)).eq('id', updated.id);
-      if (error) {
-        console.error("Erro ao atualizar fornecedor:", error);
-        alert("Erro ao atualizar fornecedor.");
-      }
-    });
-  };
-
-  const deleteSupplier = (id: string) => {
-    if (!confirm("Excluir fornecedor?")) return;
-    setSuppliers(prev => prev.filter(s => s.id !== id));
-    debounceSave(async () => {
-      const { error } = await supabase.from('suppliers').delete().eq('id', id);
-      if (error) {
-        console.error("Erro ao excluir fornecedor:", error);
-        alert("Erro ao excluir fornecedor.");
-      }
-    });
-  };
-
-  // CRUD Users
-  const addUser = (user: User) => {
-    const newUser: User = {
-      ...user,
-      id: crypto.randomUUID(),
-      updated_at: new Date().toISOString(),
-    };
-    setUsers(prev => [newUser, ...prev]);
-    debounceSave(async () => {
-      const { error } = await supabase.from('users').insert(mapToSupabase(newUser));
-      if (error) {
-        console.error("Erro ao adicionar usuário:", error);
-        alert("Erro ao salvar usuário.");
-      }
-    });
-  };
-
-  const updateUser = (user: User) => {
-    const updated = { ...user, updated_at: new Date().toISOString() };
-    setUsers(prev => prev.map(u => (u.id === updated.id ? updated : u)));
-    debounceSave(async () => {
-      const { error } = await supabase.from('users').update(mapToSupabase(updated)).eq('id', updated.id);
-      if (error) {
-        console.error("Erro ao atualizar usuário:", error);
-        alert("Erro ao atualizar usuário.");
-      }
-    });
-  };
-
-  const deleteUser = (id: string) => {
-    if (!confirm("Excluir usuário?")) return;
-    setUsers(prev => prev.filter(u => u.id !== id));
-    debounceSave(async () => {
-      const { error } = await supabase.from('users').delete().eq('id', id);
-      if (error) {
-        console.error("Erro ao excluir usuário:", error);
-        alert("Erro ao excluir usuário.");
-      }
-    });
-  };
-
-  // CRUD Purchases
-  const addPurchase = (purchase: PurchaseRecord) => {
-    const newPurchase: PurchaseRecord = {
-      ...purchase,
-      id: crypto.randomUUID(),
-      updated_at: new Date().toISOString()
-    };
-    setPurchases(prev => [newPurchase, ...prev]);
-    debounceSave(async () => {
-      const { error } = await supabase.from('purchases').insert(mapToSupabase(newPurchase));
-      if (error) {
-        console.error("Erro ao adicionar compra:", error);
-        alert("Erro ao salvar compra.");
-      }
-    });
-  };
-
-  const updatePurchase = (purchase: PurchaseRecord) => {
-    const updated = { ...purchase, updated_at: new Date().toISOString() };
-    setPurchases(prev => prev.map(p => (p.id === updated.id ? updated : p)));
-    debounceSave(async () => {
-      const { error } = await supabase.from('purchases').update(mapToSupabase(updated)).eq('id', updated.id);
-      if (error) {
-        console.error("Erro ao atualizar compra:", error);
-        alert("Erro ao atualizar compra.");
-      }
-    });
-  };
-
-  const deletePurchase = (id: string) => {
-    if (!confirm("Excluir compra?")) return;
-    setPurchases(prev => prev.filter(p => p.id !== id));
-    debounceSave(async () => {
-      const { error } = await supabase.from('purchases').delete().eq('id', id);
-      if (error) {
-        console.error("Erro ao excluir compra:", error);
-        alert("Erro ao excluir compra.");
-      }
-    });
-  };
-
-  // CRUD Buildings
-  const addBuilding = (building: Building) => {
-    const newBuilding: Building = {
-      ...building,
-      id: crypto.randomUUID(),
-      updated_at: new Date().toISOString()
-    };
-    setBuildings(prev => [newBuilding, ...prev]);
-    debounceSave(async () => {
-      const { error } = await supabase.from('buildings').insert(mapToSupabase(newBuilding));
-      if (error) {
-        console.error("Erro ao adicionar edifício:", error);
-        alert("Erro ao salvar edifício.");
-      }
-    });
-  };
-
-  const updateBuilding = (building: Building) => {
-    const updated = { ...building, updated_at: new Date().toISOString() };
-    setBuildings(prev => prev.map(b => (b.id === updated.id ? updated : b)));
-    debounceSave(async () => {
-      const { error } = await supabase.from('buildings').update(mapToSupabase(updated)).eq('id', updated.id);
-      if (error) {
-        console.error("Erro ao atualizar edifício:", error);
-        alert("Erro ao atualizar edifício.");
-      }
-    });
-  };
-
-  const deleteBuilding = (id: string) => {
-    if (!confirm("Excluir edifício?")) return;
-    setBuildings(prev => prev.filter(b => b.id !== id));
-    debounceSave(async () => {
-      const { error } = await supabase.from('buildings').delete().eq('id', id);
-      if (error) {
-        console.error("Erro ao excluir edifício:", error);
-        alert("Erro ao excluir edifício.");
-      }
-    });
-  };
-
-  // CRUD Equipments
-  const addEquipment = (equipment: Equipment) => {
-    const newEquipment: Equipment = {
-      ...equipment,
-      id: crypto.randomUUID(),
-      updated_at: new Date().toISOString()
-    };
-    setEquipments(prev => [newEquipment, ...prev]);
-    debounceSave(async () => {
-      const { error } = await supabase.from('equipments').insert(mapToSupabase(newEquipment));
-      if (error) {
-        console.error("Erro ao adicionar equipamento:", error);
-        alert("Erro ao salvar equipamento.");
-      }
-    });
-  };
-
-  const updateEquipment = (equipment: Equipment) => {
-    const updated = { ...equipment, updated_at: new Date().toISOString() };
-    setEquipments(prev => prev.map(e => (e.id === updated.id ? updated : e)));
-    debounceSave(async () => {
-      const { error } = await supabase.from('equipments').update(mapToSupabase(updated)).eq('id', updated.id);
-      if (error) {
-        console.error("Erro ao atualizar equipamento:", error);
-        alert("Erro ao atualizar equipamento.");
-      }
-    });
-  };
-
-  const deleteEquipment = (id: string) => {
-    if (!confirm("Excluir equipamento?")) return;
-    setEquipments(prev => prev.filter(e => e.id !== id));
-    debounceSave(async () => {
-      const { error } = await supabase.from('equipments').delete().eq('id', id);
-      if (error) {
-        console.error("Erro ao excluir equipamento:", error);
-        alert("Erro ao excluir equipamento.");
-      }
-    });
-  };
-
-  const canViewTab = (tabId: TabId): boolean => {
-    const moduleMap: Record<TabId, ModuleId> = {
-      dashboard: 'dashboard',
-      projects: 'projects',
-      reports: 'reports',
-      os: 'oss',
-      calendar: 'calendar',
-      buildings: 'buildings',
-      equipments: 'equipments',
-      inventory: 'inventory',
-      services: 'services',
-      suppliers: 'suppliers',
-      users: 'users',
-      documentation: 'documentation',
-      dash: 'dashboard' as any
-    };
-
-    const moduleId = moduleMap[tabId];
-    if (!moduleId) return true;
-    return canAccessModule(moduleId);
-  };
-
-  // Renderização do conteúdo principal
   const renderContent = () => {
-    if (!currentUser) return <Login onLogin={handleLogin} />;
-
     switch (activeTab) {
       case 'dashboard':
-        return (
-          <Dashboard
-            projects={projects}
-            oss={oss}
-            materials={materials}
-            purchases={purchases}
-            movements={movements}
-            equipments={equipments}
-          />
-        );
-      case 'projects':
+        return <Dashboard projects={projects} oss={oss} materials={materials} services={services} />;
+      case 'projects': 
         return (
           <ProjectList
             projects={projects}
-            onAdd={addProject}
-            onUpdate={updateProject}
-            onDelete={deleteProject}
+            setProjects={setProjects}
+            oss={oss}
+            materials={materials}
+            setMaterials={setMaterials}
+            services={services}
+            movements={movements}
             currentUser={currentUser}
           />
         );
-      case 'reports':
-        return (
-          <Reports
-            projects={projects}
-            oss={oss}
-            materials={materials}
-            movements={movements}
-            purchases={purchases}
-            equipments={equipments}
-            buildings={buildings}
-          />
-        );
-      case 'os':
+      case 'os': 
         return (
           <OSList
             oss={oss}
+            setOss={setOss}
             projects={projects}
-            materials={materials}
-            services={services}
+            buildings={buildings}
             equipments={equipments}
-            onAdd={addOS}
-            onUpdate={updateOS}
-            onDelete={deleteOS}
+            materials={materials}
+            setMaterials={setMaterials}
+            services={services}
+            users={users}
+            setUsers={setUsers}
+            movements={movements}
             onStockChange={handleStockChange}
             currentUser={currentUser}
           />
         );
       case 'calendar':
-        return (
-          <CalendarView
-            oss={oss}
-            projects={projects}
-            services={services}
-            equipments={equipments}
-            onUpdateOS={updateOS}
-          />
-        );
+        return <CalendarView oss={oss} projects={projects} materials={materials} services={services} users={users} />;
       case 'buildings':
-        return (
-          <BuildingManager
-            buildings={buildings}
-            onAdd={addBuilding}
-            onUpdate={updateBuilding}
-            onDelete={deleteBuilding}
-          />
-        );
+        return <BuildingManager buildings={buildings} setBuildings={setBuildings} currentUser={currentUser} />;
       case 'equipments':
-        return (
-          <EquipmentManager
-            equipments={equipments}
-            buildings={buildings}
-            onAdd={addEquipment}
-            onUpdate={updateEquipment}
-            onDelete={deleteEquipment}
-          />
-        );
-      case 'inventory':
+        return <EquipmentManager equipments={equipments} setEquipments={setEquipments} currentUser={currentUser} />;
+      case 'inventory': 
         return (
           <Inventory
             materials={materials}
-            suppliers={suppliers}
-            purchases={purchases}
             movements={movements}
-            onAddMaterial={addMaterial}
-            onUpdateMaterial={updateMaterial}
-            onDeleteMaterial={deleteMaterial}
-            onAddPurchase={addPurchase}
-            onUpdatePurchase={updatePurchase}
-            onDeletePurchase={deletePurchase}
+            setMaterials={setMaterials}
+            onAddMovement={(m) => setMovements(p => [...p, m])}
             currentUser={currentUser}
+            projects={projects}
+            oss={oss}
+            setOss={setOss}
           />
         );
       case 'services':
-        return (
-          <ServiceManager
-            services={services}
-            onAdd={addServiceType}
-            onUpdate={updateServiceType}
-            onDelete={deleteServiceType}
-          />
-        );
+        return <ServiceManager services={services} setServices={setServices} currentUser={currentUser} />;
       case 'suppliers':
-        return (
-          <SupplierManager
-            suppliers={suppliers}
-            onAdd={addSupplier}
-            onUpdate={updateSupplier}
-            onDelete={deleteSupplier}
-          />
-        );
+        return <SupplierManager suppliers={suppliers} setSuppliers={setSuppliers} purchases={purchases} materials={materials} currentUser={currentUser} />;
       case 'users':
+        return <UserManagement users={users} setUsers={setUsers} currentUser={currentUser} />;
+      case 'reports':
+        // Agora passamos os users, buildings e equipments para gerar os nomes corretos nos relatórios
         return (
-          <UserManagement
-            users={users}
-            onAdd={addUser}
-            onUpdate={updateUser}
-            onDelete={deleteUser}
-            currentUser={currentUser}
+          <Reports 
+            materials={materials} 
+            projects={projects} 
+            movements={movements} 
+            oss={oss} 
+            services={services} 
+            users={users} 
+            buildings={buildings}
+            equipments={equipments}
           />
         );
       case 'documentation':
@@ -857,136 +358,174 @@ const App: React.FC = () => {
     }
   };
 
-  // Se ainda está carregando pela primeira vez
-  if (firstLoad) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-700">Carregando dados...</p>
-        </div>
-      </div>
-    );
-  }
+  // Fecha o menu mobile ao trocar de aba
+  const handleTabChange = (id: TabId) => {
+    setActiveTab(id);
+    setIsMobileMenuOpen(false);
+  };
 
-  // Se não há usuário autenticado
-  if (!currentUser) {
-    return <Login onLogin={handleLogin} />;
-  }
+  // Função para verificar se usuário tem acesso ao módulo
+  const hasModuleAccess = (moduleId: string): boolean => {
+    if (!currentUser) return false;
+    return canAccessModule(currentUser.role, moduleId as ModuleId);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            className="md:hidden text-gray-700"
-            onClick={() => setIsMobileMenuOpen(prev => !prev)}
-            aria-label="Abrir menu"
-          >
-            <i className="fa-solid fa-bars text-xl"></i>
-          </button>
-          <h1 className="font-bold text-lg">Engenharia & Manutenção</h1>
+    <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
+      
+      {/* Mobile Sidebar Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
 
-          <div className="ml-3 flex items-center gap-2 text-sm">
-            <span
-              className={`inline-flex items-center gap-2 px-2 py-1 rounded-full ${
-                syncStatus === 'online'
-                  ? 'bg-green-100 text-green-800'
-                  : syncStatus === 'syncing'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : syncStatus === 'offline'
-                  ? 'bg-gray-100 text-gray-700'
-                  : 'bg-red-100 text-red-800'
-              }`}
-              title={
-                syncStatus === 'online'
-                  ? 'Online'
-                  : syncStatus === 'syncing'
-                  ? 'Sincronizando'
-                  : syncStatus === 'offline'
-                  ? 'Offline'
-                  : 'Erro'
-              }
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  syncStatus === 'online'
-                    ? 'bg-green-600'
-                    : syncStatus === 'syncing'
-                    ? 'bg-yellow-600'
-                    : syncStatus === 'offline'
-                    ? 'bg-gray-500'
-                    : 'bg-red-600'
-                }`}
-              ></span>
-              {syncStatus === 'online'
-                ? 'Online'
-                : syncStatus === 'syncing'
-                ? 'Sincronizando'
-                : syncStatus === 'offline'
-                ? 'Offline'
-                : 'Erro'}
-            </span>
+      {/* Sidebar Navigation - CUSTOM COLOR #001529 */}
+      <aside 
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 bg-[#001529] text-white flex flex-col border-r border-white/10 transition-transform duration-300 ease-in-out shadow-2xl
+          md:relative md:translate-x-0 md:shadow-none
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:w-20 lg:w-72
+        `}
+      >
+        {/* Brand Header */}
+        <div className="h-20 flex items-center px-6 border-b border-white/10 bg-[#001529] shrink-0 justify-between md:justify-center lg:justify-start relative overflow-hidden group">
+          <div className="flex items-center gap-3 relative z-10">
+             {/* Logo Icon Style - imitating the fingerprint logo */}
+             <div className="w-10 h-10 flex items-center justify-center text-clean-primary text-2xl group-hover:scale-110 transition-transform">
+               <i className="fas fa-fingerprint"></i>
+             </div>
+             <div className="block md:hidden lg:block">
+               <h1 className="text-xl font-black text-white tracking-tighter leading-none">CropService</h1>
+               <span className="text-[10px] text-clean-primary font-bold uppercase tracking-widest block -mt-1">Engineering</span>
+             </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <div className="text-sm font-semibold">{currentUser.name}</div>
-            <div className="text-xs text-gray-500">{currentUser.role}</div>
-          </div>
-          <button
-            className="px-3 py-2 rounded-md bg-gray-900 text-white text-sm hover:bg-gray-800"
-            onClick={handleLogout}
-          >
-            Sair
+          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-white hover:text-clean-primary transition-colors">
+             <i className="fas fa-times text-xl"></i>
           </button>
         </div>
-      </header>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside
-          className={`bg-white border-r border-gray-200 w-72 p-4 space-y-6 min-h-[calc(100vh-56px)] ${
-            isMobileMenuOpen ? 'block' : 'hidden'
-          } md:block`}
-        >
-          {MENU_GROUPS.map(group => (
-            <div key={group.title}>
-              <div className="text-xs uppercase text-gray-500 font-semibold mb-2">{group.title}</div>
-              <div className="space-y-1">
-                {group.items
-                  .filter(item => canViewTab(item.id as TabId))
-                  .map(item => (
-                    <button
+        {/* Menu Items (Filtered by Permissions) */}
+        <nav className="flex-1 py-8 overflow-y-auto custom-scrollbar px-3 space-y-8">
+          {MENU_GROUPS.map((group, groupIndex) => {
+            const filteredItems = group.items.filter(item => hasModuleAccess(item.id));
+
+            if (filteredItems.length === 0) return null;
+
+            return (
+              <div key={groupIndex}>
+                <h3 className="block md:hidden lg:block px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 mx-2">
+                  {group.title}
+                </h3>
+                <div className="space-y-1">
+                  {filteredItems.map((item) => (
+                    <SidebarLink
                       key={item.id}
-                      onClick={() => {
-                        setActiveTab(item.id as TabId);
-                        setIsMobileMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition ${
-                        activeTab === (item.id as TabId)
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <i className={`fa-solid ${item.icon}`}></i>
-                      <span>{item.label}</span>
-                    </button>
+                      active={activeTab === item.id}
+                      onClick={() => handleTabChange(item.id as TabId)}
+                      icon={item.icon}
+                      label={item.label}
+                    />
                   ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </aside>
+            );
+          })}
+        </nav>
 
-        {/* Main content */}
-        <main className="flex-1 p-4 md:p-6">
-          {renderContent()}
+        {/* User Footer with Logout - Darker Shade */}
+        <div className="p-4 border-t border-white/10 bg-[#000b14] shrink-0">
+          <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group mb-2">
+            <div className="w-10 h-10 rounded-full bg-[#001529] flex items-center justify-center text-sm font-bold text-white border border-white/20 group-hover:border-clean-primary transition-all shrink-0">
+              {currentUser.avatar}
+            </div>
+            <div className="block md:hidden lg:block overflow-hidden">
+              <p className="text-sm font-bold text-white truncate">{currentUser.name}</p>
+              <p className="text-xs text-white/70 truncate capitalize">{currentUser.role.toLowerCase().replace('warehouse_', 'almox_')}</p>
+            </div>
+          </div>
+          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2 text-xs font-bold text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors uppercase tracking-wider">
+             <i className="fas fa-sign-out-alt"></i> Sair
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Wrapper */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-[#f8fafc]">
+        {/* Top Header */}
+        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 shrink-0 z-30 shadow-sm relative">
+          <div className="flex items-center gap-4 text-base text-slate-600 overflow-hidden">
+             <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-sm transition-all"
+             >
+                <i className="fas fa-bars text-lg"></i>
+             </button>
+
+             <div className="flex items-center gap-2 truncate">
+               <span className="font-bold text-slate-400 hidden sm:block">CropService <span className="text-clean-primary">/</span></span>
+               <span className="font-bold text-slate-900 text-lg sm:text-xl truncate">
+                 {MENU_GROUPS.reduce((acc, g) => [...acc, ...g.items], [] as any[]).find(i => i.id === activeTab)?.label || 'Bem-vindo'}
+               </span>
+             </div>
+          </div>
+          
+          <div className="flex items-center gap-3 sm:gap-6">
+             {/* Status Sync */}
+             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
+                <span className={`w-2 h-2 rounded-full ${syncStatus === 'online' ? 'bg-clean-primary' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                    {syncStatus === 'online' ? 'Online' : syncStatus === 'syncing' ? 'Sync...' : syncStatus === 'error' ? 'Erro' : 'Offline'}
+                </span>
+             </div>
+             
+             <button className="w-10 h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-clean-primary transition-all relative shadow-sm hover:shadow active:scale-95">
+                <i className="fas fa-bell"></i>
+                <span className="absolute top-2.5 right-3 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+             </button>
+          </div>
+        </header>
+
+        {/* Content Scroll Area */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 scroll-smooth">
+          <div className="max-w-[1920px] mx-auto pb-10">
+            {renderContent()}
+          </div>
         </main>
       </div>
     </div>
   );
 };
+
+interface SidebarLinkProps {
+  active: boolean;
+  onClick: () => void;
+  icon: string;
+  label: string;
+}
+
+const SidebarLink: React.FC<SidebarLinkProps> = ({ active, onClick, icon, label }) => (
+  <button 
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group relative ${
+      active 
+        ? 'bg-clean-primary text-white font-bold border border-white shadow-md' 
+        : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
+    }`}
+    title={label}
+  >
+    <div className={`w-6 flex justify-center shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>
+      <i className={`fas ${icon} text-lg`}></i>
+    </div>
+    <span className="block md:hidden lg:block text-sm tracking-tight truncate">{label}</span>
+    
+    {/* Tooltip for collapsed state on Desktop */}
+    <div className="hidden md:block lg:hidden absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-xl border border-slate-700 font-bold">
+      {label}
+    </div>
+  </button>
+);
 
 export default App;
