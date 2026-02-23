@@ -705,13 +705,14 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       );
       console.log('Após filtro de texto:', textFiltered.length);
 
-      // 2. Filtro por Almoxarifado (apenas para usuários com permissões específicas de warehouse)
-      const isWarehouseUser = currentUser.role.startsWith('WAREHOUSE') || allowedWarehouses.length > 0;
-      console.log('É usuário de warehouse?', isWarehouseUser);
-      console.log('Almoxarifados permitidos:', allowedWarehouses);
+      // 2. Filtro por Permissões de Warehouse (apenas para usuários warehouse específicos)
+      // APENAS restringe se o usuário tem permissões limitadas (WAREHOUSE_BIO ou WAREHOUSE_FERT)
+      const isRestrictedWarehouseUser = currentUser.role === 'WAREHOUSE_BIO' || currentUser.role === 'WAREHOUSE_FERT';
 
-      if (isWarehouseUser && allowedWarehouses.length > 0) {
+      if (isRestrictedWarehouseUser && allowedWarehouses.length > 0) {
+        console.log('Usuário restrito. Almoxarifados permitidos:', allowedWarehouses);
         textFiltered = textFiltered.filter(m => {
+          // Verifica se o material está em um dos almoxarifados permitidos
           if (allowedWarehouses.includes('Cropbio') && (m.location === 'Cropbio' || m.location === 'Laboratório de defensivos')) {
             return true;
           }
@@ -726,7 +727,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
         console.log('Após filtro de warehouse do usuário:', textFiltered.length);
       }
 
-      // 3. Filtro por Almoxarifado Selecionado (aplicado para todos que usam o filtro)
+      // 3. Filtro por Almoxarifado Selecionado no Dropdown (aplicado para todos)
       if (warehouseFilter !== 'ALL') {
         console.log('Filtro de warehouse selecionado:', warehouseFilter);
         if (warehouseFilter === 'Cropbio') {
@@ -748,7 +749,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       console.log('Total final filtrado:', textFiltered.length);
 
       return textFiltered;
-  }, [materials, searchTerm, currentUser.role, currentUser.company, allowedWarehouses, warehouseFilter]);
+  }, [materials, searchTerm, currentUser.role, allowedWarehouses, warehouseFilter]);
 
   const filteredMovements = useMemo(() => {
       // Filtrar IDs dos materiais permitidos para este usuário
