@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Materials Count</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Teste de Contagem de Materiais</h1>
+  <div id="results"></div>
+
+  <script type="module">
+    // Carregar variáveis de ambiente manualmente
+    const SUPABASE_URL = 'https://oytgchiwvprzxfqhgbhe.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95dGdjaGl3dnByenhmcWhnYmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgyNTQwODYsImV4cCI6MjA1MzgzMDA4Nn0.V0fLTIhPHwM_jdFa4nnppJPd0EsSn2PuCePMnX1m4Og';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function testMaterialsCount() {
+      const results = document.getElementById('results');
+      results.innerHTML = '<p>Carregando...</p>';
+
+      try {
+        // Test 1: Count all materials
+        const { count: totalCount, error: countError } = await supabase
+          .from('materials')
+          .select('*', { count: 'exact', head: true });
+
+        // Test 2: Load all materials
+        const { data: allMaterials, error: dataError, count: dataCount } = await supabase
+          .from('materials')
+          .select('*', { count: 'exact' })
+          .order('code', { ascending: true })
+          .limit(10000);
+
+        // Test 3: Count Cropbio materials
+        const cropbioMaterials = allMaterials?.filter(m => m.location === 'Cropbio') || [];
+        const cropbioCount = cropbioMaterials.length;
+
+        // Test 4: Count Cropfert materials
+        const cropfertMaterials = allMaterials?.filter(m => m.location === 'Cropfert Jandaia') || [];
+        const cropfertCount = cropfertMaterials.length;
+
+        // Display results
+        let html = '<h2>Resultados:</h2>';
+        html += `<p><strong>Total de materiais (count):</strong> ${totalCount}</p>`;
+        html += `<p><strong>Total de materiais (data.length):</strong> ${allMaterials?.length || 0}</p>`;
+        html += `<p><strong>Materiais da Cropbio:</strong> ${cropbioCount}</p>`;
+        html += `<p><strong>Materiais da Cropfert:</strong> ${cropfertCount}</p>`;
+
+        if (countError) html += `<p style="color: red;"><strong>Erro count:</strong> ${countError.message}</p>`;
+        if (dataError) html += `<p style="color: red;"><strong>Erro data:</strong> ${dataError.message}</p>`;
+
+        // Show breakdown by location
+        if (allMaterials) {
+          const locationBreakdown = allMaterials.reduce((acc, mat) => {
+            const loc = mat.location || 'Sem localização';
+            acc[loc] = (acc[loc] || 0) + 1;
+            return acc;
+          }, {});
+
+          html += '<h3>Por localização:</h3><ul>';
+          for (const [loc, count] of Object.entries(locationBreakdown)) {
+            html += `<li>${loc}: ${count}</li>`;
+          }
+          html += '</ul>';
+        }
+
+        // Show first 10 Cropbio materials
+        html += '<h3>Primeiros 10 materiais da Cropbio:</h3><ul>';
+        cropbioMaterials.slice(0, 10).forEach(m => {
+          html += `<li>${m.code} - ${m.description}</li>`;
+        });
+        html += '</ul>';
+
+        results.innerHTML = html;
+      } catch (error) {
+        results.innerHTML = `<p style="color: red;">Erro: ${error.message}</p>`;
+        console.error(error);
+      }
+    }
+
+    testMaterialsCount();
+  </script>
+</body>
+</html>
