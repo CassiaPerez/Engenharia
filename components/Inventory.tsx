@@ -51,6 +51,21 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
     code: ''
   });
 
+
+// --- EDIÇÃO DE MATERIAL (cadastros existentes) ---
+const [showEditModal, setShowEditModal] = useState(false);
+const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+const [editMaterial, setEditMaterial] = useState<Partial<Material>>({
+  status: 'ACTIVE',
+  minStock: 10,
+  unitCost: 0,
+  group: 'Geral',
+  unit: 'Un',
+  code: '',
+  description: '',
+  location: ''
+});
+
   const [selectedMaterialForLoc, setSelectedMaterialForLoc] = useState<Material | null>(null);
   const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW'>('VIEW');
   const [outType, setOutType] = useState<'OS' | 'PROJECT' | 'GENERAL'>('OS');
@@ -186,6 +201,113 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
       });
       setShowModal(true);
   };
+
+
+const openEditItemModal = (m: Material) => {
+    // Permissão: por padrão, apenas ADMIN edita cadastros (evita quebrar estoque/Kardex).
+    if (currentUser.role !== 'ADMIN') {
+        alert('Apenas administradores podem editar o cadastro de materiais.');
+        return;
+    }
+
+    setEditingMaterial(m);
+    setEditMaterial({
+      id: m.id,
+      code: m.code || '',
+      description: m.description || '',
+      group: m.group || 'Geral',
+      unit: m.unit || 'Un',
+      unitCost: Number(m.unitCost) || 0,
+      minStock: Number(m.minStock) || 0,
+      status: m.status || 'ACTIVE',
+      location: m.location || ''
+    });
+    setShowEditModal(true);
+};
+
+const handleUpdateMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMaterial) return;
+
+    const code = (editMaterial.code || '').trim().toUpperCase();
+    const description = (editMaterial.description || '').trim();
+
+    if (!code || !description) {
+        alert('Erro: Código e Descrição são obrigatórios.');
+        return;
+    }
+
+    // Duplicidade: ignora o próprio item
+    const duplicated = materials.some(m => m.code === code && m.id !== editingMaterial.id);
+    if (duplicated) {
+        alert('Erro: Este código SKU já existe. Edite o código e tente novamente.');
+        return;
+    }
+
+    try {
+        const payload = {
+            code,
+            description,
+            unit: (editMaterial.unit || 'Un').trim(),
+            group: (editMaterial.group || 'Geral').trim(),
+            location: (editMaterial.location || editingMaterial.location || 'CD - Central').trim(),
+            status: (editMaterial.status || 'ACTIVE') as any,
+            min_stock: Number(editMaterial.minStock) || 0,
+            unit_cost: Number(editMaterial.unitCost) || 0
+            // NÃO alterar current_stock e stock_locations aqui (saldo deve ser via movimentação)
+        };
+
+        const { error } = await supabase
+            .from('materials')
+            .update(payload)
+            .eq('id', editingMaterial.id);
+
+        if (error) {
+            console.error('Erro ao atualizar material:', error);
+            alert('Erro ao atualizar material: ' + error.message);
+            return;
+        }
+
+        // Atualiza estado local mantendo estoque e locais existentes
+        setMaterials(prev => prev.map(m => {
+            if (m.id !== editingMaterial.id) return m;
+            const updated: Material = {
+                ...m,
+                code,
+                description,
+                unit: (editMaterial.unit || m.unit || 'Un') as any,
+                group: (editMaterial.group || m.group || 'Geral') as any,
+                location: (editMaterial.location || m.location) as any,
+                status: (editMaterial.status || m.status) as any,
+                minStock: Number(editMaterial.minStock) || 0,
+                unitCost: Number(editMaterial.unitCost) || 0
+            };
+            return updated;
+        }));
+
+        // Fila de sync (se você estiver usando batch save)
+        queueOperation('materials', 'upsert', {
+            id: editingMaterial.id,
+            code,
+            description,
+            unit: (editMaterial.unit || 'Un').trim(),
+            group: (editMaterial.group || 'Geral').trim(),
+            location: (editMaterial.location || editingMaterial.location || 'CD - Central').trim(),
+            status: (editMaterial.status || 'ACTIVE'),
+            minStock: Number(editMaterial.minStock) || 0,
+            unitCost: Number(editMaterial.unitCost) || 0
+        } as any, editingMaterial.id);
+
+        await flush();
+        setShowEditModal(false);
+        setEditingMaterial(null);
+        alert('Material atualizado com sucesso!');
+    } catch (err: any) {
+        console.error('Exceção ao atualizar material:', err);
+        alert(`Erro ao atualizar material: ${err?.message || 'Erro desconhecido'}`);
+    }
+};
+
 
   const openLocationManager = (m: Material) => {
       if (!m.stockLocations || m.stockLocations.length === 0) {
@@ -359,8 +481,7 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                   materialId: m.id,
                                   quantity: qty,
                                   unitCost: m.unitCost,
-                                  timestamp: new Date().toISOString(),
-                                  fromLocation: locForm.location
+                                  timestamp: new Date().toISOString()
                               };
 
                               const updatedOS = {
@@ -870,7 +991,12 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                </td>
                                <td className="px-8 py-5 text-center">
                                    <div className="flex items-center justify-center gap-2">
-                                       <button onClick={() => openLocationManager(m)} className="bg-white border border-slate-300 text-slate-600 hover:text-clean-primary hover:border-clean-primary font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2">
+                                       {currentUser.role === 'ADMIN' && (
+                                           <button onClick={() => openEditItemModal(m)} className="bg-white border border-slate-300 text-slate-600 hover:text-blue-700 hover:border-blue-500 font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2">
+                                               <i className="fas fa-pen"></i> Editar
+                                           </button>
+                                       )}
+<button onClick={() => openLocationManager(m)} className="bg-white border border-slate-300 text-slate-600 hover:text-clean-primary hover:border-clean-primary font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2">
                                            <i className="fas fa-boxes-stacked"></i> Gerenciar
                                        </button>
                                        {currentUser.role === 'ADMIN' && (
@@ -1035,6 +1161,116 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
             </div>
         </ModalPortal>
       )}
+
+
+
+{/* MODAL DE EDIÇÃO (Premium Style) */}
+{showEditModal && editingMaterial && (
+  <ModalPortal>
+      <div className="fixed inset-0 z-[9999]">
+        <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => { setShowEditModal(false); setEditingMaterial(null); }} />
+        <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+          <div className="relative w-full max-w-2xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+                  <div>
+                      <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Editar Item de Estoque</h3>
+                      <p className="text-sm text-slate-500 mt-1">Atualize os dados cadastrais do material (sem alterar saldos).</p>
+                  </div>
+                  <button onClick={() => { setShowEditModal(false); setEditingMaterial(null); }} className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-lg"></i></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto bg-slate-50/50 min-h-0">
+                  <form onSubmit={handleUpdateMaterial} className="p-8 space-y-6">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-3">
+                        <i className="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                        <div className="text-sm text-blue-800">
+                          <p className="font-bold">Importante</p>
+                          <p>Saldos e distribuição por locais devem ser ajustados pelo <b>Gerenciar</b> (Entrada / Saída / Transferência). Aqui você edita apenas cadastro.</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Código (SKU)</label>
+                              <input
+                                className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-bold shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all uppercase"
+                                value={editMaterial.code || ''}
+                                placeholder="Ex: MAT-26-1234"
+                                onChange={(e) => {
+                                  const v = e.target.value
+                                    .toUpperCase()
+                                    .replace(/\s+/g, '-')
+                                    .replace(/[^A-Z0-9-]/g, '')
+                                    .slice(0, 30);
+
+                                  setEditMaterial({ ...editMaterial, code: v });
+                                }}
+                              />
+                              <p className="text-xs text-slate-400 mt-1.5 ml-1">SKU deve ser único.</p>
+                          </div>
+
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Grupo / Categoria</label>
+                              <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Elétrica" value={editMaterial.group || ''} onChange={e => setEditMaterial({...editMaterial, group: e.target.value})} />
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="text-sm font-bold text-slate-700 mb-2 block">Descrição Completa</label>
+                          <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Cabo Flexível 2.5mm Preto" value={editMaterial.description || ''} onChange={e => setEditMaterial({...editMaterial, description: e.target.value})} />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-6">
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Unidade</label>
+                              <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Un, Kg, M" value={editMaterial.unit || ''} onChange={e => setEditMaterial({...editMaterial, unit: e.target.value})} />
+                          </div>
+
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Custo Unit. (R$)</label>
+                              <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={Number(editMaterial.unitCost) || 0} onChange={e => setEditMaterial({...editMaterial, unitCost: Number(e.target.value)})} />
+                          </div>
+
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Estoque Mínimo</label>
+                              <input type="number" min="0" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={Number(editMaterial.minStock) || 0} onChange={e => setEditMaterial({...editMaterial, minStock: Number(e.target.value)})} />
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Local Padrão</label>
+                              <select required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={editMaterial.location || ''} onChange={e => setEditMaterial({...editMaterial, location: e.target.value})}>
+                                  <option value="">Selecione o local...</option>
+                                  {globalLocations.map(loc => (
+                                      <option key={loc} value={loc}>{loc}</option>
+                                  ))}
+                              </select>
+                          </div>
+
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Status</label>
+                              <select required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={(editMaterial.status as any) || 'ACTIVE'} onChange={e => setEditMaterial({...editMaterial, status: e.target.value as any})}>
+                                  <option value="ACTIVE">Ativo</option>
+                                  <option value="INACTIVE">Inativo</option>
+                              </select>
+                          </div>
+                      </div>
+
+                  </form>
+              </div>
+
+              <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-end gap-4 rounded-b-2xl shrink-0">
+                  <button type="button" onClick={() => { setShowEditModal(false); setEditingMaterial(null); }} className="px-8 py-3.5 text-base font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">Cancelar</button>
+                  <button type="submit" onClick={handleUpdateMaterial} className="px-10 py-3.5 text-base font-bold text-white bg-clean-primary hover:bg-clean-primary/90 rounded-xl shadow-xl shadow-clean-primary/30 transition-all transform hover:-translate-y-1 active:scale-95 flex items-center gap-2">
+                      <i className="fas fa-save"></i> Salvar Alterações
+                  </button>
+              </div>
+          </div>
+        </div>
+      </div>
+  </ModalPortal>
+)}
 
       {/* MODAL DE GESTÃO DE LOCAIS (Premium Style) */}
       {selectedMaterialForLoc && (
