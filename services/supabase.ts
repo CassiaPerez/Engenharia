@@ -39,6 +39,13 @@ export const mapFromSupabase = <T extends { id: string }>(data: any[] | null): T
     if (hasNormalizedData) {
       const camelCased = snakeToCamel(normalizedColumns);
 
+      if (camelCased.stockLocations && Array.isArray(camelCased.stockLocations)) {
+        camelCased.stockLocations = camelCased.stockLocations.map((loc: any) => ({
+          name: loc.name || loc.location,
+          quantity: loc.quantity ?? loc.stock ?? 0
+        }));
+      }
+
       return {
         ...camelCased,
         id,
@@ -101,7 +108,12 @@ export const mapToSupabase = <T extends { id: string }>(item: T) => {
   if ('currentStock' in rest) normalizedData.current_stock = rest.currentStock;
   if ('minStock' in rest) normalizedData.min_stock = rest.minStock;
   if ('unitCost' in rest) normalizedData.unit_cost = rest.unitCost;
-  if ('stockLocations' in rest) normalizedData.stock_locations = rest.stockLocations;
+  if ('stockLocations' in rest) {
+    normalizedData.stock_locations = rest.stockLocations.map((loc: any) => ({
+      location: loc.name,
+      stock: loc.quantity
+    }));
+  }
 
   if ('address' in rest) normalizedData.address = rest.address;
   if ('city' in rest) normalizedData.city = rest.city;
