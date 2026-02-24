@@ -21,6 +21,12 @@ interface Props {
 const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser, projects = [], oss = [], setOss }) => {
   const [view, setView] = useState<'stock' | 'history'>('stock');
   const [allOS, setAllOS] = useState<OS[]>([]);
+  const [osPage, setOsPage] = useState(0);
+  const [osHasMore, setOsHasMore] = useState(true);
+  const [osLoading, setOsLoading] = useState(false);
+  const [osSearch, setOsSearch] = useState('');
+  const OS_PAGE_SIZE = 100;
+
   const { queueOperation, flush } = useBatchSave(1500);
   const { getWarehouses, canAccessWarehouse } = usePermissions(currentUser.role, 'inventory', currentUser.id);
 
@@ -87,49 +93,73 @@ const [editMaterial, setEditMaterial] = useState<Partial<Material>>({
   }, [searchInput]);
 
   useEffect(() => {
-    loadOS().catch(err => {
+    const t = setTimeout(() => {
+      loadOS(0, false).catch(err => console.error('Failed to reload OS:', err));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [osSearch]);
+
+  useEffect(() => {
+    loadOS(0, false).catch(err => {
       console.error('Failed to load OS in background:', err);
     });
   }, []);
 
-  const loadOS = async () => {
+  const loadOS = async (page: number = 0, append: boolean = false) => {
     try {
-      const { data, error } = await supabase
+      setOsLoading(true);
+
+      const from = page * OS_PAGE_SIZE;
+      const to = from + OS_PAGE_SIZE - 1;
+
+      let query = supabase
         .from('oss')
         .select('id, number, type, status, priority, description, equipment_id, cost_center, open_date, limit_date, close_date, sla_hours, executor_ids, requester_id, services, materials')
         .order('open_date', { ascending: false })
-        .limit(20);
+        .range(from, to);
+
+      const q = osSearch.trim();
+      if (q) {
+        query = query.or(`number.ilike.%${q}%,description.ilike.%${q}%`);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error loading OS:', error);
         setAllOS([]);
+        setOsHasMore(false);
         return;
       }
 
-      if (data) {
-        const osList = data.map(item => ({
-          id: item.id,
-          number: item.number,
-          type: item.type,
-          status: item.status,
-          priority: item.priority,
-          description: item.description,
-          equipmentId: item.equipment_id,
-          costCenter: item.cost_center,
-          openDate: item.open_date,
-          limitDate: item.limit_date,
-          closeDate: item.close_date,
-          slaHours: item.sla_hours,
-          executorIds: item.executor_ids || [],
-          requesterId: item.requester_id,
-          services: item.services || [],
-          materials: item.materials || []
-        }));
-        setAllOS(osList);
-      }
+      const osList: OS[] = (data || []).map(item => ({
+        id: item.id,
+        number: item.number,
+        type: item.type,
+        status: item.status,
+        priority: item.priority,
+        description: item.description,
+        equipmentId: item.equipment_id,
+        costCenter: item.cost_center,
+        openDate: item.open_date,
+        limitDate: item.limit_date,
+        closeDate: item.close_date,
+        slaHours: item.sla_hours,
+        executorIds: item.executor_ids || [],
+        requesterId: item.requester_id,
+        services: item.services || [],
+        materials: item.materials || []
+      }));
+
+      setAllOS(prev => (append ? [...prev, ...osList] : osList));
+      setOsHasMore(osList.length === OS_PAGE_SIZE);
+      setOsPage(page);
     } catch (e) {
       console.error('Error loading OS:', e);
       setAllOS([]);
+      setOsHasMore(false);
+    } finally {
+      setOsLoading(false);
     }
   };
 
@@ -1383,6 +1413,13 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                                                                 </span>
                                                             )}
                                                         </label>
+                                                        <input
+                                                            type="text"
+                                                            className="w-full h-11 px-4 rounded-xl border border-red-200 bg-white shadow-sm focus:border-red-400 focus:ring-0 transition-all text-slate-800 mb-3"
+                                                            placeholder="Buscar OS por número ou descrição..."
+                                                            value={osSearch}
+                                                            onChange={e => setOsSearch(e.target.value)}
+                                                        />
                                                         <select
                                                             required
                                                             className="w-full h-12 px-4 rounded-xl border border-red-200 bg-white shadow-sm focus:border-red-400 focus:ring-0 transition-all text-slate-800"
@@ -1410,6 +1447,17 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                                                                 })
                                                             }
                                                         </select>
+                                                        <div className="flex gap-2 mt-3">
+                                                            <button
+                                                                type="button"
+                                                                disabled={!osHasMore || osLoading}
+                                                                onClick={() => loadOS(osPage + 1, true)}
+                                                                className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-red-200 hover:bg-red-50 disabled:opacity-50"
+                                                            >
+                                                                {osLoading ? 'Carregando...' : osHasMore ? 'Carregar mais OS' : 'Sem mais OS'}
+                                                            </button>
+                                                            <span className="text-[10px] text-red-600 flex items-center">Exibindo {allOS.length} OS</span>
+                                                        </div>
                                                     </div>
                                                     <p className="text-[10px] text-red-600">A baixa sera vinculada a OS selecionada e o custo alocado ao centro de custo correspondente.</p>
                                                     {(() => {
