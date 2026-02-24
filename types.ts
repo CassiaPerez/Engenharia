@@ -164,6 +164,7 @@ export interface OSItem {
   quantity: number;
   unitCost: number;
   timestamp: string;
+  fromLocation?: string;
 }
 
 export interface OSService {

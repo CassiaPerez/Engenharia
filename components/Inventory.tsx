@@ -359,7 +359,8 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
                                   materialId: m.id,
                                   quantity: qty,
                                   unitCost: m.unitCost,
-                                  timestamp: new Date().toISOString()
+                                  timestamp: new Date().toISOString(),
+                                  fromLocation: locForm.location
                               };
 
                               const updatedOS = {

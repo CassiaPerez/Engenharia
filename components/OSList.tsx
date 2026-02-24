@@ -550,6 +550,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
             return [
                 mat?.code || '-',
                 mat?.description || 'Item excluído',
+                m.fromLocation || 'N/E',
                 `${m.quantity} ${mat?.unit || ''}`,
                 `R$ ${formatCurrency(m.unitCost)}`,
                 `R$ ${formatCurrency(m.quantity * m.unitCost)}`
@@ -558,11 +559,11 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
 
         autoTable(doc, {
             startY: y,
-            head: [['Cód', 'Descrição', 'Qtd', 'Unit.', 'Total']],
+            head: [['Cód', 'Descrição', 'Local', 'Qtd', 'Unit.', 'Total']],
             body: matRows,
             headStyles: { fillColor: [220, 220, 220], textColor: 50 },
-            styles: { fontSize: 9 },
-            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
+            styles: { fontSize: 8 },
+            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
         });
         
         y = (doc as any).lastAutoTable.finalY + 10;
@@ -1097,7 +1098,16 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                 <div className="space-y-6">
                                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                                         <table className="w-full text-sm text-left">
-                                            <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase"><tr className="border-b border-slate-100"><th className="p-4">Item</th><th className="p-4 text-right">Qtd</th><th className="p-4 text-right">Custo Unit.</th><th className="p-4 text-right">Total</th><th className="p-4 text-center w-20">Ações</th></tr></thead>
+                                            <thead className="bg-slate-50 text-slate-500 font-bold text-xs uppercase">
+                                                <tr className="border-b border-slate-100">
+                                                    <th className="p-4">Item</th>
+                                                    {activeSubTab === 'materials' && <th className="p-4">Local</th>}
+                                                    <th className="p-4 text-right">Qtd</th>
+                                                    <th className="p-4 text-right">Custo Unit.</th>
+                                                    <th className="p-4 text-right">Total</th>
+                                                    <th className="p-4 text-center w-20">Ações</th>
+                                                </tr>
+                                            </thead>
                                             <tbody className="divide-y divide-slate-50">
                                                 {activeSubTab === 'services' ? (
                                                     selectedOS.services.map((s, i) => {
@@ -1118,6 +1128,15 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                                         return (
                                                             <tr key={i} className="hover:bg-slate-50">
                                                                 <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluído'}</td>
+                                                                <td className="p-4 text-slate-600">
+                                                                    {m.fromLocation ? (
+                                                                        <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-medium border border-slate-200">
+                                                                            {m.fromLocation}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-slate-400 text-xs italic">Não especificado</span>
+                                                                    )}
+                                                                </td>
                                                                 <td className="p-4 text-right font-mono">{m.quantity} {mat?.unit}</td>
                                                                 <td className="p-4 text-right text-slate-600">R$ {formatCurrency(m.unitCost)}</td>
                                                                 <td className="p-4 text-right font-bold text-slate-800">R$ {formatCurrency(m.quantity * m.unitCost)}</td>
@@ -1127,7 +1146,7 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                                     })
                                                 )}
                                                 {((activeSubTab === 'services' && selectedOS.services.length === 0) || (activeSubTab === 'materials' && selectedOS.materials.length === 0)) && (
-                                                    <tr><td colSpan={5} className="p-8 text-center text-slate-400 italic">Nenhum item registrado nesta categoria.</td></tr>
+                                                    <tr><td colSpan={activeSubTab === 'materials' ? 6 : 5} className="p-8 text-center text-slate-400 italic">Nenhum item registrado nesta categoria.</td></tr>
                                                 )}
                                             </tbody>
                                         </table>
