@@ -34,34 +34,43 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
 
 // --- CUSTO DE MATERIAIS E SERVIÇOS (itens avulsos) ---
 const addCostItem = () => {
-  setSelectedOS((prev: any) => ({
-    ...prev,
-    costItems: [
-      ...(prev?.costItems || []),
-      {
-        id: Math.random().toString(36).substr(2, 9),
-        type: 'MATERIAL',
-        description: '',
-        amount: 0
-      }
-    ]
-  }));
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: [
+        ...(prev.costItems || []),
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          type: 'MATERIAL',
+          description: '',
+          amount: 0,
+        },
+      ],
+    };
+  });
 };
 
 const updateCostItem = (id: string, patch: any) => {
-  setSelectedOS((prev: any) => ({
-    ...prev,
-    costItems: (prev?.costItems || []).map((item: any) =>
-      item.id === id ? { ...item, ...patch } : item
-    )
-  }));
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: (prev.costItems || []).map((item: any) =>
+        item.id === id ? { ...item, ...patch } : item
+      ),
+    };
+  });
 };
 
 const removeCostItem = (id: string) => {
-  setSelectedOS((prev: any) => ({
-    ...prev,
-    costItems: (prev?.costItems || []).filter((item: any) => item.id !== id)
-  }));
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: (prev.costItems || []).filter((item: any) => item.id !== id),
+    };
+  });
 };
 
 const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
@@ -1005,51 +1014,60 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                                     </p>
                                     <div className="space-y-3">
                                       <div>
-                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">
-Custo de Materiais e Serviços</label>
+                                        
+<label className="text-xs font-semibold text-slate-600 mb-1 block">
+  Custo de Materiais e Serviços
+</label>
+
 <div className="space-y-2">
-  {(selectedOS.costItems || []).map((item, idx) => (
+  {(selectedOS?.costItems || []).map((item: any) => (
     <div key={item.id} className="flex gap-2">
       <select
         className="h-9 px-2 border border-slate-200 rounded-lg text-xs font-bold"
         value={item.type}
-        onChange={(e) => updateCostItem(item.id, { type: e.target.value })}
+        onChange={(e) => updateCostItem(item.id, { type: (e.target as HTMLSelectElement).value })}
       >
         <option value="MATERIAL">Material</option>
         <option value="SERVICE">Serviço</option>
       </select>
+
       <input
         className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
         placeholder="Descrição"
         value={item.description}
-        onChange={(e) => updateCostItem(item.id, { description: e.target.value })}
+        onChange={(e) => updateCostItem(item.id, { description: (e.target as HTMLInputElement).value })}
       />
+
       <input
         type="number"
         step="0.01"
-        className="w-24 h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
+        min="0"
+        className="w-28 h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
         placeholder="R$"
         value={item.amount}
-        onChange={(e) => updateCostItem(item.id, { amount: Number(e.target.value) })}
+        onChange={(e) => updateCostItem(item.id, { amount: Number((e.target as HTMLInputElement).value) })}
       />
+
       <button
         type="button"
         onClick={() => removeCostItem(item.id)}
-        className="px-2 text-red-500"
+        className="h-9 px-3 rounded-lg text-xs font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50"
+        title="Remover item"
       >
-        ✕
+        Remover
       </button>
     </div>
   ))}
+
   <button
     type="button"
     onClick={addCostItem}
-    className="text-xs font-bold text-clean-primary"
+    className="text-xs font-bold text-clean-primary hover:underline"
   >
     + Adicionar item
   </button>
 </div>
-<label className="text-xs font-semibold text-slate-600 mb-1 block">Totais</label>
+
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-slate-500">R$</span>
                                           <input
