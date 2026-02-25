@@ -27,53 +27,20 @@ interface Props {
 const ITEMS_PER_PAGE = 9;
 
 const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments = [], materials, setMaterials, services, users, setUsers, movements, onStockChange, currentUser }) => {
+
+const getUserDisplayName = (userId?: string) => {
+  if (!userId) return '';
+  const u: any = (users || []).find((x: any) => x.id === userId);
+  return (u?.name || u?.full_name || u?.nome || u?.email || '').toString();
+};
+
+const getRequesterName = (osLike: any) => {
+  return (osLike?.requesterName || getUserDisplayName(osLike?.requesterId) || 'Não informado').toString();
+};
+
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
-  
-
-
-// --- CUSTO DE MATERIAIS E SERVIÇOS (itens avulsos) ---
-const addCostItem = () => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: [
-        ...(prev.costItems || []),
-        {
-          id: Math.random().toString(36).substr(2, 9),
-          type: 'MATERIAL',
-          description: '',
-          amount: 0,
-        },
-      ],
-    };
-  });
-};
-
-const updateCostItem = (id: string, patch: any) => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: (prev.costItems || []).map((item: any) =>
-        item.id === id ? { ...item, ...patch } : item
-      ),
-    };
-  });
-};
-
-const removeCostItem = (id: string) => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: (prev.costItems || []).filter((item: any) => item.id !== id),
-    };
-  });
-};
-
-const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
+  const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
@@ -524,7 +491,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         ["Status", os.status],
         ["Prioridade", translatePriority(os.priority)],
         ["Tipo", os.type],
-        ["Solicitante", os.requesterName || 'Não informado'],
+        ["Solicitante", getRequesterName(os)],
         ["Executor(es)", executorNames],
         ["Abertura", new Date(os.openDate).toLocaleString()],
         ["Prazo Limite", new Date(os.limitDate).toLocaleString()]
@@ -816,13 +783,13 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                                         {selectedOS.projectId && <p className="text-xs text-slate-500">Herdado do Projeto</p>}
                                     </div>
                                 </div>
-                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'EXECUTOR') && selectedOS.requesterName && (
+                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'EXECUTOR') && getRequesterName(selectedOS) !== 'Não informado' && (
                                   <div>
                                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Solicitante</p>
                                       <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
                                           <p className="font-bold text-blue-900 flex items-center gap-2">
                                               <i className="fas fa-user text-sm"></i>
-                                              {selectedOS.requesterName}
+                                              {getRequesterName(selectedOS)}
                                           </p>
                                       </div>
                                   </div>
@@ -1014,60 +981,39 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                                     </p>
                                     <div className="space-y-3">
                                       <div>
-                                        
-<label className="text-xs font-semibold text-slate-600 mb-1 block">
-  Custo de Materiais e Serviços
-</label>
-
-<div className="space-y-2">
-  {(selectedOS?.costItems || []).map((item: any) => (
-    <div key={item.id} className="flex flex-wrap items-center gap-2">
-      <select
-        className="h-9 px-2 border border-slate-200 rounded-lg text-xs font-bold"
-        value={item.type}
-        onChange={(e) => updateCostItem(item.id, { type: (e.target as HTMLSelectElement).value })}
-      >
-        <option value="MATERIAL">Material</option>
-        <option value="SERVICE">Serviço</option>
-      </select>
-
-      <input
-        className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
-        placeholder="Descrição"
-        value={item.description}
-        onChange={(e) => updateCostItem(item.id, { description: (e.target as HTMLInputElement).value })}
-      />
-
-      <input
-        type="number"
-        step="0.01"
-        min="0"
-        className="w-32 min-w-[120px] h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
-        placeholder="Valor (R$)"
-        value={item.amount}
-        onChange={(e) => updateCostItem(item.id, { amount: Number((e.target as HTMLInputElement).value) })}
-      />
-
-      <button
-        type="button"
-        onClick={() => removeCostItem(item.id)}
-        className="h-9 px-3 rounded-lg text-xs font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50 whitespace-nowrap"
-        title="Remover item"
-      >
-        Remover
-      </button>
-    </div>
-  ))}
-
-  <button
-    type="button"
-    onClick={addCostItem}
-    className="text-xs font-bold text-clean-primary hover:underline"
-  >
-    + Adicionar item
-  </button>
-</div>
-
+                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Materiais</label>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-slate-500">R$</span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
+                                            placeholder="Deixe vazio para calcular automaticamente"
+                                            value={selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null ? selectedOS.manualMaterialCost : ''}
+                                            onChange={async (e) => {
+                                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                              const updatedOS = { ...selectedOS, manualMaterialCost: value };
+                                              setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+                                              setSelectedOS(updatedOS);
+                                              try {
+                                                const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
+                                                if (error) throw error;
+                                              } catch (e) {
+                                                console.error('Erro ao atualizar valor manual:', e);
+                                              }
+                                            }}
+                                          />
+                                        </div>
+                                        {selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null && (
+                                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                            <i className="fas fa-info-circle"></i>
+                                            Valor manual ativo
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Serviços</label>
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-slate-500">R$</span>
                                           <input
