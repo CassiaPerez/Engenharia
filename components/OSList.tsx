@@ -40,39 +40,50 @@ const getRequesterName = (osLike: any) => {
 
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
+  
 
-// --- EXECUÇÃO POR EXECUTOR ---
-const updateExecutionStatus = (os: any, executorId: string, newStatus: 'PAUSED' | 'RUNNING') => {
-  const now = new Date().toISOString();
-  let executions = [...(os.executions || [])];
-
-  const idx = executions.findIndex((ex: any) => ex.executorId === executorId);
-
-  if (idx >= 0) {
-    executions[idx] = {
-      ...executions[idx],
-      status: newStatus,
-      ...(newStatus === 'PAUSED' ? { pausedAt: now } : {}),
-      ...(newStatus === 'RUNNING' ? { resumedAt: now } : {}),
+// --- CUSTO DE MATERIAIS E SERVIÇOS (itens avulsos) ---
+const addCostItem = () => {
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: [
+        ...(prev.costItems || []),
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          type: 'MATERIAL',
+          description: '',
+          amount: 0,
+        },
+      ],
     };
-  } else {
-    executions.push({
-      executorId,
-      status: newStatus,
-      startedAt: now,
-      ...(newStatus === 'PAUSED' ? { pausedAt: now } : {}),
-    });
-  }
-
-  const anyRunning = executions.some((ex: any) => ex.status === 'RUNNING');
-  const allPaused = executions.length > 0 && executions.every((ex: any) => ex.status === 'PAUSED');
-
-  const osStatus = anyRunning ? 'EM_EXECUCAO' : allPaused ? 'PAUSADA' : os.status;
-
-  return { executions, osStatus };
+  });
 };
 
-  const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
+const updateCostItem = (id: string, patch: any) => {
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: (prev.costItems || []).map((item: any) =>
+        item.id === id ? { ...item, ...patch } : item
+      ),
+    };
+  });
+};
+
+const removeCostItem = (id: string) => {
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: (prev.costItems || []).filter((item: any) => item.id !== id),
+    };
+  });
+};
+
+const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
@@ -1013,39 +1024,62 @@ const updateExecutionStatus = (os: any, executorId: string, newStatus: 'PAUSED' 
                                     </p>
                                     <div className="space-y-3">
                                       <div>
-                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Materiais</label>
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm text-slate-500">R$</span>
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
-                                            placeholder="Deixe vazio para calcular automaticamente"
-                                            value={selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null ? selectedOS.manualMaterialCost : ''}
-                                            onChange={async (e) => {
-                                              const value = e.target.value === '' ? undefined : Number(e.target.value);
-                                              const updatedOS = { ...selectedOS, manualMaterialCost: value };
-                                              setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-                                              setSelectedOS(updatedOS);
-                                              try {
-                                                const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
-                                                if (error) throw error;
-                                              } catch (e) {
-                                                console.error('Erro ao atualizar valor manual:', e);
-                                              }
-                                            }}
-                                          />
-                                        </div>
-                                        {selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null && (
-                                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                                            <i className="fas fa-info-circle"></i>
-                                            Valor manual ativo
-                                          </p>
-                                        )}
-                                      </div>
-                                      <div>
-                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Serviços</label>
+                                        
+<label className="text-xs font-semibold text-slate-600 mb-1 block">
+  Custo de Materiais e Serviços
+</label>
+
+<div className="space-y-2">
+  {(selectedOS?.costItems || []).map((item: any) => (
+    <div key={item.id} className="flex flex-wrap items-center gap-2">
+      <select
+        className="h-9 px-2 border border-slate-200 rounded-lg text-xs font-bold"
+        value={item.type}
+        onChange={(e) => updateCostItem(item.id, { type: (e.target as HTMLSelectElement).value })}
+      >
+        <option value="MATERIAL">Material</option>
+        <option value="SERVICE">Serviço</option>
+      </select>
+
+      <input
+        className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
+        placeholder="Material/Serviço"
+        value={item.description}
+        onChange={(e) => updateCostItem(item.id, { description: (e.target as HTMLInputElement).value })}
+      />
+
+      <input
+        type="number"
+        step="0.01"
+        min="0"
+        aria-label="Valor"
+        title="Valor (R$)"
+        className="w-32 min-w-[120px] h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
+        placeholder="Valor (R$)"
+        value={item.amount}
+        onChange={(e) => updateCostItem(item.id, { amount: Number((e.target as HTMLInputElement).value) })}
+      />
+
+      <button
+        type="button"
+        onClick={() => removeCostItem(item.id)}
+        className="h-9 px-3 rounded-lg text-xs font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50 whitespace-nowrap"
+        title="Remover item"
+      >
+        Remover
+      </button>
+    </div>
+  ))}
+
+  <button
+    type="button"
+    onClick={addCostItem}
+    className="text-xs font-bold text-clean-primary hover:underline"
+  >
+    + Adicionar item
+  </button>
+</div>
+
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-slate-500">R$</span>
                                           <input
