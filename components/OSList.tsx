@@ -40,39 +40,50 @@ const getRequesterName = (osLike: any) => {
 
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
+  
 
-// --- EXECUÇÃO POR EXECUTOR ---
-const updateExecutionStatus = (os: any, executorId: string, newStatus: 'PAUSED' | 'RUNNING') => {
-  const now = new Date().toISOString();
-  let executions = [...(os.executions || [])];
-
-  const idx = executions.findIndex((ex: any) => ex.executorId === executorId);
-
-  if (idx >= 0) {
-    executions[idx] = {
-      ...executions[idx],
-      status: newStatus,
-      ...(newStatus === 'PAUSED' ? { pausedAt: now } : {}),
-      ...(newStatus === 'RUNNING' ? { resumedAt: now } : {}),
+// --- CUSTO DE MATERIAIS E SERVIÇOS (itens avulsos) ---
+const addCostItem = () => {
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: [
+        ...(prev.costItems || []),
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          type: 'MATERIAL',
+          description: '',
+          amount: 0,
+        },
+      ],
     };
-  } else {
-    executions.push({
-      executorId,
-      status: newStatus,
-      startedAt: now,
-      ...(newStatus === 'PAUSED' ? { pausedAt: now } : {}),
-    });
-  }
-
-  const anyRunning = executions.some((ex: any) => ex.status === 'RUNNING');
-  const allPaused = executions.length > 0 && executions.every((ex: any) => ex.status === 'PAUSED');
-
-  const osStatus = anyRunning ? 'EM_EXECUCAO' : allPaused ? 'PAUSADA' : os.status;
-
-  return { executions, osStatus };
+  });
 };
 
-  const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
+const updateCostItem = (id: string, patch: any) => {
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: (prev.costItems || []).map((item: any) =>
+        item.id === id ? { ...item, ...patch } : item
+      ),
+    };
+  });
+};
+
+const removeCostItem = (id: string) => {
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: (prev.costItems || []).filter((item: any) => item.id !== id),
+    };
+  });
+};
+
+const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
@@ -961,121 +972,7 @@ const updateExecutionStatus = (os: any, executorId: string, newStatus: 'PAUSED' 
                                             <span className="text-slate-500">SLA (Horas):</span>
                                             {canEditSLA && isEditable(selectedOS) ? (
                                                 isEditingSLA ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            type="number"
-                                                            min="1"
-                                                            className="w-20 h-8 px-2 border-2 border-blue-300 rounded-lg text-sm font-bold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                                                            value={editingSLAValue}
-                                                            onChange={e => setEditingSLAValue(Number(e.target.value))}
-                                                            autoFocus
-                                                        />
-                                                        <button
-                                                            onClick={handleSLAChange}
-                                                            className="w-7 h-7 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center justify-center"
-                                                        >
-                                                            <i className="fas fa-check text-xs"></i>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setIsEditingSLA(false)}
-                                                            className="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-all flex items-center justify-center"
-                                                        >
-                                                            <i className="fas fa-times text-xs"></i>
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingSLAValue(selectedOS.slaHours);
-                                                            setIsEditingSLA(true);
-                                                        }}
-                                                        className="font-mono font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-all border-2 border-transparent hover:border-blue-300"
-                                                    >
-                                                        {selectedOS.slaHours}h <i className="fas fa-edit text-xs ml-1"></i>
-                                                    </button>
-                                                )
-                                            ) : (
-                                                <span className="font-mono font-bold text-blue-600">{selectedOS.slaHours}h</span>
-                                            )}
-                                        </div>
-
-                                        <div className="flex justify-between"><span className="text-slate-500">Prazo Limite:</span><span className="font-mono font-bold text-red-600">{new Date(selectedOS.limitDate).toLocaleDateString()}</span></div>
-                                        {selectedOS.startTime && <div className="flex justify-between"><span className="text-slate-500">Início Real:</span><span className="font-mono font-bold text-blue-600">{new Date(selectedOS.startTime).toLocaleString()}</span></div>}
-                                        {selectedOS.endTime && <div className="flex justify-between"><span className="text-slate-500">Conclusão:</span><span className="font-mono font-bold text-emerald-600">{new Date(selectedOS.endTime).toLocaleString()}</span></div>}
-                                    </div>
-                                </div>
-
-                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') && (
-                                  <div className="pt-6 border-t border-slate-100">
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                                      <i className="fas fa-dollar-sign"></i>
-                                      Valores Manuais
-                                    </p>
-                                    <div className="space-y-3">
-                                      <div>
-                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Materiais</label>
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm text-slate-500">R$</span>
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
-                                            placeholder="Deixe vazio para calcular automaticamente"
-                                            value={selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null ? selectedOS.manualMaterialCost : ''}
-                                            onChange={async (e) => {
-                                              const value = e.target.value === '' ? undefined : Number(e.target.value);
-                                              const updatedOS = { ...selectedOS, manualMaterialCost: value };
-                                              setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-                                              setSelectedOS(updatedOS);
-                                              try {
-                                                const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
-                                                if (error) throw error;
-                                              } catch (e) {
-                                                console.error('Erro ao atualizar valor manual:', e);
-                                              }
-                                            }}
-                                          />
-                                        </div>
-                                        {selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null && (
-                                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                                            <i className="fas fa-info-circle"></i>
-                                            Valor manual ativo
-                                          </p>
-                                        )}
-                                      </div>
-                                      <div>
-                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Serviços</label>
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm text-slate-500">R$</span>
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
-                                            placeholder="Deixe vazio para calcular automaticamente"
-                                            value={selectedOS.manualServiceCost !== undefined && selectedOS.manualServiceCost !== null ? selectedOS.manualServiceCost : ''}
-                                            onChange={async (e) => {
-                                              const value = e.target.value === '' ? undefined : Number(e.target.value);
-                                              const updatedOS = { ...selectedOS, manualServiceCost: value };
-                                              setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-                                              setSelectedOS(updatedOS);
-                                              try {
-                                                const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
-                                                if (error) throw error;
-                                              } catch (e) {
-                                                console.error('Erro ao atualizar valor manual:', e);
-                                              }
-                                            }}
-                                          />
-                                        </div>
-                                        {selectedOS.manualServiceCost !== undefined && selectedOS.manualServiceCost !== null && (
-                                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                                            <i className="fas fa-info-circle"></i>
-                                            Valor manual ativo
-                                          </p>
-                                        )}
-                                      </div>
+</div>
                                       <div className="pt-2 border-t border-slate-100">
                                         <div className="flex justify-between items-center">
                                           <span className="text-sm font-bold text-slate-700">Custo Total:</span>
