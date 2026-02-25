@@ -27,63 +27,9 @@ interface Props {
 const ITEMS_PER_PAGE = 9;
 
 const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments = [], materials, setMaterials, services, users, setUsers, movements, onStockChange, currentUser }) => {
-
-const getUserDisplayName = (userId?: string) => {
-  if (!userId) return '';
-  const u: any = (users || []).find((x: any) => x.id === userId);
-  return (u?.name || u?.full_name || u?.nome || u?.email || '').toString();
-};
-
-const getRequesterName = (osLike: any) => {
-  return (osLike?.requesterName || getUserDisplayName(osLike?.requesterId) || 'Não informado').toString();
-};
-
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
-  
-
-// --- CUSTO DE MATERIAIS E SERVIÇOS (itens avulsos) ---
-const addCostItem = () => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: [
-        ...(prev.costItems || []),
-        {
-          id: Math.random().toString(36).substr(2, 9),
-          type: 'MATERIAL',
-          description: '',
-          amount: 0,
-        },
-      ],
-    };
-  });
-};
-
-const updateCostItem = (id: string, patch: any) => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: (prev.costItems || []).map((item: any) =>
-        item.id === id ? { ...item, ...patch } : item
-      ),
-    };
-  });
-};
-
-const removeCostItem = (id: string) => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: (prev.costItems || []).filter((item: any) => item.id !== id),
-    };
-  });
-};
-
-const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
+  const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
@@ -482,6 +428,49 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       setNewExecutorData({ name: '', email: '', department: '' });
   };
 
+
+  // ===== Custos informados (materiais/serviços) - itens manuais =====
+  const persistOS = async (updatedOS: OS) => {
+    setOss(prev => prev.map(o => o.id === updatedOS.id ? updatedOS : o));
+    setSelectedOS(updatedOS);
+    try {
+      const payload: any = mapToSupabase(updatedOS);
+      // campo jsonb no Supabase (oss.cost_items)
+      payload.cost_items = (updatedOS as any).costItems || [];
+      const { error } = await supabase.from('oss').upsert(payload);
+      if (error) throw error;
+    } catch (e) {
+      console.error('Erro ao salvar custos informados:', e);
+    }
+  };
+
+  const addCostItem = async () => {
+    if (!selectedOS) return;
+    const current = ((selectedOS as any).costItems || []) as any[];
+    const next = [
+      ...current,
+      { id: Math.random().toString(36).substr(2, 9), type: 'MATERIAL', description: '', amount: 0 }
+    ];
+    const updatedOS: any = { ...selectedOS, costItems: next };
+    await persistOS(updatedOS);
+  };
+
+  const updateCostItem = async (id: string, patch: Partial<{ type: string; description: string; amount: number }>) => {
+    if (!selectedOS) return;
+    const current = ((selectedOS as any).costItems || []) as any[];
+    const next = current.map(it => it.id === id ? { ...it, ...patch } : it);
+    const updatedOS: any = { ...selectedOS, costItems: next };
+    await persistOS(updatedOS);
+  };
+
+  const removeCostItem = async (id: string) => {
+    if (!selectedOS) return;
+    const current = ((selectedOS as any).costItems || []) as any[];
+    const next = current.filter(it => it.id !== id);
+    const updatedOS: any = { ...selectedOS, costItems: next };
+    await persistOS(updatedOS);
+  };
+
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const getStatusTooltip = (status: OSStatus) => { switch (status) { case OSStatus.OPEN: return 'Aguardando início.'; case OSStatus.IN_PROGRESS: return 'Atividade em execução.'; case OSStatus.PAUSED: return 'Atividade paralisada.'; case OSStatus.COMPLETED: return 'Atividade concluída.'; case OSStatus.CANCELED: return 'Atividade cancelada.'; default: return ''; } };
   const getContextInfo = (os: OS) => { 
@@ -534,7 +523,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         ["Status", os.status],
         ["Prioridade", translatePriority(os.priority)],
         ["Tipo", os.type],
-        ["Solicitante", getRequesterName(os)],
+        ["Solicitante", os.requesterName || 'Não informado'],
         ["Executor(es)", executorNames],
         ["Abertura", new Date(os.openDate).toLocaleString()],
         ["Prazo Limite", new Date(os.limitDate).toLocaleString()]
@@ -826,13 +815,13 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                                         {selectedOS.projectId && <p className="text-xs text-slate-500">Herdado do Projeto</p>}
                                     </div>
                                 </div>
-                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'EXECUTOR') && getRequesterName(selectedOS) !== 'Não informado' && (
+                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'EXECUTOR') && selectedOS.requesterName && (
                                   <div>
                                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Solicitante</p>
                                       <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
                                           <p className="font-bold text-blue-900 flex items-center gap-2">
                                               <i className="fas fa-user text-sm"></i>
-                                              {getRequesterName(selectedOS)}
+                                              {selectedOS.requesterName}
                                           </p>
                                       </div>
                                   </div>
@@ -972,7 +961,117 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                                             <span className="text-slate-500">SLA (Horas):</span>
                                             {canEditSLA && isEditable(selectedOS) ? (
                                                 isEditingSLA ? (
-</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            className="w-20 h-8 px-2 border-2 border-blue-300 rounded-lg text-sm font-bold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                                            value={editingSLAValue}
+                                                            onChange={e => setEditingSLAValue(Number(e.target.value))}
+                                                            autoFocus
+                                                        />
+                                                        <button
+                                                            onClick={handleSLAChange}
+                                                            className="w-7 h-7 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center justify-center"
+                                                        >
+                                                            <i className="fas fa-check text-xs"></i>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsEditingSLA(false)}
+                                                            className="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-all flex items-center justify-center"
+                                                        >
+                                                            <i className="fas fa-times text-xs"></i>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingSLAValue(selectedOS.slaHours);
+                                                            setIsEditingSLA(true);
+                                                        }}
+                                                        className="font-mono font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-all border-2 border-transparent hover:border-blue-300"
+                                                    >
+                                                        {selectedOS.slaHours}h <i className="fas fa-edit text-xs ml-1"></i>
+                                                    </button>
+                                                )
+                                            ) : (
+                                                <span className="font-mono font-bold text-blue-600">{selectedOS.slaHours}h</span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex justify-between"><span className="text-slate-500">Prazo Limite:</span><span className="font-mono font-bold text-red-600">{new Date(selectedOS.limitDate).toLocaleDateString()}</span></div>
+                                        {selectedOS.startTime && <div className="flex justify-between"><span className="text-slate-500">Início Real:</span><span className="font-mono font-bold text-blue-600">{new Date(selectedOS.startTime).toLocaleString()}</span></div>}
+                                        {selectedOS.endTime && <div className="flex justify-between"><span className="text-slate-500">Conclusão:</span><span className="font-mono font-bold text-emerald-600">{new Date(selectedOS.endTime).toLocaleString()}</span></div>}
+                                    </div>
+                                </div>
+
+                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') && (
+                                  <div className="pt-6 border-t border-slate-100">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                                      <i className="fas fa-dollar-sign"></i>
+                                      Valores Manuais
+                                    </p>
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">
+                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Materiais e Serviços</label>
+                                        <div className="space-y-2">
+                                          {((selectedOS as any).costItems || []).map((item: any) => (
+                                            <div key={item.id} className="flex flex-col sm:flex-row gap-2">
+                                              <div className="flex gap-2 flex-1">
+                                                <select
+                                                  className="h-9 px-2 border border-slate-200 rounded-lg text-xs font-bold bg-white"
+                                                  value={item.type}
+                                                  onChange={(e) => updateCostItem(item.id, { type: e.target.value })}
+                                                >
+                                                  <option value="MATERIAL">Material</option>
+                                                  <option value="SERVICE">Serviço</option>
+                                                </select>
+                                                <input
+                                                  className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
+                                                  placeholder="Descreva o material/serviço"
+                                                  value={item.description || ""}
+                                                  onChange={(e) => updateCostItem(item.id, { description: e.target.value })}
+                                                />
+                                              </div>
+                                              <div className="flex gap-2 items-center">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-xs font-bold text-slate-500">Valor (R$)</span>
+                                                  <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="w-28 h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
+                                                    placeholder="0,00"
+                                                    value={item.amount ?? 0}
+                                                    onChange={(e) => updateCostItem(item.id, { amount: Number(e.target.value) })}
+                                                  />
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => removeCostItem(item.id)}
+                                                  className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 transition-all"
+                                                  title="Remover item"
+                                                >
+                                                  <i className="fas fa-trash text-xs"></i>
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                          <button
+                                            type="button"
+                                            onClick={addCostItem}
+                                            className="text-xs font-bold text-clean-primary hover:underline"
+                                          >
+                                            + Adicionar item
+                                          </button>
+                                          <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+                                            <span className="text-xs font-bold text-slate-600">Total informado:</span>
+                                            <span className="text-sm font-black text-slate-800">
+                                              R$ {formatCurrency((((selectedOS as any).costItems || []).reduce((acc: number, it: any) => acc + (Number(it.amount) || 0), 0)))}
+                                            </span>
+                                          </div>
+                                        </div>
                                       <div className="pt-2 border-t border-slate-100">
                                         <div className="flex justify-between items-center">
                                           <span className="text-sm font-bold text-slate-700">Custo Total:</span>
