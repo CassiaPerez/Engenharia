@@ -970,39 +970,52 @@ const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments 
                                     </p>
                                     <div className="space-y-3">
                                       <div>
-                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Materiais</label>
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm text-slate-500">R$</span>
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
-                                            placeholder="Deixe vazio para calcular automaticamente"
-                                            value={selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null ? selectedOS.manualMaterialCost : ''}
-                                            onChange={async (e) => {
-                                              const value = e.target.value === '' ? undefined : Number(e.target.value);
-                                              const updatedOS = { ...selectedOS, manualMaterialCost: value };
-                                              setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-                                              setSelectedOS(updatedOS);
-                                              try {
-                                                const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
-                                                if (error) throw error;
-                                              } catch (e) {
-                                                console.error('Erro ao atualizar valor manual:', e);
-                                              }
-                                            }}
-                                          />
-                                        </div>
-                                        {selectedOS.manualMaterialCost !== undefined && selectedOS.manualMaterialCost !== null && (
-                                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                                            <i className="fas fa-info-circle"></i>
-                                            Valor manual ativo
-                                          </p>
-                                        )}
-                                      </div>
-                                      <div>
-                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Custo de Serviços</label>
+                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">
+Custo de Materiais e Serviços</label>
+<div className="space-y-2">
+  {(selectedOS.costItems || []).map((item, idx) => (
+    <div key={item.id} className="flex gap-2">
+      <select
+        className="h-9 px-2 border border-slate-200 rounded-lg text-xs font-bold"
+        value={item.type}
+        onChange={(e) => updateCostItem(item.id, { type: e.target.value })}
+      >
+        <option value="MATERIAL">Material</option>
+        <option value="SERVICE">Serviço</option>
+      </select>
+      <input
+        className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
+        placeholder="Descrição"
+        value={item.description}
+        onChange={(e) => updateCostItem(item.id, { description: e.target.value })}
+      />
+      <input
+        type="number"
+        step="0.01"
+        className="w-24 h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
+        placeholder="R$"
+        value={item.amount}
+        onChange={(e) => updateCostItem(item.id, { amount: Number(e.target.value) })}
+      />
+      <button
+        type="button"
+        onClick={() => removeCostItem(item.id)}
+        className="px-2 text-red-500"
+      >
+        ✕
+      </button>
+    </div>
+  ))}
+  <button
+    type="button"
+    onClick={addCostItem}
+    className="text-xs font-bold text-clean-primary"
+  >
+    + Adicionar item
+  </button>
+</div>
+<label className="text-xs font-semibold text-slate-600 mb-1 block">Totais</label>
+</label>
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-slate-500">R$</span>
                                           <input
