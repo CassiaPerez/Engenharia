@@ -1043,7 +1043,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         step="0.01"
         min="0"
         className="w-32 min-w-[120px] h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
-        placeholder="R$"
+        placeholder="Valor (R$)"
         value={item.amount}
         onChange={(e) => updateCostItem(item.id, { amount: Number((e.target as HTMLInputElement).value) })}
       />
