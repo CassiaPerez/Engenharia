@@ -759,7 +759,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
             <div className="fixed inset-0 z-[9999]">
               <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity" onClick={() => setSelectedOS(null)} />
               <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
-                <div className="relative w-full max-w-6xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="relative w-full max-w-6xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden overflow-x-hidden flex flex-col max-h-[90vh]">
                     <div className={`px-8 py-6 border-b border-slate-100 rounded-t-2xl flex justify-between items-center shrink-0 ${
                       selectedOS.priority === 'CRITICAL' ? 'bg-red-50 border-l-8 border-l-red-600' :
                       selectedOS.priority === 'HIGH' ? 'bg-orange-50 border-l-4 border-l-orange-500' :
@@ -1017,7 +1017,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
 Custo de Materiais e Serviços</label>
 <div className="space-y-2">
   {(selectedOS.costItems || []).map((item, idx) => (
-    <div key={item.id} className="flex gap-2">
+    <div key={item.id} className="flex flex-wrap items-center gap-2">
       <select
         className="h-9 px-2 border border-slate-200 rounded-lg text-xs font-bold"
         value={item.type}
@@ -1035,15 +1035,15 @@ Custo de Materiais e Serviços</label>
       <input
         type="number"
         step="0.01"
-        className="w-24 h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
-        placeholder="R$"
+        className="w-32 min-w-[120px] h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
+        placeholder="Valor (R$)"
         value={item.amount}
         onChange={(e) => updateCostItem(item.id, { amount: Number(e.target.value) })}
       />
       <button
         type="button"
         onClick={() => removeCostItem(item.id)}
-        className="px-2 text-red-500"
+        className="px-2 text-red-500 whitespace-nowrap"
       >
         ✕
       </button>
