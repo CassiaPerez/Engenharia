@@ -29,7 +29,50 @@ const ITEMS_PER_PAGE = 9;
 const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments = [], materials, setMaterials, services, users, setUsers, movements, onStockChange, currentUser }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
+  
+
+// --- CUSTO DE MATERIAIS E SERVIÇOS (itens avulsos) ---
+const addCostItem = () => {
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: [
+        ...(prev.costItems || []),
+        {
+          id: Math.random().toString(36).substr(2, 9),
+          type: 'MATERIAL',
+          description: '',
+          amount: 0,
+        },
+      ],
+    };
+  });
+};
+
+const updateCostItem = (id: string, patch: any) => {
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: (prev.costItems || []).map((item: any) =>
+        item.id === id ? { ...item, ...patch } : item
+      ),
+    };
+  });
+};
+
+const removeCostItem = (id: string) => {
+  setSelectedOS((prev: any) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      costItems: (prev.costItems || []).filter((item: any) => item.id !== id),
+    };
+  });
+};
+
+const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
