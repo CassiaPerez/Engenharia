@@ -1021,7 +1021,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
 
 <div className="space-y-2">
   {(selectedOS?.costItems || []).map((item: any) => (
-    <div key={item.id} className="flex gap-2">
+    <div key={item.id} className="flex flex-wrap items-center gap-2">
       <select
         className="h-9 px-2 border border-slate-200 rounded-lg text-xs font-bold"
         value={item.type}
@@ -1042,7 +1042,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         type="number"
         step="0.01"
         min="0"
-        className="w-28 h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
+        className="w-32 min-w-[120px] h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
         placeholder="R$"
         value={item.amount}
         onChange={(e) => updateCostItem(item.id, { amount: Number((e.target as HTMLInputElement).value) })}
@@ -1051,7 +1051,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       <button
         type="button"
         onClick={() => removeCostItem(item.id)}
-        className="h-9 px-3 rounded-lg text-xs font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50"
+        className="h-9 px-3 rounded-lg text-xs font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50 whitespace-nowrap"
         title="Remover item"
       >
         Remover
