@@ -29,49 +29,7 @@ const ITEMS_PER_PAGE = 9;
 const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments = [], materials, setMaterials, services, users, setUsers, movements, onStockChange, currentUser }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
-  
-
-// --- CUSTO DE MATERIAIS E SERVIÇOS (itens avulsos) ---
-const addCostItem = () => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: [
-        ...(prev.costItems || []),
-        {
-          id: Math.random().toString(36).substr(2, 9),
-          type: 'MATERIAL',
-          description: '',
-          amount: 0,
-        },
-      ],
-    };
-  });
-};
-
-const updateCostItem = (id: string, patch: any) => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: (prev.costItems || []).map((item: any) =>
-        item.id === id ? { ...item, ...patch } : item
-      ),
-    };
-  });
-};
-
-const removeCostItem = (id: string) => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: (prev.costItems || []).filter((item: any) => item.id !== id),
-    };
-  });
-};
-const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
+  const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
@@ -960,7 +918,133 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                                             <span className="text-slate-500">SLA (Horas):</span>
                                             {canEditSLA && isEditable(selectedOS) ? (
                                                 isEditingSLA ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            className="w-20 h-8 px-2 border-2 border-blue-300 rounded-lg text-sm font-bold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                                            value={editingSLAValue}
+                                                            onChange={e => setEditingSLAValue(Number(e.target.value))}
+                                                            autoFocus
+                                                        />
+                                                        <button
+                                                            onClick={handleSLAChange}
+                                                            className="w-7 h-7 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all flex items-center justify-center"
+                                                        >
+                                                            <i className="fas fa-check text-xs"></i>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsEditingSLA(false)}
+                                                            className="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-all flex items-center justify-center"
+                                                        >
+                                                            <i className="fas fa-times text-xs"></i>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingSLAValue(selectedOS.slaHours);
+                                                            setIsEditingSLA(true);
+                                                        }}
+                                                        className="font-mono font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-all border-2 border-transparent hover:border-blue-300"
+                                                    >
+                                                        {selectedOS.slaHours}h <i className="fas fa-edit text-xs ml-1"></i>
+                                                    </button>
+                                                )
+                                            ) : (
+                                                <span className="font-mono font-bold text-blue-600">{selectedOS.slaHours}h</span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex justify-between"><span className="text-slate-500">Prazo Limite:</span><span className="font-mono font-bold text-red-600">{new Date(selectedOS.limitDate).toLocaleDateString()}</span></div>
+                                        {selectedOS.startTime && <div className="flex justify-between"><span className="text-slate-500">Início Real:</span><span className="font-mono font-bold text-blue-600">{new Date(selectedOS.startTime).toLocaleString()}</span></div>}
+                                        {selectedOS.endTime && <div className="flex justify-between"><span className="text-slate-500">Conclusão:</span><span className="font-mono font-bold text-emerald-600">{new Date(selectedOS.endTime).toLocaleString()}</span></div>}
+                                    </div>
+                                </div>
+
+                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER') && (
+                                  <div className="pt-6 border-t border-slate-100">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                                      <i className="fas fa-dollar-sign"></i>
+                                      Valores Manuais
+                                    </p>
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">
+Custo de Materiais e Serviços</label>
+<div className="space-y-2">
+  {(selectedOS.costItems || []).map((item, idx) => (
+    <div key={item.id} className="flex gap-2">
+      <select
+        className="h-9 px-2 border border-slate-200 rounded-lg text-xs font-bold"
+        value={item.type}
+        onChange={(e) => updateCostItem(item.id, { type: e.target.value })}
+      >
+        <option value="MATERIAL">Material</option>
+        <option value="SERVICE">Serviço</option>
+      </select>
+      <input
+        className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
+        placeholder="Descrição"
+        value={item.description}
+        onChange={(e) => updateCostItem(item.id, { description: e.target.value })}
+      />
+      <input
+        type="number"
+        step="0.01"
+        className="w-24 h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
+        placeholder="R$"
+        value={item.amount}
+        onChange={(e) => updateCostItem(item.id, { amount: Number(e.target.value) })}
+      />
+      <button
+        type="button"
+        onClick={() => removeCostItem(item.id)}
+        className="px-2 text-red-500"
+      >
+        ✕
+      </button>
+    </div>
+  ))}
+  <button
+    type="button"
+    onClick={addCostItem}
+    className="text-xs font-bold text-clean-primary"
+  >
+    + Adicionar item
+  </button>
 </div>
+<label className="text-xs font-semibold text-slate-600 mb-1 block">Totais</label>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-slate-500">R$</span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:border-clean-primary transition-all"
+                                            placeholder="Deixe vazio para calcular automaticamente"
+                                            value={selectedOS.manualServiceCost !== undefined && selectedOS.manualServiceCost !== null ? selectedOS.manualServiceCost : ''}
+                                            onChange={async (e) => {
+                                              const value = e.target.value === '' ? undefined : Number(e.target.value);
+                                              const updatedOS = { ...selectedOS, manualServiceCost: value };
+                                              setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
+                                              setSelectedOS(updatedOS);
+                                              try {
+                                                const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
+                                                if (error) throw error;
+                                              } catch (e) {
+                                                console.error('Erro ao atualizar valor manual:', e);
+                                              }
+                                            }}
+                                          />
+                                        </div>
+                                        {selectedOS.manualServiceCost !== undefined && selectedOS.manualServiceCost !== null && (
+                                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                            <i className="fas fa-info-circle"></i>
+                                            Valor manual ativo
+                                          </p>
+                                        )}
+                                      </div>
                                       <div className="pt-2 border-t border-slate-100">
                                         <div className="flex justify-between items-center">
                                           <span className="text-sm font-bold text-slate-700">Custo Total:</span>
