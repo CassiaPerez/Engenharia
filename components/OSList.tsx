@@ -40,6 +40,38 @@ const getRequesterName = (osLike: any) => {
 
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
+
+// --- EXECUÇÃO POR EXECUTOR ---
+const updateExecutionStatus = (os: any, executorId: string, newStatus: 'PAUSED' | 'RUNNING') => {
+  const now = new Date().toISOString();
+  let executions = [...(os.executions || [])];
+
+  const idx = executions.findIndex((ex: any) => ex.executorId === executorId);
+
+  if (idx >= 0) {
+    executions[idx] = {
+      ...executions[idx],
+      status: newStatus,
+      ...(newStatus === 'PAUSED' ? { pausedAt: now } : {}),
+      ...(newStatus === 'RUNNING' ? { resumedAt: now } : {}),
+    };
+  } else {
+    executions.push({
+      executorId,
+      status: newStatus,
+      startedAt: now,
+      ...(newStatus === 'PAUSED' ? { pausedAt: now } : {}),
+    });
+  }
+
+  const anyRunning = executions.some((ex: any) => ex.status === 'RUNNING');
+  const allPaused = executions.length > 0 && executions.every((ex: any) => ex.status === 'PAUSED');
+
+  const osStatus = anyRunning ? 'EM_EXECUCAO' : allPaused ? 'PAUSADA' : os.status;
+
+  return { executions, osStatus };
+};
+
   const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
