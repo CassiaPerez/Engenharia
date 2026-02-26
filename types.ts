@@ -2,6 +2,14 @@
 
 export type UUID = string;
 
+/**
+ * Compatibilidade:
+ * Seu ProjectList.tsx já espera existir export "Category".
+ * Para não quebrar nada e não impor categorias fixas, deixei como string.
+ * Se você já tiver categorias fixas no seu sistema, pode trocar para union.
+ */
+export type Category = string;
+
 export type CompanyName =
   | "Cropbio"
   | "Cropfert Industria"
@@ -56,6 +64,9 @@ export interface MaterialWithdrawal {
   company?: CompanyName;
 
   observation?: string;
+
+  // opcional (se existir no seu sistema)
+  unitCost?: number;
 }
 
 export interface Equipment {
@@ -76,6 +87,10 @@ export interface Equipment {
 export interface Project {
   id: UUID;
   name: string;
+
+  // compatibilidade com ProjectList (muito comum existir)
+  category?: Category;
+
   location?: string; // usado como fallback p/ empresa/custo
   costCenter?: string;
 }
@@ -142,6 +157,7 @@ export function inferCompanyFrom(
   project?: Project
 ): CompanyName {
   if (equipment?.company && equipment.company !== "Não informado") return equipment.company;
+
   const loc = (equipment?.location || project?.location || "").toLowerCase();
   if (!loc) return "Não informado";
   if (loc.includes("cropbio")) return "Cropbio";
@@ -154,7 +170,11 @@ export function inferCompanyFrom(
 export function isOverdue(os: OS, now = new Date()): boolean {
   if (!os.dueAt) return false;
   const due = new Date(os.dueAt);
-  return due.getTime() < now.getTime() && os.status !== "Finalizada" && os.status !== "Cancelada";
+  return (
+    due.getTime() < now.getTime() &&
+    os.status !== "Finalizada" &&
+    os.status !== "Cancelada"
+  );
 }
 
 export function sortByMostRecentOpened(a: OS, b: OS): number {
@@ -207,10 +227,10 @@ export function calcEffectiveHoursForOS(os: OS, now = new Date()): number {
     let exMs = end - start;
 
     const ph = ex.pauseHistory || [];
-    // ordenar por data
-    const sorted = [...ph].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+    const sorted = [...ph].sort(
+      (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime()
+    );
 
-    // subtrair intervalos PAUSE->RESUME
     let pauseStart: number | null = null;
     for (const ev of sorted) {
       const t = new Date(ev.at).getTime();
@@ -220,15 +240,14 @@ export function calcEffectiveHoursForOS(os: OS, now = new Date()): number {
         pauseStart = t;
       } else if (ev.type === "RESUME" && pauseStart != null) {
         const pauseEnd = t;
-        if (pauseEnd > pauseStart) exMs -= (pauseEnd - pauseStart);
+        if (pauseEnd > pauseStart) exMs -= pauseEnd - pauseStart;
         pauseStart = null;
       }
     }
 
-    // se ainda está pausado e não teve RESUME, desconta até "end"
     if (pauseStart != null) {
       const pauseEnd = end;
-      if (pauseEnd > pauseStart) exMs -= (pauseEnd - pauseStart);
+      if (pauseEnd > pauseStart) exMs -= pauseEnd - pauseStart;
     }
 
     totalMs += Math.max(0, exMs);
@@ -238,17 +257,14 @@ export function calcEffectiveHoursForOS(os: OS, now = new Date()): number {
 }
 
 export interface ReportPeriod {
-  from: string; // ISO date
-  to: string; // ISO date
+  from: string; // ISO date (YYYY-MM-DD)
+  to: string;   // ISO date (YYYY-MM-DD)
 }
 
 export function normalizePeriod(period: ReportPeriod): ReportPeriod {
   const from = new Date(period.from);
   const to = new Date(period.to);
-  // garantir ordem
-  if (to.getTime() < from.getTime()) {
-    return { from: period.to, to: period.from };
-  }
+  if (to.getTime() < from.getTime()) return { from: period.to, to: period.from };
   return period;
 }
 
@@ -258,7 +274,6 @@ export function inPeriod(iso: string, period: ReportPeriod): boolean {
   const a = new Date(p.from).getTime();
   const b = new Date(p.to).getTime();
   if ([t, a, b].some(Number.isNaN)) return false;
-  // inclui o dia final inteiro: adiciona 23:59:59.999
   const end = b + 24 * 60 * 60 * 1000 - 1;
   return t >= a && t <= end;
 }
