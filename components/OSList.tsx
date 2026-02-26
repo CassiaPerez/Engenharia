@@ -532,7 +532,7 @@ const getRequesterDisplayName = (os: any) => {
         ["Status", os.status],
         ["Prioridade", translatePriority(os.priority)],
         ["Tipo", os.type],
-        ["Solicitante", os.requesterName || 'Não informado'],
+        ["Solicitante", getRequesterDisplayName(os)],
         ["Executor(es)", executorNames],
         ["Abertura", new Date(os.openDate).toLocaleString()],
         ["Prazo Limite", new Date(os.limitDate).toLocaleString()]
