@@ -1,346 +1,339 @@
+import React, { useMemo } from 'react';
+import { Project, OS, Material, ServiceType, User, Equipment, StockMovement, OSStatus, ProjectStatus } from '../types';
 
-import React, { useMemo, useState } from 'react';
-import { Project, OS, Material, ServiceType, OSStatus, ProjectStatus } from '../types';
-import { calculateProjectCosts, formatDate } from '../services/engine';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import ModalPortal from './ModalPortal';
-
-// KpiCard Component Definition
-interface KpiCardProps {
-  title: string;
-  value: string;
-  icon: string;
-  color: string;
-  sub: string;
-}
-
-const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, sub }) => {
-    // Mapping colors to Tailwind classes to ensure they exist/work
-    const getColorClasses = (c: string) => {
-        switch(c) {
-            case 'emerald': return { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', icon: 'text-emerald-500' };
-            case 'blue': return { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100', icon: 'text-blue-500' };
-            case 'amber': return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100', icon: 'text-amber-500' };
-            case 'red': return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-100', icon: 'text-red-500' };
-            case 'purple': return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100', icon: 'text-purple-500' };
-            default: return { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-100', icon: 'text-slate-500' };
-        }
-    };
-    
-    const colors = getColorClasses(color);
-
-    
-
-// Modelos de indicadores (base para relatórios micro/macro)
-const modelCards = [
-  { title: 'Custo por empresa', desc: 'Soma de baixas + custos de OS no período.' },
-  { title: 'Horas por executor', desc: 'Apontamento por período (inclui pausas).' },
-  { title: 'SLA atrasado', desc: 'OS com prazo limite vencido e não finalizadas.' },
-  { title: 'Custo por setor/equipamento', desc: 'Requer árvore de bens (empresa > setor > equipamento).' },
-];
-return (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between group hover:shadow-md transition-all relative overflow-hidden">
-            <div className={`absolute right-0 top-0 p-3 opacity-10 text-9xl -mr-6 -mt-6 pointer-events-none group-hover:scale-110 transition-transform ${colors.icon}`}>
-                <i className={`fas ${icon}`}></i>
-            </div>
-            <div className="relative z-10">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">{title}</p>
-                <h3 className="text-3xl font-black text-slate-800 tracking-tight">{value}</h3>
-                <p className={`text-xs font-bold mt-2 flex items-center gap-1 ${colors.text}`}>
-                    <i className={`fas ${icon}`}></i> {sub}
-                </p>
-            </div>
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-sm z-10 ${colors.bg} ${colors.text} ${colors.border} border`}>
-                <i className={`fas ${icon}`}></i>
-            </div>
-        </div>
-    );
-};
-
-interface Props {
+interface DashboardProps {
   projects: Project[];
   oss: OS[];
   materials: Material[];
   services: ServiceType[];
+  // ✅ NOVOS props para KPIs extras
+  users?: User[];
+  equipments?: Equipment[];
+  movements?: StockMovement[];
 }
 
-const Dashboard: React.FC<Props> = ({ projects, oss, materials, services }) => {
-  const [showDetail, setShowDetail] = useState<Project | null>(null);
+const Dashboard: React.FC<DashboardProps> = ({
+  projects, oss, materials, services,
+  users = [], equipments = [], movements = []
+}) => {
+  const now = new Date();
+  const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-  const stats = useMemo(() => {
-    const totalEstimated = projects.reduce((acc, p) => acc + p.estimatedValue, 0);
-    let totalSpent = 0;
-    projects.forEach(p => {
-      totalSpent += calculateProjectCosts(p, oss, materials, services).totalReal;
+  // ======= KPIs =======
+  const kpis = useMemo(() => {
+    const osAbertas      = oss.filter(o => o.status === OSStatus.OPEN).length;
+    const osEmAndamento  = oss.filter(o => o.status === OSStatus.IN_PROGRESS).length;
+    const osPausadas     = oss.filter(o => o.status === OSStatus.PAUSED).length;
+    const osConcluidas   = oss.filter(o => o.status === OSStatus.COMPLETED).length;
+
+    // ✅ NOVO: OS com SLA vencido
+    const osAtrasadas = oss.filter(o =>
+      o.status !== OSStatus.COMPLETED && o.status !== OSStatus.CANCELED &&
+      new Date(o.limitDate) < now
+    ).length;
+
+    // ✅ NOVO: Custo total do mês (OS abertas no mês corrente)
+    const custoMes = oss
+      .filter(o => (o.openDate || '').startsWith(mesAtual))
+      .reduce((sum, o) => {
+        const mat = o.materials.reduce((s, m) => s + m.quantity * m.unitCost, 0);
+        const svc = o.services.reduce((s, sv) => s + sv.quantity * sv.unitCost, 0);
+        return sum + mat + svc + (o.manualMaterialCost || 0) + (o.manualServiceCost || 0);
+      }, 0);
+
+    // ✅ NOVO: Materiais abaixo do estoque mínimo
+    const materiaisAbaixoMin = materials.filter(m => m.status === 'ACTIVE' && m.currentStock < m.minStock).length;
+
+    const projetosAtivos = projects.filter(p =>
+      p.status === ProjectStatus.IN_PROGRESS || p.status === ProjectStatus.PLANNED
+    ).length;
+
+    const custoTotalCapex = projects.reduce((s, p) => s + (p.estimatedValue || 0), 0);
+
+    return { osAbertas, osEmAndamento, osPausadas, osConcluidas, osAtrasadas, custoMes, materiaisAbaixoMin, projetosAtivos, custoTotalCapex };
+  }, [oss, materials, projects, mesAtual]);
+
+  // OS por tipo
+  const ossByType = useMemo(() => {
+    const counts: Record<string, number> = {};
+    oss.forEach(o => { counts[o.type] = (counts[o.type] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [oss]);
+
+  // OS urgentes (mais críticas no topo)
+  const ossUrgentes = useMemo(() =>
+    oss
+      .filter(o => o.status !== OSStatus.COMPLETED && o.status !== OSStatus.CANCELED)
+      .sort((a, b) => {
+        const score = (o: OS) => {
+          let s = 0;
+          if (new Date(o.limitDate) < now) s += 1000;
+          if (o.priority === 'CRITICAL') s += 100;
+          if (o.priority === 'HIGH') s += 50;
+          if (o.priority === 'MEDIUM') s += 10;
+          return s;
+        };
+        return score(b) - score(a);
+      }).slice(0, 6),
+  [oss]);
+
+  // Custo por empresa (via equipamentos vinculados às OS)
+  const costByCompany = useMemo(() => {
+    const COMPANIES = ['Cropbio', 'Cropfert Industria', 'Cropfert Jandaia', 'Cropfert do Brasil'];
+    return COMPANIES.map(company => {
+      const companyEqIds = new Set(equipments.filter(e => e.company === company).map(e => e.id));
+      const total = oss
+        .filter(o => o.equipmentId && companyEqIds.has(o.equipmentId))
+        .reduce((sum, o) => {
+          return sum
+            + o.materials.reduce((s, m) => s + m.quantity * m.unitCost, 0)
+            + o.services.reduce((s, sv) => s + sv.quantity * sv.unitCost, 0)
+            + (o.manualMaterialCost || 0) + (o.manualServiceCost || 0);
+        }, 0);
+      return { company, total };
     });
-    const delayedOS = oss.filter(o => o.status !== OSStatus.COMPLETED && new Date(o.limitDate) < new Date()).length;
-    return { totalEstimated, totalSpent, delayedOS };
-  }, [projects, oss, materials, services]);
+  }, [oss, equipments]);
 
-  const sortedProjects = useMemo(() => {
-    return [...projects].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-  }, [projects]);
+  const maxCompanyCost = Math.max(...costByCompany.map(c => c.total), 1);
 
-  const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Movimentos recentes
+  const recentMovements = useMemo(() =>
+    [...movements]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5),
+  [movements]);
 
-  const getStatusBadge = (status: ProjectStatus) => {
-    switch (status) {
-      case ProjectStatus.FINISHED: return <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-md text-sm font-bold uppercase border border-emerald-200">Concluído</span>;
-      case ProjectStatus.IN_PROGRESS: return <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-md text-sm font-bold uppercase border border-blue-200">Em Andamento</span>;
-      case ProjectStatus.PAUSED: return <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-md text-sm font-bold uppercase border border-amber-200">Pausado</span>;
-      case ProjectStatus.CANCELED: return <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md text-sm font-bold uppercase border border-slate-200">Cancelado</span>;
-      default: return <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-md text-sm font-bold uppercase border border-slate-200">Planejado</span>;
-    }
-  };
-
-  const getActualMaterialQty = (projectId: string, materialId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.materials.find(m => m.materialId === materialId)?.quantity || 0), 0);
-  const getActualServiceHours = (projectId: string, serviceId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.services.find(s => s.serviceTypeId === serviceId)?.quantity || 0), 0);
-
-  // PDF Generation functions
-  const generateConsolidatedReport = () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const today = new Date().toLocaleDateString('pt-BR');
-    doc.setFillColor(71, 122, 127);
-    doc.rect(0, 0, 297, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("RELATÓRIO DE CUSTOS POR PROJETO (CAPEX)", 14, 16);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
-    let totalBudget = 0;
-    let totalReal = 0;
-    const tableBody = sortedProjects.map(p => {
-        const costs = calculateProjectCosts(p, oss, materials, services);
-        totalBudget += p.estimatedValue;
-        totalReal += costs.totalReal;
-        const variance = p.estimatedValue - costs.totalReal;
-        const variancePct = p.estimatedValue > 0 ? (costs.totalReal / p.estimatedValue) * 100 : 0;
-        return [p.code, p.description, p.responsible, formatDate(p.startDate), p.status, `R$ ${formatCurrency(p.estimatedValue)}`, `R$ ${formatCurrency(costs.totalReal)}`, `R$ ${formatCurrency(variance)}`, `${variancePct.toFixed(1)}%`];
-    });
-    tableBody.push(['', 'TOTAIS CONSOLIDADOS', '', '', '', `R$ ${formatCurrency(totalBudget)}`, `R$ ${formatCurrency(totalReal)}`, `R$ ${formatCurrency(totalBudget - totalReal)}`, `${totalBudget > 0 ? ((totalReal/totalBudget)*100).toFixed(1) : 0}%`]);
-    autoTable(doc, {
-        head: [['Código', 'Projeto', 'Responsável', 'Início', 'Status', 'Budget (Plan)', 'Custo Real', 'Saldo (Var)', '% Uso']],
-        body: tableBody,
-        startY: 35,
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: [71, 122, 127], textColor: 255, fontStyle: 'bold' },
-        columnStyles: { 0: { fontStyle: 'bold' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' }, 7: { halign: 'right' }, 8: { halign: 'right' } },
-        didParseCell: function(data) { if (data.row.index === tableBody.length - 1) { data.cell.styles.fontStyle = 'bold'; data.cell.styles.fillColor = [240, 240, 240]; } }
-    });
-    doc.save(`Relatorio_Custos_Projetos_${new Date().toISOString().split('T')[0]}.pdf`);
-  };
-
-  const generateProjectDetailPDF = (project: Project) => {
-    const doc = new jsPDF();
-    const costs = calculateProjectCosts(project, oss, materials, services);
-    doc.setFillColor(71, 122, 127);
-    doc.rect(0, 0, 210, 20, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("FICHA TÉCNICA DE PROJETO (CAPEX)", 14, 13);
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    let yPos = 30;
-    doc.text(`Código: ${project.code}`, 14, yPos);
-    doc.text(`Status: ${project.status}`, 120, yPos);
-    yPos += 6;
-    doc.text(`Descrição:`, 14, yPos);
-    doc.setFont("helvetica", "normal");
-    const descLines = doc.splitTextToSize(project.description, 170);
-    doc.text(descLines, 35, yPos);
-    yPos += descLines.length * 5;
-    if (project.detailedDescription) {
-        doc.setFont("helvetica", "bold");
-        doc.text(`Detalhes:`, 14, yPos);
-        doc.setFont("helvetica", "normal");
-        const detLines = doc.splitTextToSize(project.detailedDescription, 170);
-        doc.text(detLines, 35, yPos);
-        yPos += detLines.length * 5 + 2;
-    }
-    doc.setFont("helvetica", "bold");
-    doc.text(`Local: ${project.location || '-'} | Cidade: ${project.city || '-'}`, 14, yPos);
-    yPos += 6;
-    doc.text(`Responsável: ${project.responsible || '-'} | Centro de Custo: ${project.costCenter || '-'}`, 14, yPos);
-    yPos += 6;
-    doc.text(`Datas: Início ${formatDate(project.startDate)} | Fim Est. ${formatDate(project.estimatedEndDate)}`, 14, yPos);
-    yPos += 10;
-    doc.setDrawColor(200, 200, 200);
-    doc.line(14, yPos, 196, yPos);
-    yPos += 10;
-    doc.setFontSize(11);
-    doc.setTextColor(71, 122, 127);
-    doc.text("RESUMO FINANCEIRO", 14, yPos);
-    yPos += 8;
-    const summaryData = [["Orçamento Aprovado (Budget)", `R$ ${formatCurrency(project.estimatedValue)}`], ["Custo Realizado (Total)", `R$ ${formatCurrency(costs.totalReal)}`], ["Variação", `R$ ${formatCurrency(costs.variance)} (${costs.variancePercent.toFixed(1)}% utilizado)`]];
-    autoTable(doc, { startY: yPos, head: [], body: summaryData, theme: 'plain', styles: { fontSize: 10, cellPadding: 2 }, columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 }, 1: { halign: 'right' } } });
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-    doc.text("PLANEJAMENTO DE MATERIAIS (FÍSICO)", 14, yPos);
-    yPos += 5;
-    const materialRows = project.plannedMaterials.map(pm => {
-        const actual = getActualMaterialQty(project.id, pm.materialId);
-        const mat = materials.find(m => m.id === pm.materialId);
-        const diff = actual - pm.quantity;
-        return [mat?.code || '-', mat?.description || 'Item excluído', pm.quantity.toString(), actual.toString(), diff > 0 ? `+${diff}` : diff.toString()];
-    });
-    autoTable(doc, { startY: yPos, head: [['Cód', 'Material', 'Plan', 'Real', 'Var']], body: materialRows, styles: { fontSize: 8 }, headStyles: { fillColor: [71, 122, 127] }, columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'center' } } });
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-    doc.text("PLANEJAMENTO DE SERVIÇOS (HH)", 14, yPos);
-    yPos += 5;
-    const serviceRows = project.plannedServices.map(ps => {
-        const actual = getActualServiceHours(project.id, ps.serviceTypeId);
-        const srv = services.find(s => s.id === ps.serviceTypeId);
-        const diff = actual - ps.hours;
-        return [srv?.name || 'Serviço excluído', ps.hours.toString(), actual.toString(), diff > 0 ? `+${diff}` : diff.toString()];
-    });
-    autoTable(doc, { startY: yPos, head: [['Serviço', 'Plan (h)', 'Real (h)', 'Var']], body: serviceRows, styles: { fontSize: 8 }, headStyles: { fillColor: [71, 122, 127] }, columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'center' } } });
-    doc.save(`${project.code}_Detalhado.pdf`);
-  };
+  const fmt = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  const fmtCompact = (v: number) => v >= 1000 ? `R$ ${(v / 1000).toFixed(1)}k` : fmt(v);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Painel de Governança</h2>
-          <p className="text-slate-600 text-lg mt-1 font-medium">Visão consolidada de custos e performance industrial.</p>
+    <div className="space-y-6">
+
+      {/* Título */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+        <p className="text-slate-500 text-sm">
+          {now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        </p>
+      </div>
+
+      {/* ======= ROW 1: KPIs de OS ======= */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <KpiCard icon="fa-circle-dot"    label="OS Abertas"    value={kpis.osAbertas}     color="slate" />
+        <KpiCard icon="fa-play-circle"   label="Em Andamento"  value={kpis.osEmAndamento}  color="blue" />
+        <KpiCard icon="fa-pause-circle"  label="Pausadas"      value={kpis.osPausadas}     color="amber" />
+        <KpiCard icon="fa-check-circle"  label="Concluídas"    value={kpis.osConcluidas}   color="green" />
+        {/* ✅ NOVO */}
+        <KpiCard icon="fa-exclamation-triangle" label="SLA Atrasado"  value={kpis.osAtrasadas}    color="red"    highlight={kpis.osAtrasadas > 0} />
+        {/* ✅ NOVO */}
+        <KpiCard icon="fa-box-open"      label="Mat. em Falta"  value={kpis.materiaisAbaixoMin} color="orange" highlight={kpis.materiaisAbaixoMin > 0} />
+      </div>
+
+      {/* ======= ROW 2: Cards financeiros ======= */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+        {/* ✅ NOVO: Custo do mês */}
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-slate-500">Custo do Mês</p>
+            <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+              <i className="fas fa-wallet text-purple-500 text-sm"></i>
+            </div>
+          </div>
+          <p className="text-2xl font-black text-purple-700">{fmtCompact(kpis.custoMes)}</p>
+          <p className="text-xs text-slate-400 mt-1">OS abertas em {now.toLocaleDateString('pt-BR', { month: 'long' })}</p>
         </div>
-        <div className="flex items-center gap-3">
-            <button onClick={generateConsolidatedReport} className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-slate-900/20 transition-all flex items-center gap-2">
-                <i className="fas fa-file-invoice-dollar"></i> Relatório de Gastos
-            </button>
-            <span className="text-sm font-bold text-emerald-700 bg-emerald-50 px-4 py-2.5 rounded-lg border border-emerald-200 flex items-center gap-2">
-               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sistema Operante
-            </span>
+
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-slate-500">Projetos Ativos</p>
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+              <i className="fas fa-folder-open text-blue-500 text-sm"></i>
+            </div>
+          </div>
+          <p className="text-2xl font-black text-blue-700">{kpis.projetosAtivos}</p>
+          <p className="text-xs text-slate-400 mt-1">Capex em execução / planejamento</p>
+        </div>
+
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-slate-500">Orçamento Capex</p>
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+              <i className="fas fa-chart-bar text-emerald-500 text-sm"></i>
+            </div>
+          </div>
+          <p className="text-2xl font-black text-emerald-700">{fmtCompact(kpis.custoTotalCapex)}</p>
+          <p className="text-xs text-slate-400 mt-1">Valor estimado total dos projetos</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KpiCard title="Total Executado" value={`R$ ${formatCurrency(stats.totalSpent)}`} icon="fa-chart-line" color="emerald" sub="Realizado Acumulado" />
-        <KpiCard title="OS Críticas" value={stats.delayedOS.toString()} icon="fa-triangle-exclamation" color={stats.delayedOS > 0 ? "red" : "slate"} sub="Fora do SLA" />
-        <KpiCard title="Projetos Ativos" value={projects.length.toString()} icon="fa-network-wired" color="purple" sub="Em Andamento" />
-      </div>
+      {/* ======= ROW 3: Tabelas ======= */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden mt-6">
-        <div className="p-6 border-b border-slate-200 bg-slate-50">
-          <h3 className="text-lg font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
-            <i className="fas fa-table-list text-clean-primary"></i> Detalhamento de Custos por Projeto
-          </h3>
-          <p className="text-sm text-slate-500 mt-1 font-medium">Acompanhamento físico-financeiro detalhado.</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-base text-left">
-            <thead className="bg-white text-slate-500 font-bold uppercase text-xs border-b border-slate-200 tracking-wider">
-              <tr>
-                <th className="px-6 py-5">Código</th>
-                <th className="px-6 py-5">Descrição</th>
-                <th className="px-6 py-5 text-center">Início</th>
-                <th className="px-6 py-5 text-right">Orçamento (Plan)</th>
-                <th className="px-6 py-5 text-right">Custo Real</th>
-                <th className="px-6 py-5 text-right">Variação (R$)</th>
-                <th className="px-6 py-5 text-right">Var (%)</th>
-                <th className="px-6 py-5 text-center">Status</th>
-                <th className="px-6 py-5 text-center">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {sortedProjects.map(p => {
-                const costs = calculateProjectCosts(p, oss, materials, services);
-                const variance = costs.variance; 
-                const variancePercent = costs.variancePercent; 
-                const isPositive = variance >= 0; 
-                
-                return (
-                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-5 font-mono font-bold text-slate-700">{p.code}</td>
-                    <td className="px-6 py-5 font-bold text-slate-800">{p.description}</td>
-                    <td className="px-6 py-5 text-center text-slate-500 font-medium">{formatDate(p.startDate)}</td>
-                    <td className="px-6 py-5 text-right text-slate-600 font-medium">R$ {formatCurrency(p.estimatedValue)}</td>
-                    <td className="px-6 py-5 text-right font-bold text-slate-900">R$ {formatCurrency(costs.totalReal)}</td>
-                    <td className={`px-6 py-5 text-right font-black ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {isPositive ? '+' : ''} R$ {formatCurrency(variance)}
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                       <span className={`px-2.5 py-1 rounded-md text-sm font-bold border ${variancePercent > 100 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-                         {variancePercent.toFixed(1)}%
-                       </span>
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                        {getStatusBadge(p.status)}
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                       <button onClick={() => setShowDetail(p)} className="text-slate-400 hover:text-clean-primary transition-colors text-base font-bold flex items-center justify-center gap-1 mx-auto">
-                          Ver <i className="fas fa-chevron-right text-xs"></i>
-                       </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {showDetail && (
-        <ModalPortal>
-            <div className="fixed inset-0 z-[9999]">
-              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowDetail(null)} />
-              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
-                <div className="relative w-full max-w-4xl my-8 bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in duration-200">
-                    <div className="p-8 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
-                        <div>
-                        <h3 className="text-xl font-bold text-slate-900">Detalhamento Físico-Financeiro</h3>
-                        <p className="text-base text-slate-600 mt-1 font-medium">{showDetail.code} - {showDetail.description}</p>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => generateProjectDetailPDF(showDetail)} className="bg-slate-100 text-slate-700 hover:bg-slate-200 px-4 py-2 rounded-lg font-bold text-sm transition-all border border-slate-200 flex items-center gap-2">
-                                <i className="fas fa-print"></i> Imprimir PDF
-                            </button>
-                            <button onClick={() => setShowDetail(null)} className="w-10 h-10 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors"><i className="fas fa-times text-xl"></i></button>
-                        </div>
+        {/* OS Urgentes */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+              <i className="fas fa-fire text-red-500"></i> OS Prioritárias
+            </h2>
+            <span className="text-xs text-slate-400">{ossUrgentes.length} pendente(s)</span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {ossUrgentes.length === 0 && (
+              <p className="text-center text-slate-400 py-10 text-sm">
+                <i className="fas fa-check-circle text-green-300 text-2xl block mb-2"></i>
+                Nenhuma OS urgente
+              </p>
+            )}
+            {ossUrgentes.map(os => {
+              const late = new Date(os.limitDate) < now;
+              return (
+                <div key={os.id} className="px-5 py-3 flex items-center gap-3 hover:bg-slate-50">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="text-xs font-bold text-blue-600 font-mono">{os.number}</span>
+                      {late && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 rounded font-bold">ATRASADA</span>}
                     </div>
-                    
-                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar min-h-0">
-                        {(() => {
-                            const costs = calculateProjectCosts(showDetail, oss, materials, services);
-                            return (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-sm">
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Orçamento (Budget)</p>
-                                        <p className="text-2xl font-black text-slate-800">R$ {formatCurrency(showDetail.estimatedValue)}</p>
-                                    </div>
-                                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Custo Realizado</p>
-                                        <p className="text-2xl font-black text-blue-900">R$ {formatCurrency(costs.totalReal)}</p>
-                                        <div className="flex gap-3 text-[10px] uppercase font-bold mt-2 pt-2 border-t border-slate-100">
-                                            <span className="text-slate-500">Mat: <span className="text-slate-700">R$ {formatCurrency(costs.totalMaterials)}</span></span>
-                                            <span className="text-slate-500">Srv: <span className="text-slate-700">R$ {formatCurrency(costs.totalServices)}</span></span>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-                                        <div className={`absolute top-0 left-0 w-1 h-full ${costs.variance >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Saldo / Variação</p>
-                                        <p className={`text-2xl font-black ${costs.variance >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                                            {costs.variance >= 0 ? '+' : ''} R$ {formatCurrency(costs.variance)}
-                                        </p>
-                                        <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">{costs.variancePercent.toFixed(1)}% utilizado</p>
-                                    </div>
-                                </div>
-                            );
-                        })()}
-                        
-                        <div className="text-center text-slate-400 italic mt-8 border-t border-slate-100 pt-8">
-                            Para mais detalhes técnicos, acesse o módulo de Projetos.
-                        </div>
-                    </div>
+                    <p className="text-sm text-slate-700 truncate font-medium">{os.description}</p>
+                    <p className="text-xs text-slate-400">Limite: {new Date(os.limitDate).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-bold shrink-0 ${
+                    os.priority === 'CRITICAL' ? 'bg-red-100 text-red-700' :
+                    os.priority === 'HIGH' ? 'bg-amber-100 text-amber-700' :
+                    os.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-700' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    {os.priority === 'CRITICAL' ? 'Crítica' : os.priority === 'HIGH' ? 'Alta' : os.priority === 'MEDIUM' ? 'Média' : 'Baixa'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ✅ NOVO: Custo por empresa */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+              <i className="fas fa-building text-blue-500"></i> Custo por Empresa
+            </h2>
+            <span className="text-xs text-slate-400">via OS vinculadas</span>
+          </div>
+          <div className="p-5 space-y-4">
+            {costByCompany.every(c => c.total === 0) && (
+              <p className="text-center text-slate-400 py-4 text-sm">
+                <i className="fas fa-link-slash text-slate-300 text-2xl block mb-2"></i>
+                Vincule equipamentos a empresas para ver este gráfico
+              </p>
+            )}
+            {costByCompany.filter(c => c.total > 0).map(({ company, total }) => (
+              <div key={company}>
+                <div className="flex justify-between text-sm mb-1.5">
+                  <span className="font-medium text-slate-700 truncate">{company}</span>
+                  <span className="font-bold text-slate-900 ml-2 shrink-0">{fmtCompact(total)}</span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${(total / maxCompanyCost) * 100}%` }} />
                 </div>
               </div>
-            </div>
-        </ModalPortal>
+            ))}
+          </div>
+        </div>
+
+        {/* OS por tipo */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+              <i className="fas fa-tags text-slate-500"></i> OS por Tipo
+            </h2>
+          </div>
+          <div className="p-5 space-y-3">
+            {ossByType.length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Sem dados</p>}
+            {ossByType.map(([tipo, count]) => (
+              <div key={tipo}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-slate-700">{tipo}</span>
+                  <span className="font-bold text-slate-900">{count}</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${(count / (oss.length || 1)) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Movimentos recentes */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+              <i className="fas fa-exchange-alt text-slate-500"></i> Movimentos Recentes
+            </h2>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {recentMovements.length === 0 && (
+              <p className="text-center text-slate-400 py-10 text-sm">Nenhum movimento registrado</p>
+            )}
+            {recentMovements.map(mov => {
+              const mat = materials.find(m => m.id === mov.materialId);
+              const usr = users.find(u => u.id === mov.userId);
+              return (
+                <div key={mov.id} className="px-5 py-3 flex items-center gap-3">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs ${
+                    mov.type === 'IN' ? 'bg-green-100 text-green-600' :
+                    mov.type === 'OUT' ? 'bg-red-100 text-red-600' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    <i className={`fas ${mov.type === 'IN' ? 'fa-arrow-down' : mov.type === 'OUT' ? 'fa-arrow-up' : 'fa-arrows-alt-h'}`}></i>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{mat?.description || mov.materialId}</p>
+                    <p className="text-xs text-slate-400">{usr?.name || mov.userId} · {new Date(mov.date).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <span className={`text-sm font-bold shrink-0 ${mov.type === 'OUT' ? 'text-red-600' : 'text-green-600'}`}>
+                    {mov.type === 'OUT' ? '-' : '+'}{mov.quantity}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+// ======= KPI Card Component =======
+interface KpiCardProps {
+  icon: string;
+  label: string;
+  value: number;
+  color: 'slate' | 'blue' | 'amber' | 'green' | 'red' | 'orange' | 'purple';
+  highlight?: boolean;
+}
+
+const COLORS: Record<string, { bg: string; text: string; iconColor: string; ring: string }> = {
+  slate:  { bg: 'bg-slate-50',  text: 'text-slate-700',  iconColor: 'text-slate-400',  ring: 'ring-slate-200' },
+  blue:   { bg: 'bg-blue-50',   text: 'text-blue-700',   iconColor: 'text-blue-400',   ring: 'ring-blue-200' },
+  amber:  { bg: 'bg-amber-50',  text: 'text-amber-700',  iconColor: 'text-amber-400',  ring: 'ring-amber-200' },
+  green:  { bg: 'bg-green-50',  text: 'text-green-700',  iconColor: 'text-green-400',  ring: 'ring-green-200' },
+  red:    { bg: 'bg-red-50',    text: 'text-red-700',    iconColor: 'text-red-400',    ring: 'ring-red-300' },
+  orange: { bg: 'bg-orange-50', text: 'text-orange-700', iconColor: 'text-orange-400', ring: 'ring-orange-300' },
+  purple: { bg: 'bg-purple-50', text: 'text-purple-700', iconColor: 'text-purple-400', ring: 'ring-purple-200' },
+};
+
+const KpiCard: React.FC<KpiCardProps> = ({ icon, label, value, color, highlight }) => {
+  const c = COLORS[color] || COLORS.slate;
+  return (
+    <div className={`rounded-xl p-4 shadow-sm border border-slate-100 ${c.bg} ${highlight ? `ring-2 ${c.ring}` : ''}`}>
+      <div className="flex items-center justify-between mb-2">
+        <p className={`text-xs font-semibold ${c.text} leading-tight`}>{label}</p>
+        <i className={`fas ${icon} ${c.iconColor} text-base`}></i>
+      </div>
+      <p className={`text-3xl font-black ${c.text}`}>{value}</p>
+      {highlight && value > 0 && (
+        <p className={`text-[10px] font-bold mt-1 ${c.text} opacity-70`}>Requer atenção</p>
       )}
     </div>
   );
