@@ -76,8 +76,11 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
-  const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
-  const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
+    const [pauseWorkNotes, setPauseWorkNotes] = useState('');
+const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
+    const [sortRecentOpen, setSortRecentOpen] = useState(false);
+  const [slaOverdueOnly, setSlaOverdueOnly] = useState(false);
+const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
   
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE, executorIds: [] });
   const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING' | 'EQUIPMENT'>('PROJECT');
@@ -401,6 +404,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       }
 
       setShowModal(false);
+    setPauseWorkNotes('');
       setFormOS({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
       setCreationContext('PROJECT');
       setPlannedMaterials([]);
@@ -696,7 +700,24 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-200 pb-6">
         <div><h2 className="text-3xl font-bold text-slate-900 tracking-tight">Ordens de Serviço</h2><p className="text-slate-600 text-lg mt-1 font-medium">Gestão Operacional e Apontamentos.</p></div>
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-center">
-            <div className="flex gap-2 w-full md:w-auto"><div className="relative group w-full md:w-56"><i className={`fas ${searchTerm !== searchInput ? 'fa-spinner fa-spin' : 'fa-search'} absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg transition-all`}></i><input type="text" placeholder="Buscar OS..." className="w-full h-12 pl-12 pr-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={searchInput} onChange={e => setSearchInput(e.target.value)} /></div><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}><option value="ALL">Todos Status</option>{Object.values(OSStatus).map(s => <option key={s} value={s}>{s}</option>)}</select><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)}><option value="ALL">Todas Prioridades</option><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></div>
+            <div className="flex gap-2 w-full md:w-auto"><div className="relative group w-full md:w-56"><i className={`fas ${searchTerm !== searchInput ? 'fa-spinner fa-spin' : 'fa-search'} absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg transition-all`}></i><input type="text" placeholder="Buscar OS..." className="w-full h-12 pl-12 pr-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={searchInput} onChange={e => setSearchInput(e.target.value)} /></div><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}><option value="ALL">Todos Status</option>{Object.values(OSStatus).map(s => <option key={s} value={s}>{s}</option>)}</select>
+
+<button
+  type="button"
+  onClick={() => setSortRecentOpen(v => !v)}
+  className={`h-9 px-3 rounded-lg text-xs font-bold border ${sortRecentOpen ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'}`}
+>
+  Mais recentes abertas
+</button>
+
+<button
+  type="button"
+  onClick={() => setSlaOverdueOnly(v => !v)}
+  className={`h-9 px-3 rounded-lg text-xs font-bold border ${slaOverdueOnly ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-700 border-slate-200'}`}
+>
+  SLA atrasado
+</button>
+<select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)}><option value="ALL">Todas Prioridades</option><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></div>
             <div className="flex gap-2 w-full md:w-auto"><button onClick={openNewOS} className="flex-1 md:flex-none bg-clean-primary text-white px-6 rounded-xl font-bold text-base uppercase tracking-wide hover:bg-clean-primary/90 transition-all shadow-lg shadow-clean-primary/20 h-12 whitespace-nowrap"><i className="fas fa-plus mr-2"></i> Abrir OS</button></div>
         </div>
       </header>
