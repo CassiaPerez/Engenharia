@@ -29,58 +29,12 @@ const ITEMS_PER_PAGE = 9;
 const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments = [], materials, setMaterials, services, users, setUsers, movements, onStockChange, currentUser }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
-  
-
-// --- CUSTO DE MATERIAIS E SERVIÇOS (itens avulsos) ---
-const addCostItem = () => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: [
-        ...(prev.costItems || []),
-        {
-          id: Math.random().toString(36).substr(2, 9),
-          type: 'MATERIAL',
-          description: '',
-          amount: 0,
-        },
-      ],
-    };
-  });
-};
-
-const updateCostItem = (id: string, patch: any) => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: (prev.costItems || []).map((item: any) =>
-        item.id === id ? { ...item, ...patch } : item
-      ),
-    };
-  });
-};
-
-const removeCostItem = (id: string) => {
-  setSelectedOS((prev: any) => {
-    if (!prev) return prev;
-    return {
-      ...prev,
-      costItems: (prev.costItems || []).filter((item: any) => item.id !== id),
-    };
-  });
-};
-
-const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
+  const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
-    const [pauseWorkNotes, setPauseWorkNotes] = useState('');
-const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
-    const [sortRecentOpen, setSortRecentOpen] = useState(false);
-  const [slaOverdueOnly, setSlaOverdueOnly] = useState(false);
-const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
+  const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
   
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE, executorIds: [] });
   const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING' | 'EQUIPMENT'>('PROJECT');
@@ -149,6 +103,16 @@ const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 
           }
       }
   };
+
+// --- Nome do solicitante (fallback por requesterId) ---
+const getRequesterDisplayName = (os: any) => {
+  if (!os) return 'Não informado';
+  if (os.requesterName && String(os.requesterName).trim()) return os.requesterName;
+  const uid = os.requesterId;
+  const u: any = users.find(us => us.id === uid);
+  return (u?.name || u?.full_name || u?.nome || u?.email || 'Não informado') as string;
+};
+
 
   const handlePriorityChange = async (newPriority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL') => {
       if (!selectedOS) return;
@@ -404,7 +368,6 @@ const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 
       }
 
       setShowModal(false);
-    setPauseWorkNotes('');
       setFormOS({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE });
       setCreationContext('PROJECT');
       setPlannedMaterials([]);
@@ -700,24 +663,7 @@ const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-200 pb-6">
         <div><h2 className="text-3xl font-bold text-slate-900 tracking-tight">Ordens de Serviço</h2><p className="text-slate-600 text-lg mt-1 font-medium">Gestão Operacional e Apontamentos.</p></div>
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-center">
-            <div className="flex gap-2 w-full md:w-auto"><div className="relative group w-full md:w-56"><i className={`fas ${searchTerm !== searchInput ? 'fa-spinner fa-spin' : 'fa-search'} absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg transition-all`}></i><input type="text" placeholder="Buscar OS..." className="w-full h-12 pl-12 pr-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={searchInput} onChange={e => setSearchInput(e.target.value)} /></div><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}><option value="ALL">Todos Status</option>{Object.values(OSStatus).map(s => <option key={s} value={s}>{s}</option>)}</select>
-
-<button
-  type="button"
-  onClick={() => setSortRecentOpen(v => !v)}
-  className={`h-9 px-3 rounded-lg text-xs font-bold border ${sortRecentOpen ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'}`}
->
-  Mais recentes abertas
-</button>
-
-<button
-  type="button"
-  onClick={() => setSlaOverdueOnly(v => !v)}
-  className={`h-9 px-3 rounded-lg text-xs font-bold border ${slaOverdueOnly ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-700 border-slate-200'}`}
->
-  SLA atrasado
-</button>
-<select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)}><option value="ALL">Todas Prioridades</option><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></div>
+            <div className="flex gap-2 w-full md:w-auto"><div className="relative group w-full md:w-56"><i className={`fas ${searchTerm !== searchInput ? 'fa-spinner fa-spin' : 'fa-search'} absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg transition-all`}></i><input type="text" placeholder="Buscar OS..." className="w-full h-12 pl-12 pr-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={searchInput} onChange={e => setSearchInput(e.target.value)} /></div><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}><option value="ALL">Todos Status</option>{Object.values(OSStatus).map(s => <option key={s} value={s}>{s}</option>)}</select><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)}><option value="ALL">Todas Prioridades</option><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></div>
             <div className="flex gap-2 w-full md:w-auto"><button onClick={openNewOS} className="flex-1 md:flex-none bg-clean-primary text-white px-6 rounded-xl font-bold text-base uppercase tracking-wide hover:bg-clean-primary/90 transition-all shadow-lg shadow-clean-primary/20 h-12 whitespace-nowrap"><i className="fas fa-plus mr-2"></i> Abrir OS</button></div>
         </div>
       </header>
@@ -763,6 +709,10 @@ const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 
                        <span className="text-slate-400 italic">Sem executor</span>
                      )}
                    </p>
+                   <p className="text-sm text-slate-600">
+                     <span className="font-bold text-slate-500">Solicitante:</span>
+                     <span className="ml-2 font-semibold text-slate-700">{getRequesterDisplayName(os)}</span>
+                   </p>
                  </div>
                  <div className="grid grid-cols-2 gap-4 text-base mb-6"><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Materiais</span><span className="font-bold text-slate-800 text-lg">R$ {formatCurrency(costs.materialCost)}</span></div><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Mão de Obra</span><span className="font-bold text-slate-800 text-lg">{os.services.reduce((a,b)=>a+b.quantity,0)} h</span></div></div>
                  <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto"><span title={getStatusTooltip(os.status)} className={`text-sm font-bold uppercase px-3 py-1.5 rounded cursor-help ${os.status === 'COMPLETED' ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' : os.status === 'IN_PROGRESS' ? 'text-blue-800 bg-blue-100 border border-blue-200' : 'text-slate-700 bg-slate-100 border border-slate-200'}`}>{os.status.replace('_', ' ')}</span><button onClick={() => setSelectedOS(os)} className="text-base font-bold text-slate-700 hover:text-white hover:bg-clean-primary px-5 py-2.5 rounded-lg transition-all border border-slate-300 hover:border-clean-primary hover:shadow-md"><i className="fas fa-pen-to-square mr-2"></i> {os.status === OSStatus.COMPLETED ? 'Visualizar' : 'Gerenciar'}</button></div>
@@ -780,7 +730,7 @@ const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 
             <div className="fixed inset-0 z-[9999]">
               <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity" onClick={() => setSelectedOS(null)} />
               <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
-                <div className="relative w-full max-w-6xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden overflow-x-hidden flex flex-col max-h-[90vh]">
+                <div className="relative w-full max-w-6xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                     <div className={`px-8 py-6 border-b border-slate-100 rounded-t-2xl flex justify-between items-center shrink-0 ${
                       selectedOS.priority === 'CRITICAL' ? 'bg-red-50 border-l-8 border-l-red-600' :
                       selectedOS.priority === 'HIGH' ? 'bg-orange-50 border-l-4 border-l-orange-500' :
@@ -836,13 +786,13 @@ const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 
                                         {selectedOS.projectId && <p className="text-xs text-slate-500">Herdado do Projeto</p>}
                                     </div>
                                 </div>
-                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'EXECUTOR') && selectedOS.requesterName && (
+                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'EXECUTOR') && (
                                   <div>
                                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Solicitante</p>
                                       <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
                                           <p className="font-bold text-blue-900 flex items-center gap-2">
                                               <i className="fas fa-user text-sm"></i>
-                                              {selectedOS.requesterName}
+                                              {getRequesterDisplayName(selectedOS)}
                                           </p>
                                       </div>
                                   </div>
@@ -1038,7 +988,7 @@ const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 
 Custo de Materiais e Serviços</label>
 <div className="space-y-2">
   {(selectedOS.costItems || []).map((item, idx) => (
-    <div key={item.id} className="flex flex-wrap items-center gap-2">
+    <div key={item.id} className="flex gap-2">
       <select
         className="h-9 px-2 border border-slate-200 rounded-lg text-xs font-bold"
         value={item.type}
@@ -1056,15 +1006,15 @@ Custo de Materiais e Serviços</label>
       <input
         type="number"
         step="0.01"
-        className="w-32 min-w-[120px] h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
-        placeholder="Valor (R$)"
+        className="w-24 h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right"
+        placeholder="R$"
         value={item.amount}
         onChange={(e) => updateCostItem(item.id, { amount: Number(e.target.value) })}
       />
       <button
         type="button"
         onClick={() => removeCostItem(item.id)}
-        className="px-2 text-red-500 whitespace-nowrap"
+        className="px-2 text-red-500"
       >
         ✕
       </button>
@@ -1079,6 +1029,7 @@ Custo de Materiais e Serviços</label>
   </button>
 </div>
 <label className="text-xs font-semibold text-slate-600 mb-1 block">Totais</label>
+</label>
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-slate-500">R$</span>
                                           <input
