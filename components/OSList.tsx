@@ -484,6 +484,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
     const doc = new jsPDF();
     const context = getContextInfo(os);
     const osExecutors = os.executorIds ? users.filter(u => os.executorIds?.includes(u.id)) : (os.executorId ? [users.find(u => u.id === os.executorId)].filter(Boolean) : []);
+            const requesterName = (os as any).requesterName || ((os as any).requesterId ? (users.find(u => u.id === (os as any).requesterId)?.name) : undefined) || 'Não informado';
     const executorNames = osExecutors.length > 0 ? osExecutors.map(e => e?.name).join(', ') : 'Não Atribuído';
     const costs = calculateOSCosts(os, materials, services);
 
@@ -741,6 +742,13 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                      ) : (
                        <span className="text-slate-400 italic">Sem executor</span>
                      )}
+                   </p>
+                   <p className="text-sm text-slate-600 font-medium flex items-center gap-2 mt-1">
+                     <i className="fas fa-user text-slate-400 w-4"></i>
+                     <span className="text-slate-700">
+                       <span className="text-slate-500">Solicitante:</span>{" "}
+                       <span className="font-bold">{requesterName}</span>
+                     </span>
                    </p>
                  </div>
                  <div className="grid grid-cols-2 gap-4 text-base mb-6"><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Materiais</span><span className="font-bold text-slate-800 text-lg">R$ {formatCurrency(costs.materialCost)}</span></div><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Mão de Obra</span><span className="font-bold text-slate-800 text-lg">{os.services.reduce((a,b)=>a+b.quantity,0)} h</span></div></div>
@@ -1313,6 +1321,14 @@ Custo de Materiais e Serviços</label>
                                 )}
                                 </div>
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição</label><textarea required className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium h-24" value={formOS.description} onChange={e => setFormOS({...formOS, description: e.target.value})} /></div>
+                                <div>
+                                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Solicitante</label>
+                                  <div className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 flex items-center">
+                                    <i className="fas fa-user mr-2 text-slate-400"></i>
+                                    {currentUser?.name || 'Não informado'}
+                                  </div>
+                                  <p className="text-xs text-slate-500 mt-1.5 ml-1">O solicitante é automaticamente o usuário logado que abriu a OS.</p>
+                                </div>
                                 <div className="grid grid-cols-2 gap-6">
                                 <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tipo</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold" value={formOS.type} onChange={e => setFormOS({...formOS, type: e.target.value as any})}>{Object.values(OSType).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                                 <div>
