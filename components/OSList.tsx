@@ -472,6 +472,16 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   };
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const getRequesterName = (os: any): string => {
+    if (os?.requesterName) return String(os.requesterName);
+    if (os?.requesterId) {
+      const u = users.find(x => x.id === os.requesterId);
+      if (u?.name) return u.name;
+    }
+    return 'Não informado';
+  };
+
   const getStatusTooltip = (status: OSStatus) => { switch (status) { case OSStatus.OPEN: return 'Aguardando início.'; case OSStatus.IN_PROGRESS: return 'Atividade em execução.'; case OSStatus.PAUSED: return 'Atividade paralisada.'; case OSStatus.COMPLETED: return 'Atividade concluída.'; case OSStatus.CANCELED: return 'Atividade cancelada.'; default: return ''; } };
   const getContextInfo = (os: OS) => { 
       if (os.projectId) { const p = projects.find(proj => proj.id === os.projectId); return { label: p?.code || 'N/A', sub: p?.city || '', type: 'PROJECT' }; } 
@@ -523,7 +533,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         ["Status", os.status],
         ["Prioridade", translatePriority(os.priority)],
         ["Tipo", os.type],
-        ["Solicitante", os.requesterName || 'Não informado'],
+        ["Solicitante", getRequesterName(os)],
         ["Executor(es)", executorNames],
         ["Abertura", new Date(os.openDate).toLocaleString()],
         ["Prazo Limite", new Date(os.limitDate).toLocaleString()]
@@ -736,7 +746,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                      <i className="fas fa-user text-slate-400 w-4"></i>
                      <span className="text-slate-700">
                        <span className="text-slate-500">Solicitante:</span>{" "}
-                       <span className="font-bold">{os.requesterName || "Não informado"}</span>
+                       <span className="font-bold">{getRequesterName(os)}</span>
                      </span>
                    </p>
                    <p className="text-sm text-slate-600 font-medium flex items-center gap-2">
@@ -822,13 +832,13 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                                         {selectedOS.projectId && <p className="text-xs text-slate-500">Herdado do Projeto</p>}
                                     </div>
                                 </div>
-                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'EXECUTOR') && selectedOS.requesterName && (
+                                {(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'EXECUTOR') && (
                                   <div>
                                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">Solicitante</p>
                                       <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
                                           <p className="font-bold text-blue-900 flex items-center gap-2">
                                               <i className="fas fa-user text-sm"></i>
-                                              {selectedOS.requesterName}
+                                              {getRequesterName(selectedOS)}
                                           </p>
                                       </div>
                                   </div>
