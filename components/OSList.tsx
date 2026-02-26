@@ -1029,7 +1029,6 @@ Custo de Materiais e Serviços</label>
   </button>
 </div>
 <label className="text-xs font-semibold text-slate-600 mb-1 block">Totais</label>
-</label>
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-slate-500">R$</span>
                                           <input
