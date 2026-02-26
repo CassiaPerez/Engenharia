@@ -30,7 +30,16 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, sub }) => 
     
     const colors = getColorClasses(color);
 
-    return (
+    
+
+// Modelos de indicadores (base para relatórios micro/macro)
+const modelCards = [
+  { title: 'Custo por empresa', desc: 'Soma de baixas + custos de OS no período.' },
+  { title: 'Horas por executor', desc: 'Apontamento por período (inclui pausas).' },
+  { title: 'SLA atrasado', desc: 'OS com prazo limite vencido e não finalizadas.' },
+  { title: 'Custo por setor/equipamento', desc: 'Requer árvore de bens (empresa > setor > equipamento).' },
+];
+return (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between group hover:shadow-md transition-all relative overflow-hidden">
             <div className={`absolute right-0 top-0 p-3 opacity-10 text-9xl -mr-6 -mt-6 pointer-events-none group-hover:scale-110 transition-transform ${colors.icon}`}>
                 <i className={`fas ${icon}`}></i>
