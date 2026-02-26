@@ -1,113 +1,126 @@
+import { EngineDB, Equipment, MaterialWithdrawal, OS, PauseEvent, Project, User } from "../types";
 
-import { OS, Material, ServiceType, Project, OSStatus, ServiceCostType } from '../types';
+const LS_KEY = "engine_db_v1";
 
-export const calculateOSCosts = (os: OS, materials: Material[], services: ServiceType[]) => {
-  // Usa valor manual se definido, senão calcula pela soma dos itens
-  const calculatedMaterialCost = os.materials.reduce((acc, item) => {
-    return acc + (item.quantity * item.unitCost);
-  }, 0);
-
-  const calculatedServiceCost = os.services.reduce((acc, srvEntry) => {
-    return acc + (srvEntry.quantity * srvEntry.unitCost);
-  }, 0);
-
-  const materialCost = os.manualMaterialCost !== undefined && os.manualMaterialCost !== null
-    ? os.manualMaterialCost
-    : calculatedMaterialCost;
-
-  const serviceCost = os.manualServiceCost !== undefined && os.manualServiceCost !== null
-    ? os.manualServiceCost
-    : calculatedServiceCost;
-
-  return {
-    materialCost,
-    serviceCost,
-    totalCost: materialCost + serviceCost,
-    isManualMaterial: os.manualMaterialCost !== undefined && os.manualMaterialCost !== null,
-    isManualService: os.manualServiceCost !== undefined && os.manualServiceCost !== null
-  };
-};
-
-export const calculateProjectCosts = (project: Project, oss: OS[], materials: Material[], services: ServiceType[]) => {
-  const projectOSs = oss.filter(os => os.projectId === project.id);
-
-  let totalMaterials = 0;
-  let totalServices = 0;
-
-  projectOSs.forEach(os => {
-    const costs = calculateOSCosts(os, materials, services);
-    totalMaterials += costs.materialCost;
-    totalServices += costs.serviceCost;
+function uuid(): string {
+  // uuid simples suficiente para storage local
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
   });
+}
 
-  // Adiciona valores manuais do projeto se definidos
-  if (project.manualMaterialCost !== undefined && project.manualMaterialCost !== null) {
-    totalMaterials += project.manualMaterialCost;
-  }
-  if (project.manualServiceCost !== undefined && project.manualServiceCost !== null) {
-    totalServices += project.manualServiceCost;
-  }
+function nowISO(): string {
+  return new Date().toISOString();
+}
 
-  const totalReal = totalMaterials + totalServices;
-
+function defaultDB(): EngineDB {
   return {
-    totalMaterials,
-    totalServices,
-    totalReal,
-    variance: project.estimatedValue - totalReal,
-    variancePercent: project.estimatedValue > 0 ? (totalReal / project.estimatedValue) * 100 : 0
+    os: [],
+    projects: [],
+    equipments: [],
+    withdrawals: [],
+    users: [],
   };
-};
+}
 
-export const calculatePlannedCosts = (project: Partial<Project>, materials: Material[], services: ServiceType[]) => {
-  const matCost = (project.plannedMaterials || []).reduce((acc, pm) => {
-    // Usa o custo manual definido no planejamento, ou fallback para o cadastro se não existir (compatibilidade)
-    const manualCost = pm.unitCost;
-    const catalogCost = materials.find(m => m.id === pm.materialId)?.unitCost || 0;
-    const finalCost = manualCost !== undefined ? manualCost : catalogCost;
-    
-    return acc + (pm.quantity * finalCost);
-  }, 0);
+export const engine = {
+  load(): EngineDB {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return defaultDB();
+      const parsed = JSON.parse(raw) as EngineDB;
+      // fallback de campos novos
+      parsed.withdrawals = parsed.withdrawals || [];
+      parsed.projects = parsed.projects || [];
+      parsed.equipments = parsed.equipments || [];
+      parsed.users = parsed.users || [];
+      parsed.os = (parsed.os || []).map(o => ({
+        ...o,
+        createdAt: o.createdAt || nowISO(),
+        executions: o.executions || [],
+        withdrawals: o.withdrawals || [],
+      }));
+      return parsed;
+    } catch {
+      return defaultDB();
+    }
+  },
 
-  const srvCost = (project.plannedServices || []).reduce((acc, ps) => {
-    // Usa o custo manual definido no planejamento
-    const manualCost = ps.unitCost;
-    const catalogCost = services.find(s => s.id === ps.serviceTypeId)?.unitValue || 0;
-    const finalCost = manualCost !== undefined ? manualCost : catalogCost;
+  save(db: EngineDB) {
+    localStorage.setItem(LS_KEY, JSON.stringify(db));
+  },
 
-    return acc + (ps.hours * finalCost); 
-  }, 0);
+  uuid,
 
-  return {
-    matCost,
-    srvCost,
-    totalPlanned: matCost + srvCost
-  };
-};
+  // PAUSE HISTORY helpers
+  addPauseEvent(osId: string, executorId: string, ev: Omit<PauseEvent, "id">) {
+    const db = this.load();
+    const os = db.os.find(o => o.id === osId);
+    if (!os) return;
 
-export const checkSLA = (limitDate: string, completionDate?: string) => {
-  const limit = new Date(limitDate);
-  const completion = completionDate ? new Date(completionDate) : new Date();
-  return completion <= limit;
-};
+    const ex = (os.executions || []).find(e => e.executorId === executorId);
+    if (!ex) return;
 
-export const formatDate = (dateStr: string) => {
-  if (!dateStr) return '---';
-  return new Date(dateStr).toLocaleDateString('pt-BR');
-};
+    ex.pauseHistory = ex.pauseHistory || [];
+    ex.pauseHistory.push({ ...ev, id: uuid() });
 
-export const getStatusColor = (status: string) => {
-  switch (status) {
-    case OSStatus.COMPLETED:
-    case 'FINISHED':
-      return 'emerald';
-    case OSStatus.IN_PROGRESS:
-      return 'blue';
-    case OSStatus.OPEN:
-      return 'amber';
-    case OSStatus.CANCELED:
-      return 'slate';
-    default:
-      return 'slate';
-  }
+    this.save(db);
+  },
+
+  // withdrawals (baixas)
+  addWithdrawal(withdrawal: Omit<MaterialWithdrawal, "id" | "createdAt">) {
+    const db = this.load();
+    const w: MaterialWithdrawal = {
+      ...withdrawal,
+      id: uuid(),
+      createdAt: nowISO(),
+    };
+    db.withdrawals.unshift(w);
+
+    if (w.osId) {
+      const os = db.os.find(o => o.id === w.osId);
+      if (os) {
+        os.withdrawals = os.withdrawals || [];
+        os.withdrawals.unshift(w);
+      }
+    }
+
+    this.save(db);
+    return w;
+  },
+
+  // Equipment update with new fields (company/sector/parentEquipmentId)
+  upsertEquipment(eq: Equipment) {
+    const db = this.load();
+    const idx = db.equipments.findIndex(e => e.id === eq.id);
+    if (idx >= 0) db.equipments[idx] = { ...db.equipments[idx], ...eq };
+    else db.equipments.unshift(eq);
+    this.save(db);
+  },
+
+  upsertProject(p: Project) {
+    const db = this.load();
+    const idx = db.projects.findIndex(x => x.id === p.id);
+    if (idx >= 0) db.projects[idx] = { ...db.projects[idx], ...p };
+    else db.projects.unshift(p);
+    this.save(db);
+  },
+
+  upsertUser(u: User) {
+    const db = this.load();
+    const idx = db.users.findIndex(x => x.id === u.id);
+    if (idx >= 0) db.users[idx] = { ...db.users[idx], ...u };
+    else db.users.unshift(u);
+    this.save(db);
+  },
+
+  upsertOS(o: OS) {
+    const db = this.load();
+    const idx = db.os.findIndex(x => x.id === o.id);
+    if (idx >= 0) db.os[idx] = { ...db.os[idx], ...o };
+    else db.os.unshift(o);
+    this.save(db);
+  },
 };
