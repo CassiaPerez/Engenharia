@@ -1,3 +1,4 @@
+
 export enum ProjectStatus {
   PLANNED = 'PLANNED',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -47,25 +48,18 @@ export interface Building {
   notes?: string;
 }
 
-// ✅ NOVO: Tipo das empresas do grupo para Árvore de Bens
-export type CompanyName = 'Cropbio' | 'Cropfert Industria' | 'Cropfert Jandaia' | 'Cropfert do Brasil';
-
 export interface Equipment {
   id: string;
-  code: string;        // TAG do equipamento
+  code: string;     // TAG do equipamento
   name: string;
   description: string;
-  location: string;    // Local físico do equipamento
+  location: string; // Empresa proprietária
   model: string;
   serialNumber: string;
   manufacturer: string;
   status: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE';
   purchaseDate?: string;
   notes?: string;
-  // ✅ NOVOS campos para Árvore de Bens (retrocompatíveis - opcionais)
-  company?: CompanyName | string;  // Empresa proprietária
-  sector?: string;                  // Setor dentro da empresa
-  buildingId?: string;              // Vínculo com prédio/unidade
 }
 
 export interface StockLocation {
@@ -81,9 +75,9 @@ export interface Material {
   unit: string;
   unitCost: number;
   minStock: number;
-  currentStock: number;
-  location: string;
-  stockLocations?: StockLocation[];
+  currentStock: number; // Soma total de todos os locais
+  location: string; // Local principal/padrão (display)
+  stockLocations?: StockLocation[]; // Detalhamento por local
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -91,7 +85,7 @@ export interface ServiceType {
   id: string;
   name: string;
   description: string;
-  team: string;
+  team: string; /* Time/Equipe responsável */
   costType: ServiceCostType;
   unitValue: number;
   category: 'INTERNAL' | 'EXTERNAL';
@@ -135,15 +129,6 @@ export interface Project {
   manualServiceCost?: number;
 }
 
-// ✅ NOVO: Interface tipada para entradas no histórico de pausas
-export interface PauseEntry {
-  timestamp: string;             // ISO datetime da ação
-  reason: string;                // Motivo da pausa ou texto de início/retomada
-  workDoneDescription?: string;  // O que foi feito até o momento da pausa (opcional)
-  userId: string;
-  action: 'PAUSE' | 'RESUME';
-}
-
 export interface OS {
   id: string;
   number: string;
@@ -165,8 +150,7 @@ export interface OS {
   startTime?: string;
   endTime?: string;
   pauseReason?: string;
-  // ✅ ATUALIZADO: usa PauseEntry tipado (retrocompatível com dados antigos)
-  pauseHistory?: PauseEntry[];
+  pauseHistory?: { timestamp: string; reason: string; userId: string; action: 'PAUSE' | 'RESUME' }[];
   completionImage?: string;
   executionDescription?: string;
   materials: OSItem[];
@@ -198,16 +182,16 @@ export interface StockMovement {
   date: string;
   userId: string;
   osId?: string;
-  projectId?: string;
-  costCenter?: string;
+  projectId?: string; // Para baixa direta em projeto
+  costCenter?: string; // Centro de custo da OS ou Projeto
   description: string;
-  fromLocation?: string;
-  toLocation?: string;
+  fromLocation?: string; // Para transferências e saídas
+  toLocation?: string;   // Para transferências e entradas
 }
 
 export interface SupplierDoc {
   name: string;
-  url: string;
+  url: string; /* Base64 ou URL */
   type: string;
   uploadDate: string;
 }
@@ -236,6 +220,11 @@ export interface PurchaseRecord {
   invoiceNumber: string;
 }
 
+// User Role Definitions
+// WAREHOUSE: Almoxarife Geral (Supervisor)
+// WAREHOUSE_BIO: Almoxarife Unidade CropBio
+// WAREHOUSE_FERT: Almoxarife Unidade CropFert
+// COORDINATOR: Coordenador (repassa serviços para executores e cadastra equipamentos)
 export type UserRole = 'ADMIN' | 'MANAGER' | 'COORDINATOR' | 'EXECUTOR' | 'USER' | 'WAREHOUSE' | 'WAREHOUSE_BIO' | 'WAREHOUSE_FERT';
 
 export interface User {
@@ -245,7 +234,7 @@ export interface User {
   password: string;
   role: UserRole;
   department?: string;
-  company?: string;
+  company?: string; // Empresa do usuário (Cropbio, Cropfert, etc)
   active: boolean;
   avatar?: string;
 }

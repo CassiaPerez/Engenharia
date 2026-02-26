@@ -1,491 +1,306 @@
-import React, { useState, useMemo } from 'react';
-import { Equipment, User, OS, CompanyName } from '../types';
-import { supabase, mapToSupabase } from '../services/supabase';
 
-interface EquipmentManagerProps {
+import React, { useState } from 'react';
+import { Equipment, User } from '../types';
+import { supabase, mapToSupabase } from '../services/supabase';
+import ModalPortal from './ModalPortal';
+
+interface Props {
   equipments: Equipment[];
   setEquipments: React.Dispatch<React.SetStateAction<Equipment[]>>;
   currentUser: User;
-  oss?: OS[];  // ✅ NOVO: para calcular custo acumulado na Árvore de Bens
 }
 
-const COMPANIES: CompanyName[] = [
-  'Cropbio',
-  'Cropfert Industria',
-  'Cropfert Jandaia',
-  'Cropfert do Brasil',
-];
-
-const EMPTY_FORM: Partial<Equipment> = {
-  code: '', name: '', description: '', location: '',
-  model: '', serialNumber: '', manufacturer: '',
-  status: 'ACTIVE', notes: '', purchaseDate: '',
-  company: undefined, sector: '', buildingId: undefined,
-};
-
-const STATUS_CFG: Record<string, { label: string; color: string; icon: string; dot: string }> = {
-  ACTIVE:      { label: 'Ativo',      color: 'bg-green-100 text-green-700',  icon: 'fa-check-circle', dot: 'bg-green-500' },
-  MAINTENANCE: { label: 'Manutenção', color: 'bg-amber-100 text-amber-700',  icon: 'fa-tools',        dot: 'bg-amber-500' },
-  INACTIVE:    { label: 'Inativo',    color: 'bg-red-100 text-red-700',      icon: 'fa-times-circle', dot: 'bg-red-400'   },
-};
-
-const EquipmentManager: React.FC<EquipmentManagerProps> = ({
-  equipments, setEquipments, currentUser, oss = []
-}) => {
-  const [view, setView] = useState<'list' | 'tree'>('list');
-  const [showForm, setShowForm] = useState(false);
+const EquipmentManager: React.FC<Props> = ({ equipments, setEquipments, currentUser }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState<Partial<Equipment>>({ status: 'ACTIVE' });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<Partial<Equipment>>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
-  const [filterCompany, setFilterCompany] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCompany, setFilterCompany] = useState(currentUser.role !== 'ADMIN' && currentUser.company ? currentUser.company : '');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterManufacturer, setFilterManufacturer] = useState('');
 
-  const canEdit = ['ADMIN', 'MANAGER', 'COORDINATOR'].includes(currentUser.role);
-
-  const setField = (k: keyof Equipment, v: any) => setForm(p => ({ ...p, [k]: v }));
-
-  // ✅ Custo acumulado por equipamento (via OS vinculadas)
-  const costByEq = useMemo(() => {
-    const map: Record<string, { total: number; osCount: number }> = {};
-    oss.forEach(o => {
-      if (!o.equipmentId) return;
-      const matCost = o.materials.reduce((s, m) => s + m.quantity * m.unitCost, 0);
-      const svcCost = o.services.reduce((s, sv) => s + sv.quantity * sv.unitCost, 0);
-      const cost = matCost + svcCost + (o.manualMaterialCost || 0) + (o.manualServiceCost || 0);
-      if (!map[o.equipmentId]) map[o.equipmentId] = { total: 0, osCount: 0 };
-      map[o.equipmentId].total   += cost;
-      map[o.equipmentId].osCount += 1;
-    });
-    return map;
-  }, [oss]);
-
-  // Filtro para lista
-  const filteredEqs = useMemo(() => {
-    const q = search.toLowerCase();
-    return equipments.filter(eq => {
-      const matchSearch = !q || [eq.name, eq.code, eq.description, eq.manufacturer, eq.model, eq.location, eq.company, eq.sector]
-        .some(f => f?.toLowerCase().includes(q));
-      const matchCompany = !filterCompany || eq.company === filterCompany;
-      const matchStatus  = !filterStatus  || eq.status  === filterStatus;
-      return matchSearch && matchCompany && matchStatus;
-    });
-  }, [equipments, search, filterCompany, filterStatus]);
-
-  // ✅ Árvore de bens: Empresa → Setor → Equipamentos
-  const assetTree = useMemo(() => {
-    const tree: Record<string, Record<string, Equipment[]>> = {};
-    equipments.forEach(eq => {
-      const company = eq.company || 'Sem empresa';
-      const sector  = eq.sector  || 'Sem setor';
-      if (!tree[company]) tree[company] = {};
-      if (!tree[company][sector]) tree[company][sector] = [];
-      tree[company][sector].push(eq);
-    });
-    return tree;
-  }, [equipments]);
-
-  const fmt = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-
-  const handleSave = async () => {
-    if (!form.code?.trim() || !form.name?.trim()) {
-      alert('TAG (código) e nome são obrigatórios.');
-      return;
-    }
-    setSaving(true);
-    const eq: Equipment = {
-      id: editingId || `EQP-${Date.now()}`,
-      code: form.code!,
-      name: form.name!,
-      description: form.description || '',
-      location: form.location || '',
-      model: form.model || '',
-      serialNumber: form.serialNumber || '',
-      manufacturer: form.manufacturer || '',
-      status: (form.status as Equipment['status']) || 'ACTIVE',
-      notes: form.notes || '',
-      purchaseDate: form.purchaseDate,
-      company: form.company as CompanyName | undefined,
-      sector: form.sector || undefined,
-      buildingId: form.buildingId,
-    };
-
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      if (editingId) {
-        setEquipments(prev => prev.map(e => e.id === editingId ? eq : e));
-      } else {
-        setEquipments(prev => [...prev, eq]);
-      }
-      const { error } = await supabase.from('equipments').upsert(mapToSupabase(eq));
-      if (error) throw error;
-      setShowForm(false); setEditingId(null); setForm(EMPTY_FORM);
-    } catch (err) {
-      console.error('Erro ao salvar equipamento:', err);
-      alert('Erro ao salvar. Tente novamente.');
-    } finally {
-      setSaving(false);
+        if (editingId) {
+            const updated = { ...formData, id: editingId } as Equipment;
+            setEquipments(prev => prev.map(eq => eq.id === editingId ? updated : eq));
+
+            const { error } = await supabase.from('equipments').upsert(mapToSupabase(updated));
+            if (error) throw error;
+        } else {
+            const newEquipment: Equipment = {
+              id: Math.random().toString(36).substr(2, 9),
+              code: formData.code || '',
+              name: formData.name || '',
+              description: formData.description || '',
+              location: formData.location || '',
+              model: formData.model || '',
+              serialNumber: formData.serialNumber || '',
+              manufacturer: formData.manufacturer || '',
+              status: formData.status || 'ACTIVE',
+              notes: formData.notes || ''
+            };
+            setEquipments(prev => [...prev, newEquipment]);
+
+            const { error } = await supabase.from('equipments').insert(mapToSupabase(newEquipment));
+            if (error) throw error;
+        }
+        setShowModal(false);
+        setFormData({ status: 'ACTIVE' });
+        setEditingId(null);
+    } catch (e) {
+        console.error('Erro ao salvar:', e);
+        alert('Erro ao salvar no banco de dados.');
     }
   };
 
   const handleEdit = (eq: Equipment) => {
-    setEditingId(eq.id);
-    setForm({ ...eq });
-    setShowForm(true);
+      setFormData(eq);
+      setEditingId(eq.id);
+      setShowModal(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Confirmar exclusão do equipamento?')) return;
-    setEquipments(prev => prev.filter(e => e.id !== id));
-    await supabase.from('equipments').delete().eq('id', id);
+      if (currentUser.role !== 'ADMIN') {
+          alert('Apenas administradores podem excluir equipamentos.');
+          return;
+      }
+      
+      if (confirm('Tem certeza que deseja excluir este equipamento?')) {
+          setEquipments(prev => prev.filter(eq => eq.id !== id));
+          try {
+              const { error } = await supabase.from('equipments').delete().eq('id', id);
+              if (error) throw error;
+          } catch (e) {
+              console.error('Erro ao excluir:', e);
+              alert('Erro ao excluir do banco de dados.');
+          }
+      }
   };
 
-  return (
-    <div className="space-y-6">
+  const openNew = () => {
+      setFormData({ status: 'ACTIVE', code: '', name: '', description: '', location: '', model: '', serialNumber: '', manufacturer: '' });
+      setEditingId(null);
+      setShowModal(true);
+  };
 
-      {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  const uniqueCompanies = Array.from(new Set(equipments.map(eq => eq.location).filter(Boolean)));
+  const uniqueManufacturers = Array.from(new Set(equipments.map(eq => eq.manufacturer).filter(Boolean)));
+
+  const filteredEquipments = equipments.filter(eq => {
+    const matchesSearch = !searchTerm ||
+      eq.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      eq.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesCompany = !filterCompany || eq.location === filterCompany;
+    const matchesStatus = !filterStatus || eq.status === filterStatus;
+    const matchesManufacturer = !filterManufacturer || eq.manufacturer === filterManufacturer;
+
+    return matchesSearch && matchesCompany && matchesStatus && matchesManufacturer;
+  });
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterCompany('');
+    setFilterStatus('');
+    setFilterManufacturer('');
+  };
+
+  const hasActiveFilters = searchTerm || filterCompany || filterStatus || filterManufacturer;
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <header className="flex justify-between items-center border-b border-slate-200 pb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Equipamentos</h1>
-          <p className="text-slate-500 text-sm">{equipments.length} equipamentos cadastrados</p>
+            <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Equipamentos</h2>
+            <p className="text-slate-500 text-base mt-1">Gestão de ativos industriais e frota.</p>
         </div>
-        <div className="flex gap-2">
-          {/* Toggle lista / árvore */}
-          <div className="flex border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-            <button onClick={() => setView('list')}
-              className={`px-4 py-2 text-sm font-bold transition-colors ${view === 'list' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
-              <i className="fas fa-list mr-1.5"></i>Lista
-            </button>
-            <button onClick={() => setView('tree')}
-              className={`px-4 py-2 text-sm font-bold transition-colors ${view === 'tree' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
-              <i className="fas fa-sitemap mr-1.5"></i>Árvore de Bens
-            </button>
+        <button onClick={openNew} className="bg-clean-primary text-white px-6 py-3 rounded-xl text-sm font-bold uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2">
+            <i className="fas fa-plus"></i> Novo Equipamento
+        </button>
+      </header>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <i className="fas fa-filter text-clean-primary"></i>
+            <h3 className="text-sm font-bold text-slate-700 uppercase">Filtros</h3>
           </div>
-          {canEdit && (
-            <button onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setShowForm(true); }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm">
-              <i className="fas fa-plus mr-1.5"></i>Novo Equipamento
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="text-xs font-bold text-slate-500 hover:text-clean-primary transition-colors flex items-center gap-1">
+              <i className="fas fa-times"></i> Limpar filtros
             </button>
           )}
         </div>
-      </div>
 
-      {/* ===== VISTA LISTA ===== */}
-      {view === 'list' && (
-        <>
-          {/* Filtros */}
-          <div className="flex flex-wrap gap-3">
-            <div className="flex-1 min-w-52 relative">
-              <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-              <input type="text" placeholder="Buscar por nome, TAG, fabricante, empresa..."
-                className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                value={search} onChange={e => setSearch(e.target.value)} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Buscar</label>
+            <div className="relative">
+              <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+              <input
+                type="text"
+                placeholder="TAG, nome ou descrição..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full h-11 pl-11 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:border-clean-primary focus:outline-none focus:ring-2 focus:ring-clean-primary/20 transition-all"
+              />
             </div>
-            <select className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-              value={filterCompany} onChange={e => setFilterCompany(e.target.value)}>
-              <option value="">Todas as empresas</option>
-              {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
-              <option value="Sem empresa">Sem empresa</option>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
+              Empresa
+              {currentUser.role !== 'ADMIN' && currentUser.company && (
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded-full normal-case font-bold">Filtro padrão</span>
+              )}
+            </label>
+            <select
+              value={filterCompany}
+              onChange={e => setFilterCompany(e.target.value)}
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:border-clean-primary focus:outline-none focus:ring-2 focus:ring-clean-primary/20 transition-all"
+            >
+              <option value="">Todas</option>
+              {uniqueCompanies.map(company => (
+                <option key={company} value={company}>{company}</option>
+              ))}
             </select>
-            <select className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-              value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-              <option value="">Todos os status</option>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Status</label>
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:border-clean-primary focus:outline-none focus:ring-2 focus:ring-clean-primary/20 transition-all"
+            >
+              <option value="">Todos</option>
               <option value="ACTIVE">Ativo</option>
               <option value="MAINTENANCE">Manutenção</option>
               <option value="INACTIVE">Inativo</option>
             </select>
           </div>
 
-          {/* Grid de cards */}
-          {filteredEqs.length === 0 && (
-            <div className="text-center py-16 text-slate-400">
-              <i className="fas fa-cogs text-5xl mb-3 block"></i>
-              <p className="font-semibold">Nenhum equipamento encontrado</p>
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredEqs.map(eq => {
-              const st = STATUS_CFG[eq.status] || STATUS_CFG.ACTIVE;
-              const costs = costByEq[eq.id];
-              return (
-                <div key={eq.id} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="p-4">
-                    {/* TAG + Status */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                          <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{eq.code}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${st.color}`}>
-                            <i className={`fas ${st.icon} mr-1 text-[10px]`}></i>{st.label}
-                          </span>
-                        </div>
-                        <h3 className="font-bold text-slate-900 truncate">{eq.name}</h3>
-                        <p className="text-xs text-slate-500 truncate">{eq.description}</p>
-                      </div>
-                    </div>
-
-                    {/* Campos */}
-                    <div className="space-y-1 text-xs text-slate-600 mt-2">
-                      <div className="flex gap-1.5">
-                        <i className="fas fa-industry text-slate-300 w-3.5 mt-0.5 shrink-0"></i>
-                        <span className="truncate">{eq.manufacturer}{eq.model ? ` — ${eq.model}` : ''}</span>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <i className="fas fa-map-marker-alt text-slate-300 w-3.5 mt-0.5 shrink-0"></i>
-                        <span className="truncate">{eq.location || '—'}</span>
-                      </div>
-                      {/* ✅ NOVO: empresa e setor */}
-                      {eq.company && (
-                        <div className="flex gap-1.5">
-                          <i className="fas fa-building text-blue-400 w-3.5 mt-0.5 shrink-0"></i>
-                          <span className="font-semibold text-blue-700 truncate">{eq.company}</span>
-                        </div>
-                      )}
-                      {eq.sector && (
-                        <div className="flex gap-1.5">
-                          <i className="fas fa-layer-group text-slate-300 w-3.5 mt-0.5 shrink-0"></i>
-                          <span className="truncate">{eq.sector}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Custo acumulado */}
-                    {costs && (
-                      <div className="mt-3 bg-slate-50 rounded-lg px-3 py-2 flex justify-between text-xs border border-slate-100">
-                        <span className="text-slate-500">{costs.osCount} OS vinculada(s)</span>
-                        <span className="font-bold text-slate-800">{fmt(costs.total)}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ações */}
-                  {canEdit && (
-                    <div className="px-4 pb-3 flex gap-2 border-t border-slate-50 pt-3">
-                      <button onClick={() => handleEdit(eq)}
-                        className="flex-1 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 transition-colors">
-                        <i className="fas fa-pencil mr-1"></i>Editar
-                      </button>
-                      <button onClick={() => handleDelete(eq.id)}
-                        className="py-1.5 px-3 text-xs font-semibold border border-red-200 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Fabricante</label>
+            <select
+              value={filterManufacturer}
+              onChange={e => setFilterManufacturer(e.target.value)}
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:border-clean-primary focus:outline-none focus:ring-2 focus:ring-clean-primary/20 transition-all"
+            >
+              <option value="">Todos</option>
+              {uniqueManufacturers.map(mfr => (
+                <option key={mfr} value={mfr}>{mfr}</option>
+              ))}
+            </select>
           </div>
-        </>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+          <p className="text-sm text-slate-600">
+            Exibindo <span className="font-bold text-clean-primary">{filteredEquipments.length}</span> de <span className="font-bold">{equipments.length}</span> equipamentos
+          </p>
+        </div>
+      </div>
+
+      {filteredEquipments.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <i className="fas fa-search text-2xl text-slate-400"></i>
+          </div>
+          <h3 className="text-lg font-bold text-slate-700 mb-2">Nenhum equipamento encontrado</h3>
+          <p className="text-slate-500 text-sm mb-4">
+            {hasActiveFilters
+              ? 'Tente ajustar os filtros ou limpar a busca.'
+              : 'Cadastre o primeiro equipamento para começar.'}
+          </p>
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-bold transition-colors">
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredEquipments.map(eq => (
+            <div key={eq.id} className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all flex flex-col group relative">
+               <div className="flex justify-between items-start mb-4">
+                   <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm text-xl bg-slate-50 text-slate-600">
+                       <i className="fas fa-cogs"></i>
+                   </div>
+                   <div className="flex flex-col items-end gap-1">
+                        <span className="font-mono font-bold text-xs bg-slate-100 px-2 py-1 rounded">{eq.code}</span>
+                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase border ${eq.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : eq.status === 'MAINTENANCE' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                            {eq.status === 'ACTIVE' ? 'Ativo' : eq.status === 'MAINTENANCE' ? 'Manutenção' : 'Inativo'}
+                        </span>
+                   </div>
+               </div>
+               
+               <h3 className="font-bold text-lg text-slate-800 mb-1">{eq.name}</h3>
+               <p className="text-sm text-slate-500 mb-4 h-10 line-clamp-2">{eq.description}</p>
+               
+               <div className="space-y-2 mb-4 text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                   <p><span className="font-bold text-slate-400 text-xs uppercase block">Empresa:</span> {eq.location}</p>
+                   <p><span className="font-bold text-slate-400 text-xs uppercase block">Modelo/Série:</span> {eq.model} / {eq.serialNumber}</p>
+               </div>
+
+               <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <button onClick={() => handleEdit(eq)} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 hover:border-blue-300 shadow-sm transition-all" title="Editar">
+                       <i className="fas fa-pencil-alt text-xs"></i>
+                   </button>
+                   {currentUser.role === 'ADMIN' && (
+                       <button onClick={() => handleDelete(eq.id)} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-red-600 hover:border-red-300 shadow-sm transition-all" title="Excluir">
+                           <i className="fas fa-trash text-xs"></i>
+                       </button>
+                   )}
+               </div>
+            </div>
+          ))}
+        </div>
       )}
 
-      {/* ===== VISTA ÁRVORE DE BENS ===== */}
-      {view === 'tree' && (
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-            <i className="fas fa-info-circle mr-2"></i>
-            A Árvore de Bens organiza os equipamentos por <strong>empresa</strong> e <strong>setor</strong>.
-            Edite os equipamentos e preencha os campos "Empresa" e "Setor" para populá-la.
-          </div>
-
-          {Object.keys(assetTree).length === 0 && (
-            <div className="text-center py-16 text-slate-400">
-              <i className="fas fa-sitemap text-5xl mb-3 block"></i>
-              <p className="font-semibold">Nenhum equipamento vinculado a empresa</p>
-              <p className="text-sm mt-1">Edite equipamentos e preencha o campo "Empresa"</p>
-            </div>
-          )}
-
-          {Object.entries(assetTree).map(([company, sectors]) => {
-            const allEqs    = Object.values(sectors).flat();
-            const totalCost = allEqs.reduce((s, eq) => s + (costByEq[eq.id]?.total || 0), 0);
-            const isReal    = COMPANIES.includes(company as CompanyName);
-
-            return (
-              <div key={company} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-
-                {/* Nível: EMPRESA */}
-                <div className={`flex items-center justify-between px-5 py-4 ${isReal ? 'bg-[#001529]' : 'bg-slate-200'}`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isReal ? 'bg-blue-600' : 'bg-slate-400'}`}>
-                      <i className="fas fa-building text-white"></i>
-                    </div>
-                    <div>
-                      <p className={`font-bold text-base ${isReal ? 'text-white' : 'text-slate-700'}`}>{company}</p>
-                      <p className={`text-xs ${isReal ? 'text-blue-300' : 'text-slate-500'}`}>
-                        {allEqs.length} equipamento(s) · {Object.keys(sectors).length} setor(es)
-                      </p>
-                    </div>
-                  </div>
-                  {totalCost > 0 && (
-                    <div className="text-right">
-                      <p className={`text-xs ${isReal ? 'text-blue-300' : 'text-slate-400'}`}>Custo acumulado</p>
-                      <p className={`font-black text-lg ${isReal ? 'text-white' : 'text-slate-700'}`}>{fmt(totalCost)}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Nível: SETORES */}
-                <div className="divide-y divide-slate-100">
-                  {Object.entries(sectors).map(([sector, eqs]) => {
-                    const sectorCost = eqs.reduce((s, eq) => s + (costByEq[eq.id]?.total || 0), 0);
-                    return (
-                      <details key={sector} className="group">
-                        <summary className="flex items-center gap-3 px-5 py-3 bg-blue-50 cursor-pointer hover:bg-blue-100 transition-colors list-none select-none">
-                          <i className="fas fa-chevron-right text-blue-400 text-xs group-open:rotate-90 transition-transform"></i>
-                          <i className="fas fa-layer-group text-blue-400 text-sm"></i>
-                          <span className="font-semibold text-blue-900 flex-1 text-sm">{sector}</span>
-                          <span className="text-xs text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full font-bold">{eqs.length}</span>
-                          {sectorCost > 0 && (
-                            <span className="text-xs font-bold text-blue-700">{fmt(sectorCost)}</span>
-                          )}
-                        </summary>
-
-                        {/* Nível: EQUIPAMENTOS */}
-                        <div className="divide-y divide-slate-50">
-                          {eqs.map(eq => {
-                            const st    = STATUS_CFG[eq.status] || STATUS_CFG.ACTIVE;
-                            const costs = costByEq[eq.id];
-                            return (
-                              <div key={eq.id} className="flex items-center gap-3 px-6 sm:px-10 py-3 hover:bg-slate-50 transition-colors">
-                                <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`}></span>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{eq.code}</span>
-                                    <span className="font-semibold text-slate-800 text-sm truncate">{eq.name}</span>
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${st.color}`}>{st.label}</span>
-                                  </div>
-                                  <p className="text-xs text-slate-400 mt-0.5 truncate">
-                                    {eq.manufacturer}{eq.model ? ` · ${eq.model}` : ''}{eq.location ? ` · ${eq.location}` : ''}
-                                  </p>
-                                </div>
-                                {costs && (
-                                  <div className="text-right shrink-0">
-                                    <p className="text-[10px] text-slate-400">{costs.osCount} OS</p>
-                                    <p className="text-xs font-bold text-slate-700">{fmt(costs.total)}</p>
-                                  </div>
-                                )}
-                                {canEdit && (
-                                  <button onClick={() => handleEdit(eq)}
-                                    className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-all text-xs">
-                                    <i className="fas fa-pencil"></i>
-                                  </button>
-                                )}
+      {showModal && (
+          <ModalPortal>
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => setShowModal(false)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                  <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden border border-slate-200 my-8">
+                      <div className="px-8 py-5 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
+                          <div>
+                              <h3 className="font-bold text-xl text-slate-800">{editingId ? 'Editar Equipamento' : 'Novo Equipamento'}</h3>
+                              <p className="text-sm text-slate-500 mt-1">Cadastro de ativo.</p>
+                          </div>
+                          <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center"><i className="fas fa-times"></i></button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50 min-h-0">
+                          <form id="equipmentForm" onSubmit={handleSave} className="space-y-6">
+                              <div className="grid grid-cols-2 gap-6">
+                                  <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">TAG (Código)</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.code || ''} onChange={e=>setFormData({...formData, code:e.target.value})} /></div>
+                                  <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Status</label><select className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value as any})}><option value="ACTIVE">Ativo</option><option value="MAINTENANCE">Manutenção</option><option value="INACTIVE">Inativo</option></select></div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      </details>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ===== MODAL DE FORMULÁRIO ===== */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-start sm:items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4 overflow-hidden">
-            <div className="bg-[#001529] text-white px-6 py-4 flex items-center justify-between">
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                <i className="fas fa-cogs"></i>
-                {editingId ? 'Editar Equipamento' : 'Novo Equipamento'}
-              </h3>
-              <button onClick={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }}
-                className="text-white/70 hover:text-white text-xl">
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="TAG / Código *" value={form.code || ''} onChange={v => setField('code', v)} placeholder="Ex: COM-01" />
-                <Field label="Nome do Equipamento *" value={form.name || ''} onChange={v => setField('name', v)} placeholder="Ex: Compressor Parafuso" />
-              </div>
-              <Field label="Descrição" value={form.description || ''} onChange={v => setField('description', v)} placeholder="Descrição detalhada do equipamento" />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Fabricante" value={form.manufacturer || ''} onChange={v => setField('manufacturer', v)} placeholder="Ex: Atlas Copco" />
-                <Field label="Modelo" value={form.model || ''} onChange={v => setField('model', v)} placeholder="Ex: GA-30" />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Número de Série" value={form.serialNumber || ''} onChange={v => setField('serialNumber', v)} placeholder="Ex: AIF-998877" />
-                <Field label="Local Físico" value={form.location || ''} onChange={v => setField('location', v)} placeholder="Ex: Sala de Máquinas" />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Status</label>
-                  <select className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                    value={form.status || 'ACTIVE'} onChange={e => setField('status', e.target.value)}>
-                    <option value="ACTIVE">Ativo</option>
-                    <option value="MAINTENANCE">Em Manutenção</option>
-                    <option value="INACTIVE">Inativo</option>
-                  </select>
-                </div>
-                <Field label="Data de Aquisição" value={form.purchaseDate || ''} onChange={v => setField('purchaseDate', v)} type="date" />
-              </div>
-
-              {/* ✅ NOVO: Campos para Árvore de Bens */}
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">
-                  <i className="fas fa-sitemap mr-1.5"></i>Árvore de Bens
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Empresa</label>
-                    <select className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                      value={form.company || ''} onChange={e => setField('company', e.target.value || undefined)}>
-                      <option value="">Não vinculado</option>
-                      {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                              <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nome</label><input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.name || ''} onChange={e=>setFormData({...formData, name:e.target.value})} /></div>
+                              <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Descrição</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.description || ''} onChange={e=>setFormData({...formData, description:e.target.value})} /></div>
+                              <div className="grid grid-cols-2 gap-6">
+                                  <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Modelo</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.model || ''} onChange={e=>setFormData({...formData, model:e.target.value})} /></div>
+                                  <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nº Série</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.serialNumber || ''} onChange={e=>setFormData({...formData, serialNumber:e.target.value})} /></div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-6">
+                                  <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Fabricante</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.manufacturer || ''} onChange={e=>setFormData({...formData, manufacturer:e.target.value})} /></div>
+                                  <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Empresa</label><input className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all" value={formData.location || ''} onChange={e=>setFormData({...formData, location:e.target.value})} /></div>
+                              </div>
+                              <div><label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Obs</label><textarea className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 shadow-sm h-24 transition-all" value={formData.notes || ''} onChange={e=>setFormData({...formData, notes:e.target.value})} /></div>
+                          </form>
+                      </div>
+                      <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0"><button type="button" onClick={()=>setShowModal(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-slate-200">Cancelar</button><button type="submit" form="equipmentForm" className="px-8 py-3 bg-clean-primary text-white rounded-xl text-sm font-bold hover:bg-clean-primary/90 shadow-lg transition-all">Salvar</button></div>
                   </div>
-                  <Field label="Setor" value={form.sector || ''} onChange={v => setField('sector', v)} placeholder="Ex: Produção, Laboratório, Manutenção..." />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Observações</label>
-                <textarea rows={3} className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
-                  placeholder="Notas de manutenção, periodicidade de revisão, etc..."
-                  value={form.notes || ''} onChange={e => setField('notes', e.target.value)} />
               </div>
             </div>
-
-            <div className="flex gap-3 px-6 pb-6 border-t border-slate-100 pt-4">
-              <button onClick={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }}
-                className="flex-1 py-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
-                Cancelar
-              </button>
-              <button onClick={handleSave} disabled={saving}
-                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold transition-colors">
-                {saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>Salvando...</> : <><i className="fas fa-save mr-1.5"></i>{editingId ? 'Atualizar' : 'Cadastrar'}</>}
-              </button>
-            </div>
-          </div>
-        </div>
+          </ModalPortal>
       )}
     </div>
   );
 };
-
-// Componente auxiliar de campo de texto
-const Field: React.FC<{
-  label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; type?: string;
-}> = ({ label, value, onChange, placeholder, type = 'text' }) => (
-  <div>
-    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{label}</label>
-    <input
-      type={type}
-      className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-      placeholder={placeholder}
-      value={value}
-      onChange={e => onChange(e.target.value)}
-    />
-  </div>
-);
 
 export default EquipmentManager;

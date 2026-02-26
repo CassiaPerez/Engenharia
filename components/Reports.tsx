@@ -1,565 +1,498 @@
-import React, { useState, useMemo } from 'react';
-import {
-  Material, Project, StockMovement, OS, ServiceType,
-  User, Building, Equipment, OSStatus
-} from '../types';
 
-interface ReportsProps {
+import React, { useState } from 'react';
+import { Material, Project, StockMovement, OS, ServiceType, User, Building, Equipment } from '../types';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { calculateProjectCosts, calculateOSCosts } from '../services/engine';
+
+interface Props {
   materials: Material[];
   projects: Project[];
   movements: StockMovement[];
   oss: OS[];
   services: ServiceType[];
-  users: User[];
-  buildings: Building[];
-  equipments: Equipment[];
+  users?: User[];
+  buildings?: Building[];
+  equipments?: Equipment[];
 }
 
-type ReportTab = 'material_withdrawal' | 'executor_hours' | 'cost_by_company' | 'os_summary';
-
-const COMPANIES = ['Cropbio', 'Cropfert Industria', 'Cropfert Jandaia', 'Cropfert do Brasil'];
-
-const Reports: React.FC<ReportsProps> = ({
-  materials, projects, movements, oss, services, users, buildings, equipments
-}) => {
-  const [activeReport, setActiveReport] = useState<ReportTab>('material_withdrawal');
+const Reports: React.FC<Props> = ({ materials, projects, movements, oss, services, users = [], buildings = [], equipments = [] }) => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [selectedEquipment, setSelectedEquipment] = useState('');
+  const [selectedBuilding, setSelectedBuilding] = useState('');
+  const [selectedProject, setSelectedProject] = useState('');
 
-  const fmt   = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-  const fmtDt = (d: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
+  const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const inPeriod = (dateStr: string) => {
-    if (dateFrom && dateStr < dateFrom) return false;
-    if (dateTo && dateStr > dateTo + 'T23:59:59') return false;
-    return true;
-  };
+  const applyFilters = (data: any[]) => {
+    let filtered = [...data];
 
-  const periodLabel = dateFrom || dateTo
-    ? `${dateFrom ? new Date(dateFrom + 'T12:00:00').toLocaleDateString('pt-BR') : 'início'} → ${dateTo ? new Date(dateTo + 'T12:00:00').toLocaleDateString('pt-BR') : 'hoje'}`
-    : 'Todo o período';
-
-  // ======= HELPER: Horas efetivas de uma OS (desconta pausas) =======
-  const calcOsHours = (os: OS): number => {
-    if (!os.startTime || !os.endTime) return 0;
-    const start = new Date(os.startTime).getTime();
-    const end   = new Date(os.endTime).getTime();
-    let pausedMs = 0;
-    if (os.pauseHistory) {
-      let lastPause: number | null = null;
-      os.pauseHistory.forEach(e => {
-        const t = new Date(e.timestamp).getTime();
-        if (e.action === 'PAUSE') lastPause = t;
-        else if (e.action === 'RESUME' && lastPause !== null) { pausedMs += t - lastPause; lastPause = null; }
+    if (dateFrom || dateTo) {
+      filtered = filtered.filter((item: any) => {
+        const itemDate = new Date(item.openDate || item.date || item.startDate);
+        if (dateFrom && itemDate < new Date(dateFrom)) return false;
+        if (dateTo && itemDate > new Date(dateTo + 'T23:59:59')) return false;
+        return true;
       });
     }
-    return Math.max(0, (end - start - pausedMs) / 3600000);
+
+    if (selectedEquipment) {
+      filtered = filtered.filter((item: any) => item.equipmentId === selectedEquipment);
+    }
+
+    if (selectedBuilding) {
+      filtered = filtered.filter((item: any) => item.buildingId === selectedBuilding);
+    }
+
+    if (selectedProject) {
+      filtered = filtered.filter((item: any) => item.projectId === selectedProject);
+    }
+
+    return filtered;
   };
 
-  // ======= RELATÓRIO 1: RETIRADA DE MATERIAIS =======
-  const materialWithdrawals = useMemo(() =>
-    movements
-      .filter(m => m.type === 'OUT' && inPeriod(m.date))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .map(m => {
-        const mat  = materials.find(x => x.id === m.materialId);
-        const usr  = users.find(u => u.id === m.userId);
-        const relOs = oss.find(o => o.id === m.osId || o.number === m.osId);
-        const relPrj = projects.find(p => p.id === m.projectId);
-        return {
-          date: m.date,
-          materialCode: mat?.code || '—',
-          materialName: mat?.description || m.materialId,
-          quantity: m.quantity,
-          unit: mat?.unit || '—',
-          unitCost: mat?.unitCost || 0,
-          totalCost: m.quantity * (mat?.unitCost || 0),
-          withdrawnBy: usr?.name || m.userId || 'Desconhecido',
-          destination: relOs ? `OS ${relOs.number}` : relPrj ? `Proj. ${relPrj.code}` : m.description || '—',
-          fromLocation: m.fromLocation || '—',
-        };
-      }),
-  [movements, materials, users, oss, projects, dateFrom, dateTo]);
+  const generateMaterialReport = () => {
+      const doc = new jsPDF();
+      const today = new Date().toLocaleDateString('pt-BR');
+      const filteredMovements = applyFilters(movements);
 
-  const totalWithdrawalCost = materialWithdrawals.reduce((s, r) => s + r.totalCost, 0);
+      doc.setFillColor(71, 122, 127);
+      doc.rect(0, 0, 210, 24, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("RELATÓRIO DE GASTOS POR MATERIAL", 14, 16);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Gerado em: ${today}`, 196, 16, { align: 'right' });
 
-  // ======= RELATÓRIO 2: HORAS DOS EXECUTORES =======
-  const executorHoursData = useMemo(() => {
-    const filtered = oss.filter(o => o.status === OSStatus.COMPLETED && inPeriod(o.openDate));
-    const byExec: Record<string, { name: string; hours: number; osCount: number; osNumbers: string[] }> = {};
+      if (dateFrom || dateTo) {
+        doc.setFontSize(8);
+        doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, 196, 20, { align: 'right' });
+      }
 
-    filtered.forEach(os => {
-      const execIds = [...new Set([...(os.executorIds || []), ...(os.executorId ? [os.executorId] : [])])];
-      const hours = calcOsHours(os);
-      execIds.forEach(uid => {
-        const u = users.find(x => x.id === uid);
-        if (!byExec[uid]) byExec[uid] = { name: u?.name || uid, hours: 0, osCount: 0, osNumbers: [] };
-        byExec[uid].hours += hours;
-        byExec[uid].osCount += 1;
-        byExec[uid].osNumbers.push(os.number);
+      const materialStats = materials.map(mat => {
+          const outMovements = filteredMovements.filter(m => m.materialId === mat.id && m.type === 'OUT');
+          const totalQtyOut = outMovements.reduce((acc, m) => acc + m.quantity, 0);
+          const totalCostOut = totalQtyOut * mat.unitCost;
+          return {
+              code: mat.code,
+              description: mat.description,
+              unit: mat.unit,
+              qtyOut: totalQtyOut,
+              unitCost: mat.unitCost,
+              totalCost: totalCostOut
+          };
+      }).filter(i => i.qtyOut > 0).sort((a,b) => b.totalCost - a.totalCost); // Apenas com movimento, ordenado por valor
+
+      const totalGeneral = materialStats.reduce((acc, i) => acc + i.totalCost, 0);
+
+      const rows = materialStats.map(i => [
+          i.code,
+          i.description,
+          `${i.qtyOut} ${i.unit}`,
+          `R$ ${formatCurrency(i.unitCost)}`,
+          `R$ ${formatCurrency(i.totalCost)}`
+      ]);
+
+      rows.push(['', 'TOTAL GERAL GASTO', '', '', `R$ ${formatCurrency(totalGeneral)}`]);
+
+      autoTable(doc, {
+          startY: 30,
+          head: [['Código', 'Descrição', 'Qtd Consumida', 'Custo Médio', 'Custo Total']],
+          body: rows,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [71, 122, 127] },
+          columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right', fontStyle: 'bold' } },
+          didParseCell: (data) => {
+             if (data.row.index === rows.length - 1) {
+                 data.cell.styles.fontStyle = 'bold';
+                 data.cell.styles.fillColor = [240, 240, 240];
+             }
+          }
       });
-    });
 
-    return Object.values(byExec).sort((a, b) => b.hours - a.hours);
-  }, [oss, users, dateFrom, dateTo]);
-
-  const totalHours = executorHoursData.reduce((s, r) => s + r.hours, 0);
-
-  // ======= RELATÓRIO 3: CUSTO POR EMPRESA =======
-  const costByCompanyData = useMemo(() => {
-    const filtered = oss.filter(o => inPeriod(o.openDate));
-
-    const result: Record<string, {
-      materialCost: number; serviceCost: number; manualCost: number;
-      osCount: number;
-      sectors: Record<string, { materialCost: number; serviceCost: number; osCount: number }>;
-    }> = {};
-
-    [...COMPANIES, 'Não identificado'].forEach(c => {
-      result[c] = { materialCost: 0, serviceCost: 0, manualCost: 0, osCount: 0, sectors: {} };
-    });
-
-    filtered.forEach(os => {
-      const eq = equipments.find(e => e.id === os.equipmentId);
-      const company = eq?.company || 'Não identificado';
-      const sector  = eq?.sector  || 'Geral';
-
-      if (!result[company]) result[company] = { materialCost: 0, serviceCost: 0, manualCost: 0, osCount: 0, sectors: {} };
-
-      const matCost = os.materials.reduce((s, m) => s + m.quantity * m.unitCost, 0);
-      const svcCost = os.services.reduce((s, sv) => s + sv.quantity * sv.unitCost, 0);
-      const manCost = (os.manualMaterialCost || 0) + (os.manualServiceCost || 0);
-
-      result[company].materialCost += matCost;
-      result[company].serviceCost  += svcCost;
-      result[company].manualCost   += manCost;
-      result[company].osCount      += 1;
-
-      if (!result[company].sectors[sector])
-        result[company].sectors[sector] = { materialCost: 0, serviceCost: 0, osCount: 0 };
-      result[company].sectors[sector].materialCost += matCost;
-      result[company].sectors[sector].serviceCost  += svcCost;
-      result[company].sectors[sector].osCount      += 1;
-    });
-
-    return result;
-  }, [oss, equipments, dateFrom, dateTo]);
-
-  const grandTotalCompany = Object.values(costByCompanyData).reduce(
-    (s, c) => s + c.materialCost + c.serviceCost + c.manualCost, 0
-  );
-
-  // ======= RELATÓRIO 4: RESUMO DE OS =======
-  const osSummaryData = useMemo(() =>
-    oss
-      .filter(o => inPeriod(o.openDate))
-      .sort((a, b) => new Date(b.openDate).getTime() - new Date(a.openDate).getTime()),
-  [oss, dateFrom, dateTo]);
-
-  const TABS: { id: ReportTab; label: string; icon: string }[] = [
-    { id: 'material_withdrawal', label: 'Retirada de Materiais', icon: 'fa-boxes'       },
-    { id: 'executor_hours',      label: 'Horas dos Executores',  icon: 'fa-user-clock'  },
-    { id: 'cost_by_company',     label: 'Custo por Empresa',     icon: 'fa-building'    },
-    { id: 'os_summary',          label: 'Resumo de OS',          icon: 'fa-list-check'  },
-  ];
-
-  const STATUS_LABELS: Record<string, string> = {
-    OPEN: 'Aberta', IN_PROGRESS: 'Em Andamento', PAUSED: 'Pausada', COMPLETED: 'Concluída', CANCELED: 'Cancelada'
+      doc.save(`Relatorio_Materiais_${new Date().toISOString().split('T')[0]}.pdf`);
   };
-  const STATUS_COLORS: Record<string, string> = {
-    OPEN: 'bg-slate-100 text-slate-700', IN_PROGRESS: 'bg-blue-100 text-blue-700',
-    PAUSED: 'bg-amber-100 text-amber-700', COMPLETED: 'bg-green-100 text-green-700', CANCELED: 'bg-red-100 text-red-700'
+
+  const generateProjectReport = () => {
+      const doc = new jsPDF({ orientation: 'landscape' });
+      const today = new Date().toLocaleDateString('pt-BR');
+      const filteredProjects = selectedProject ? projects.filter(p => p.id === selectedProject) : projects;
+      const filteredOSs = applyFilters(oss);
+      const filteredMovements = applyFilters(movements);
+
+      doc.setFillColor(71, 122, 127);
+      doc.rect(0, 0, 297, 24, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("RELATÓRIO DE CUSTOS POR PROJETO (OS + BAIXA DIRETA)", 14, 16);
+      doc.setFontSize(10);
+      doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+
+      if (dateFrom || dateTo) {
+        doc.setFontSize(8);
+        doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, 280, 20, { align: 'right' });
+      }
+
+      const projectStats = filteredProjects.map(proj => {
+          const osCosts = calculateProjectCosts(proj, filteredOSs, materials, services);
+          
+          // 2. Custos via Baixa Direta (Inventory Direct Issue)
+          // Procura movimentações do tipo OUT que tenham projectId igual ao projeto atual
+          const directMovements = filteredMovements.filter(m => m.projectId === proj.id && m.type === 'OUT');
+          const directMaterialCost = directMovements.reduce((acc, m) => {
+              const mat = materials.find(mt => mt.id === m.materialId);
+              return acc + (m.quantity * (mat?.unitCost || 0));
+          }, 0);
+
+          const totalReal = osCosts.totalReal + directMaterialCost;
+          const totalMaterials = osCosts.totalMaterials + directMaterialCost;
+
+          return {
+              code: proj.code,
+              desc: proj.description,
+              status: proj.status,
+              budget: proj.estimatedValue,
+              osMaterial: osCosts.totalMaterials,
+              directMaterial: directMaterialCost,
+              services: osCosts.totalServices,
+              total: totalReal
+          };
+      });
+
+      const rows = projectStats.map(p => [
+          p.code,
+          p.desc,
+          p.status,
+          `R$ ${formatCurrency(p.budget)}`,
+          `R$ ${formatCurrency(p.osMaterial)}`,
+          `R$ ${formatCurrency(p.directMaterial)}`, 
+          `R$ ${formatCurrency(p.services)}`,
+          `R$ ${formatCurrency(p.total)}`
+      ]);
+
+      const grandTotal = projectStats.reduce((acc, p) => acc + p.total, 0);
+      rows.push(['', 'TOTAL CONSOLIDADO', '', '', '', '', '', `R$ ${formatCurrency(grandTotal)}`]);
+
+      autoTable(doc, {
+          startY: 30,
+          head: [['Código', 'Projeto', 'Status', 'Budget', 'Mat. via OS', 'Mat. Direto', 'Serviços', 'Custo Total']],
+          body: rows,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [71, 122, 127] },
+          columnStyles: { 3: {halign:'right'}, 4: {halign:'right'}, 5: {halign:'right', fontStyle:'bold', textColor:[100,100,100]}, 6: {halign:'right'}, 7: {halign:'right', fontStyle:'bold'} },
+          didParseCell: (data) => {
+             if (data.row.index === rows.length - 1) {
+                 data.cell.styles.fontStyle = 'bold';
+                 data.cell.styles.fillColor = [240, 240, 240];
+             }
+          }
+      });
+
+      doc.save(`Relatorio_Projetos_Consolidado_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const generateStockFlowReport = () => {
+      const doc = new jsPDF({ orientation: 'landscape' });
+      const today = new Date().toLocaleDateString('pt-BR');
+
+      doc.setFillColor(50, 60, 70);
+      doc.rect(0, 0, 297, 24, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("FLUXO DE ESTOQUE DETALHADO (ENTRADA / SAÍDA)", 14, 16);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+
+      // Filtrar e ordenar movimentações
+      const sortedMovements = [...movements].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      const rows = sortedMovements.map(m => {
+          const mat = materials.find(mt => mt.id === m.materialId);
+          // Tenta encontrar o usuário pelo ID ou retorna o próprio ID/System
+          const user = users.find(u => u.id === m.userId)?.name || 'Sistema / Importação';
+          
+          let reference = '-';
+          if (m.osId) reference = `OS: ${m.osId}`;
+          else if (m.projectId) {
+              const p = projects.find(proj => proj.id === m.projectId);
+              reference = `Proj: ${p?.code || 'N/A'}`;
+          }
+
+          return [
+              new Date(m.date).toLocaleString(),
+              m.type,
+              mat?.code || '???',
+              mat?.description || 'Item excluído',
+              m.quantity,
+              m.type === 'OUT' || m.type === 'PROJECT_OUT' ? user : '-', // Responsável pela retirada/reserva
+              reference,
+              m.description
+          ];
+      });
+
+      autoTable(doc, {
+          startY: 30,
+          head: [['Data', 'Tipo', 'Código', 'Material', 'Qtd', 'Responsável Reserva', 'Ref. (OS/Proj)', 'Detalhes']],
+          body: rows,
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [50, 60, 70], textColor: 255, fontStyle: 'bold' },
+          columnStyles: { 
+              1: { fontStyle: 'bold' },
+              4: { halign: 'right', fontStyle: 'bold' }, 
+              5: { fontStyle: 'bold', textColor: [20, 100, 200] } // Destacar responsável
+          },
+          didParseCell: (data) => {
+              if (data.column.index === 1) {
+                  const type = data.cell.raw;
+                  if (type === 'IN') data.cell.styles.textColor = [0, 150, 0];
+                  if (type === 'OUT') data.cell.styles.textColor = [200, 0, 0];
+              }
+          }
+      });
+
+      doc.save(`Fluxo_Estoque_Detalhado_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const generateCostCenterReport = () => {
+      const doc = new jsPDF();
+      const today = new Date().toLocaleDateString('pt-BR');
+
+      // Cabeçalho
+      doc.setFillColor(71, 122, 127);
+      doc.rect(0, 0, 210, 24, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("RELATÓRIO DE CUSTOS OPERACIONAIS (OS & ATIVOS)", 14, 16);
+      doc.setFontSize(10);
+      doc.text(`Gerado em: ${today}`, 196, 16, { align: 'right' });
+
+      let yPos = 35;
+
+      // 1. CUSTOS POR EDIFÍCIO
+      doc.setTextColor(0);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("1. CUSTOS POR EDIFÍCIO (FACILITIES)", 14, yPos);
+      yPos += 5;
+
+      const buildingCosts = buildings.map(b => {
+          const relatedOS = oss.filter(o => o.buildingId === b.id && o.status !== 'CANCELED');
+          const totalCost = relatedOS.reduce((acc, os) => acc + calculateOSCosts(os, materials, services).totalCost, 0);
+          return [b.name, b.city, relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
+      }).sort((a,b) => {
+          const valA = parseFloat(String(a[3]).replace('R$ ','').replace('.','').replace(',','.'));
+          const valB = parseFloat(String(b[3]).replace('R$ ','').replace('.','').replace(',','.'));
+          return valB - valA;
+      });
+
+      autoTable(doc, {
+          startY: yPos,
+          head: [['Edifício', 'Local', 'Qtd OS', 'Custo Total']],
+          body: buildingCosts,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [50, 80, 120] },
+          columnStyles: { 2: { halign: 'center' }, 3: { halign: 'right', fontStyle: 'bold' } }
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+
+      // 2. CUSTOS POR EQUIPAMENTO
+      doc.text("2. CUSTOS POR EQUIPAMENTO (MANUTENÇÃO)", 14, yPos);
+      yPos += 5;
+
+      const equipmentCosts = equipments.map(eq => {
+          const relatedOS = oss.filter(o => o.equipmentId === eq.id && o.status !== 'CANCELED');
+          const totalCost = relatedOS.reduce((acc, os) => acc + calculateOSCosts(os, materials, services).totalCost, 0);
+          return [eq.code, eq.name, eq.status, relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
+      }).sort((a,b) => {
+          const valA = parseFloat(String(a[4]).replace('R$ ','').replace('.','').replace(',','.'));
+          const valB = parseFloat(String(b[4]).replace('R$ ','').replace('.','').replace(',','.'));
+          return valB - valA;
+      });
+
+      autoTable(doc, {
+          startY: yPos,
+          head: [['TAG', 'Equipamento', 'Status', 'Qtd OS', 'Custo Total']],
+          body: equipmentCosts,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [120, 80, 50] },
+          columnStyles: { 3: { halign: 'center' }, 4: { halign: 'right', fontStyle: 'bold' } }
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+
+      // 3. CUSTOS POR OS (TOP 30)
+      // Se necessário, nova página
+      if (yPos > 240) {
+          doc.addPage();
+          yPos = 20;
+      }
+
+      doc.text("3. TOP 30 ORDENS DE SERVIÇO MAIS CARAS", 14, yPos);
+      yPos += 5;
+
+      const osCosts = oss
+          .filter(o => o.status !== 'CANCELED')
+          .map(o => {
+              const costs = calculateOSCosts(o, materials, services);
+              return { ...o, total: costs.totalCost };
+          })
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 30)
+          .map(o => [
+              o.number,
+              o.description.substring(0, 40) + '...',
+              o.type,
+              `R$ ${formatCurrency(o.total)}`
+          ]);
+
+      autoTable(doc, {
+          startY: yPos,
+          head: [['Número OS', 'Descrição', 'Tipo', 'Custo Total']],
+          body: osCosts,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [80, 80, 80] },
+          columnStyles: { 3: { halign: 'right', fontStyle: 'bold' } }
+      });
+
+      doc.save(`Custos_Operacionais_Analitico_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Relatórios</h1>
-        <p className="text-slate-500 text-sm">Análise e exportação de dados do sistema</p>
-      </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <header className="border-b border-slate-200 pb-6">
+        <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Central de Relatórios</h2>
+        <p className="text-slate-500 text-base mt-1">Exportação de dados para análise gerencial.</p>
+      </header>
 
-      {/* ======= Filtro de período global ======= */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 text-slate-600">
-            <i className="fas fa-calendar-alt text-slate-400"></i>
-            <span className="text-sm font-semibold">Período:</span>
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+          <i className="fas fa-filter text-blue-600"></i>
+          Filtros de Período e Contexto
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data Inicial</label>
+            <input
+              type="date"
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-500">De:</label>
-            <input type="date" className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data Final</label>
+            <input
+              type="date"
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-500">Até:</label>
-            <input type="date" className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Equipamento</label>
+            <select
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={selectedEquipment}
+              onChange={e => setSelectedEquipment(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {equipments.map(eq => (
+                <option key={eq.id} value={eq.id}>{eq.name} - {eq.code}</option>
+              ))}
+            </select>
           </div>
-          {(dateFrom || dateTo) && (
-            <button onClick={() => { setDateFrom(''); setDateTo(''); }}
-              className="text-xs text-red-500 hover:text-red-700 font-semibold flex items-center gap-1">
-              <i className="fas fa-times"></i> Limpar
-            </button>
-          )}
-          <div className="ml-auto text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg font-semibold">
-            <i className="fas fa-filter mr-1"></i>{periodLabel}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Edifício/Setor</label>
+            <select
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={selectedBuilding}
+              onChange={e => setSelectedBuilding(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {buildings.map(b => (
+                <option key={b.id} value={b.id}>{b.name} - {b.city}</option>
+              ))}
+            </select>
           </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Projeto</label>
+            <select
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={selectedProject}
+              onChange={e => setSelectedProject(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.code} - {p.description}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-2 text-sm text-slate-600">
+          <i className="fas fa-info-circle text-blue-500"></i>
+          <span>Os filtros serão aplicados aos relatórios que você gerar. Deixe em branco para considerar todos os dados.</span>
         </div>
       </div>
 
-      {/* ======= Tabs ======= */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActiveReport(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-              activeReport === tab.id ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-            }`}>
-            <i className={`fas ${tab.icon}`}></i>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ===== RELATÓRIO 1: RETIRADA DE MATERIAIS ===== */}
-      {activeReport === 'material_withdrawal' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <i className="fas fa-boxes text-blue-500"></i> Retirada de Materiais
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">{materialWithdrawals.length} movimentos · {periodLabel}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-slate-400">Custo total</p>
-              <p className="font-black text-xl text-slate-900">{fmt(totalWithdrawalCost)}</p>
-            </div>
-          </div>
-
-          {materialWithdrawals.length === 0
-            ? <EmptyState icon="fa-box-open" text="Nenhuma retirada no período selecionado" />
-            : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-800 text-white text-xs">
-                      <th className="px-4 py-3 text-left">Data</th>
-                      <th className="px-4 py-3 text-left">Material</th>
-                      <th className="px-4 py-3 text-right">Qtd</th>
-                      <th className="px-4 py-3 text-right">Custo Unit.</th>
-                      <th className="px-4 py-3 text-right">Custo Total</th>
-                      <th className="px-4 py-3 text-left">Retirado por</th>
-                      <th className="px-4 py-3 text-left">Destino</th>
-                      <th className="px-4 py-3 text-left">Estoque</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {materialWithdrawals.map((row, i) => (
-                      <tr key={i} className={`border-b border-slate-50 hover:bg-blue-50/30 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                        <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{fmtDt(row.date)}</td>
-                        <td className="px-4 py-2.5">
-                          <p className="font-semibold text-slate-800">{row.materialName}</p>
-                          <p className="text-xs text-slate-400 font-mono">{row.materialCode}</p>
-                        </td>
-                        <td className="px-4 py-2.5 text-right">{row.quantity} <span className="text-slate-400">{row.unit}</span></td>
-                        <td className="px-4 py-2.5 text-right text-slate-600">{fmt(row.unitCost)}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-slate-900">{fmt(row.totalCost)}</td>
-                        <td className="px-4 py-2.5">
-                          <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                            <i className="fas fa-user text-[9px]"></i> {row.withdrawnBy}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">{row.destination}</span>
-                        </td>
-                        <td className="px-4 py-2.5 text-xs text-slate-400">{row.fromLocation}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-slate-800 text-white font-bold">
-                      <td className="px-4 py-3" colSpan={4}>TOTAL — {materialWithdrawals.length} movimentos</td>
-                      <td className="px-4 py-3 text-right">{fmt(totalWithdrawalCost)}</td>
-                      <td colSpan={3}></td>
-                    </tr>
-                  </tfoot>
-                </table>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* MATERIAL REPORT */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                  <i className="fas fa-cubes"></i>
               </div>
-            )}
-        </div>
-      )}
-
-      {/* ===== RELATÓRIO 2: HORAS DOS EXECUTORES ===== */}
-      {activeReport === 'executor_hours' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <i className="fas fa-user-clock text-blue-500"></i> Horas dos Executores
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                OS concluídas com tempo registrado · {periodLabel} · {executorHoursData.length} executor(es)
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-slate-400">Total geral</p>
-              <p className="font-black text-xl text-slate-900">{totalHours.toFixed(1)} h</p>
-            </div>
+              <h3 className="font-bold text-lg text-slate-800 mb-2">Relatório de Materiais (Sintético)</h3>
+              <p className="text-slate-500 text-sm mb-6">Detalhamento de consumo total de itens do almoxarifado e custo médio.</p>
+              <button onClick={generateMaterialReport} className="mt-auto px-6 py-3 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 w-full justify-center">
+                  <i className="fas fa-file-pdf"></i> Gerar PDF
+              </button>
           </div>
 
-          {executorHoursData.length === 0 ? (
-            <EmptyState icon="fa-clock" text="Nenhuma OS concluída com tempo registrado no período" sub="OS precisam ter data/hora de início e fim para calcular horas" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-800 text-white text-xs">
-                    <th className="px-4 py-3 text-left">Executor</th>
-                    <th className="px-4 py-3 text-center">OS Concluídas</th>
-                    <th className="px-4 py-3 text-right">Horas Trabalhadas</th>
-                    <th className="px-4 py-3 text-right">Média h/OS</th>
-                    <th className="px-4 py-3 text-left">OS Atendidas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {executorHoursData.map((row, i) => (
-                    <tr key={i} className={`border-b border-slate-50 hover:bg-blue-50/30 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
-                            {row.name.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="font-semibold text-slate-800">{row.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center justify-center w-8 h-8 bg-slate-100 rounded-full text-sm font-bold text-slate-700">{row.osCount}</span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-black text-lg text-slate-900">{row.hours.toFixed(1)}</span>
-                        <span className="text-slate-400 text-xs ml-1">h</span>
-                      </td>
-                      <td className="px-4 py-3 text-right text-slate-600">
-                        {row.osCount > 0 ? (row.hours / row.osCount).toFixed(1) : '0.0'}h
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {row.osNumbers.slice(0, 6).map(n => (
-                            <span key={n} className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono font-bold">{n}</span>
-                          ))}
-                          {row.osNumbers.length > 6 && (
-                            <span className="text-[10px] text-slate-400 italic">+{row.osNumbers.length - 6} mais</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-800 text-white font-bold">
-                    <td className="px-4 py-3">TOTAL</td>
-                    <td className="px-4 py-3 text-center">{executorHoursData.reduce((s, r) => s + r.osCount, 0)}</td>
-                    <td className="px-4 py-3 text-right">{totalHours.toFixed(1)} h</td>
-                    <td colSpan={2}></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== RELATÓRIO 3: CUSTO POR EMPRESA ===== */}
-      {activeReport === 'cost_by_company' && (
-        <div className="space-y-4">
-          {/* Total geral */}
-          <div className="bg-slate-800 text-white rounded-xl p-5 flex items-center justify-between">
-            <div>
-              <p className="text-slate-400 text-sm mb-1">Custo Total — {periodLabel}</p>
-              <p className="text-3xl font-black">{`R$ ${grandTotalCompany.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}</p>
-            </div>
-            <div className="text-slate-600 text-5xl"><i className="fas fa-building"></i></div>
-          </div>
-
-          {/* Card por empresa */}
-          {COMPANIES.map(company => {
-            const data = costByCompanyData[company];
-            if (!data) return null;
-            const total = data.materialCost + data.serviceCost + data.manualCost;
-            const pct   = grandTotalCompany > 0 ? (total / grandTotalCompany * 100) : 0;
-
-            return (
-              <div key={company} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="px-5 py-4 flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <i className="fas fa-building text-blue-500"></i>
-                      <h3 className="font-bold text-slate-900">{company}</h3>
-                      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{data.osCount} OS</span>
-                    </div>
-
-                    {/* Barra de progresso */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="text-xs text-slate-400 shrink-0 w-12 text-right">{pct.toFixed(1)}%</span>
-                    </div>
-
-                    {/* Sub-custos */}
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { label: 'Materiais', val: data.materialCost, color: 'bg-blue-50 text-blue-800' },
-                        { label: 'Serviços',  val: data.serviceCost,  color: 'bg-emerald-50 text-emerald-800' },
-                        { label: 'Manual',    val: data.manualCost,   color: 'bg-slate-50 text-slate-700' },
-                      ].map(({ label, val, color }) => (
-                        <div key={label} className={`rounded-lg p-2 ${color}`}>
-                          <p className="text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</p>
-                          <p className="text-xs font-bold mt-0.5">{`R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs text-slate-400">Total</p>
-                    <p className="text-2xl font-black text-blue-700">{`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}</p>
-                  </div>
-                </div>
-
-                {/* Drill-down por setor */}
-                {Object.keys(data.sectors).length > 0 && (
-                  <details className="border-t border-slate-100">
-                    <summary className="px-5 py-3 text-xs font-bold text-blue-600 cursor-pointer hover:bg-blue-50 flex items-center gap-2 list-none">
-                      <i className="fas fa-chevron-right text-[10px] group-open:rotate-90"></i>
-                      <i className="fas fa-layer-group"></i>
-                      Detalhar por setor ({Object.keys(data.sectors).length})
-                    </summary>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-blue-50 text-blue-900 text-xs">
-                            <th className="px-5 py-2.5 text-left">Setor</th>
-                            <th className="px-4 py-2.5 text-center">OS</th>
-                            <th className="px-4 py-2.5 text-right">Materiais</th>
-                            <th className="px-4 py-2.5 text-right">Serviços</th>
-                            <th className="px-4 py-2.5 text-right font-bold">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.entries(data.sectors)
-                            .sort((a, b) => (b[1].materialCost + b[1].serviceCost) - (a[1].materialCost + a[1].serviceCost))
-                            .map(([sector, costs], si) => (
-                              <tr key={sector} className={si % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                                <td className="px-5 py-2 font-medium text-slate-700">{sector}</td>
-                                <td className="px-4 py-2 text-center text-slate-500">{costs.osCount}</td>
-                                <td className="px-4 py-2 text-right text-slate-600">{fmt(costs.materialCost)}</td>
-                                <td className="px-4 py-2 text-right text-slate-600">{fmt(costs.serviceCost)}</td>
-                                <td className="px-4 py-2 text-right font-bold text-slate-900">{fmt(costs.materialCost + costs.serviceCost)}</td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </details>
-                )}
+          {/* PROJECT REPORT */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group">
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                  <i className="fas fa-folder-tree"></i>
               </div>
-            );
-          })}
-
-          {/* OS sem empresa identificada */}
-          {costByCompanyData['Não identificado']?.osCount > 0 && (
-            <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-4 text-sm text-slate-500 flex items-start gap-3">
-              <i className="fas fa-question-circle text-slate-400 mt-0.5 shrink-0"></i>
-              <p>
-                <strong>{costByCompanyData['Não identificado'].osCount} OS</strong> sem empresa identificada
-                (custo: {fmt(costByCompanyData['Não identificado'].materialCost + costByCompanyData['Não identificado'].serviceCost)}).
-                Vincule equipamentos a empresas no módulo de Equipamentos para rastrear corretamente.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ===== RELATÓRIO 4: RESUMO DE OS ===== */}
-      {activeReport === 'os_summary' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h2 className="font-bold text-slate-800 flex items-center gap-2">
-              <i className="fas fa-list-check text-blue-500"></i> Resumo de Ordens de Serviço
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">{osSummaryData.length} OS · {periodLabel}</p>
+              <h3 className="font-bold text-lg text-slate-800 mb-2">Relatório de Projetos (Consolidado)</h3>
+              <p className="text-slate-500 text-sm mb-6">Custo total por projeto (Capex), incluindo materiais via OS, baixas diretas e serviços.</p>
+              <button onClick={generateProjectReport} className="mt-auto px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 transition-colors flex items-center gap-2 w-full justify-center">
+                  <i className="fas fa-file-pdf"></i> Gerar PDF
+              </button>
           </div>
 
-          {osSummaryData.length === 0 ? (
-            <EmptyState icon="fa-clipboard-list" text="Nenhuma OS no período selecionado" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-800 text-white text-xs">
-                    <th className="px-4 py-3 text-left">Número</th>
-                    <th className="px-4 py-3 text-left">Descrição</th>
-                    <th className="px-4 py-3 text-left">Abertura</th>
-                    <th className="px-4 py-3 text-left">Limite SLA</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-left">Prioridade</th>
-                    <th className="px-4 py-3 text-right">Custo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {osSummaryData.map((os, i) => {
-                    const late = new Date(os.limitDate) < new Date() && os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
-                    const cost = os.materials.reduce((s, m) => s + m.quantity * m.unitCost, 0)
-                      + os.services.reduce((s, sv) => s + sv.quantity * sv.unitCost, 0)
-                      + (os.manualMaterialCost || 0) + (os.manualServiceCost || 0);
-                    return (
-                      <tr key={os.id} className={`border-b border-slate-50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                        <td className="px-4 py-2.5 font-mono font-bold text-blue-700 text-xs">{os.number}</td>
-                        <td className="px-4 py-2.5 max-w-xs">
-                          <p className="truncate font-medium text-slate-800">{os.description}</p>
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{fmtDt(os.openDate)}</td>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <span className={late ? 'text-red-600 font-bold' : 'text-slate-600'}>{fmtDt(os.limitDate)}</span>
-                          {late && <span className="ml-1 text-[9px] bg-red-100 text-red-600 px-1 rounded font-bold">ATRASADA</span>}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[os.status]}`}>
-                            {STATUS_LABELS[os.status]}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                            os.priority === 'CRITICAL' ? 'bg-red-100 text-red-700' :
-                            os.priority === 'HIGH' ? 'bg-amber-100 text-amber-700' :
-                            os.priority === 'MEDIUM' ? 'bg-blue-100 text-blue-700' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                            {os.priority === 'CRITICAL' ? 'Crítica' : os.priority === 'HIGH' ? 'Alta' : os.priority === 'MEDIUM' ? 'Média' : 'Baixa'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-slate-900">
-                          {cost > 0 ? fmt(cost) : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+          {/* STOCK FLOW REPORT (NEW) */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group">
+              <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                  <i className="fas fa-exchange-alt"></i>
+              </div>
+              <h3 className="font-bold text-lg text-slate-800 mb-2">Fluxo de Estoque Detalhado</h3>
+              <p className="text-slate-500 text-sm mb-6">Entradas e saídas com identificação do <strong>responsável pela reserva</strong> e contexto (OS/Proj).</p>
+              <button onClick={generateStockFlowReport} className="mt-auto px-6 py-3 bg-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors flex items-center gap-2 w-full justify-center">
+                  <i className="fas fa-file-pdf"></i> Gerar PDF
+              </button>
+          </div>
+
+          {/* COST CENTERS REPORT (NEW) */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group">
+              <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                  <i className="fas fa-coins"></i>
+              </div>
+              <h3 className="font-bold text-lg text-slate-800 mb-2">Custos Operacionais (Analítico)</h3>
+              <p className="text-slate-500 text-sm mb-6">Gastos segmentados por <strong>Edifício</strong>, <strong>Equipamento</strong> e Ranking de <strong>OS</strong>.</p>
+              <button onClick={generateCostCenterReport} className="mt-auto px-6 py-3 bg-purple-600 text-white rounded-lg font-bold text-sm hover:bg-purple-700 transition-colors flex items-center gap-2 w-full justify-center">
+                  <i className="fas fa-file-pdf"></i> Gerar PDF
+              </button>
+          </div>
+      </div>
     </div>
   );
 };
-
-const EmptyState: React.FC<{ icon: string; text: string; sub?: string }> = ({ icon, text, sub }) => (
-  <div className="text-center py-14 text-slate-400">
-    <i className={`fas ${icon} text-4xl mb-3 block`}></i>
-    <p className="font-semibold">{text}</p>
-    {sub && <p className="text-sm mt-1 text-slate-400">{sub}</p>}
-  </div>
-);
 
 export default Reports;

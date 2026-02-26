@@ -20,6 +20,7 @@ import Reports from './components/Reports';
 import { supabase, mapFromSupabase, mapToSupabase, mapToSupabaseJson } from './services/supabase';
 import { canAccessModule, ModuleId, loadCustomPermissions, loadUserPermissions } from './services/permissions';
 
+// Definição da estrutura do Menu
 const MENU_GROUPS = [
   {
     title: "Estratégico",
@@ -53,9 +54,12 @@ const MENU_GROUPS = [
 type TabId = typeof MENU_GROUPS[number]['items'][number]['id'];
 
 const App: React.FC = () => {
+  // Estado de Autenticação
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
 
+  const [activeTab, setActiveTab] = useState<TabId>('dash');
+
+  // Dados do Sistema (Sempre vazio no início - carregados do Supabase)
   const [projects, setProjects] = useState<Project[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [services, setServices] = useState<ServiceType[]>([]);
@@ -67,35 +71,56 @@ const App: React.FC = () => {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
 
+  // Estado de Layout Mobile
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Estado de Sincronização
   const [syncStatus, setSyncStatus] = useState<'online' | 'syncing' | 'offline' | 'error'>('online');
   const [firstLoad, setFirstLoad] = useState(true);
 
+  // Refs para debounce de salvamento
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Buscar todos os registros em páginas (evita limite do PostgREST)
+  // ✅ FIX 1: Buscar todos os registros em páginas (evita limite do PostgREST / Max Rows)
   const fetchAllRows = async <T,>(
     table: string,
-    params?: { select?: string; orderBy?: string; ascending?: boolean; pageSize?: number }
+    params?: {
+      select?: string;
+      orderBy?: string;
+      ascending?: boolean;
+      pageSize?: number;
+    }
   ): Promise<T[]> => {
     const select = params?.select ?? '*';
     const orderBy = params?.orderBy ?? 'updated_at';
     const ascending = params?.ascending ?? false;
     const pageSize = Math.min(Math.max(params?.pageSize ?? 1000, 1), 5000);
+
     const all: T[] = [];
     let from = 0;
+
     while (true) {
       const to = from + pageSize - 1;
-      const { data, error } = await supabase.from(table).select(select).order(orderBy, { ascending }).range(from, to);
+
+      const { data, error } = await supabase
+        .from(table)
+        .select(select)
+        .order(orderBy, { ascending })
+        .range(from, to);
+
       if (error) throw error;
+
       const batch = (data ?? []) as T[];
       all.push(...batch);
-      if (batch.length < pageSize) break;
+
+      if (batch.length < pageSize) break; // acabou
       from += pageSize;
     }
+
     return all;
   };
 
+  // Carregamento Inicial do Supabase (Única Fonte de Dados)
   useEffect(() => {
     const loadData = async () => {
       setSyncStatus('syncing');
@@ -104,6 +129,8 @@ const App: React.FC = () => {
         await loadCustomPermissions();
         await loadUserPermissions();
 
+        // ⚠️ Mantém tudo como estava, só tiramos "materials" do Promise.all
+        // para não sofrer corte por limite de linhas.
         const [p, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
           supabase.from('projects').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
           supabase.from('services').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
@@ -116,9 +143,15 @@ const App: React.FC = () => {
           supabase.from('equipments').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999)
         ]);
 
+        // ✅ FIX 2: materials paginado para garantir que puxe TODOS
         let allMaterialsRows: any[] = [];
         try {
-          allMaterialsRows = await fetchAllRows<any>('materials', { select: '*', orderBy: 'code', ascending: true, pageSize: 1000 });
+          allMaterialsRows = await fetchAllRows<any>('materials', {
+            select: '*',
+            orderBy: 'code',
+            ascending: true,
+            pageSize: 1000
+          });
         } catch (mErr) {
           console.error("❌ Error loading materials:", mErr);
           throw mErr;
@@ -132,11 +165,14 @@ const App: React.FC = () => {
         if (usr.error) console.error("❌ Error loading users:", usr.error);
 
         if (p.error || s.error || usr.error) {
+          console.error("Critical errors found. Check logs above.");
           throw new Error("Erro de conexão com Supabase");
         }
 
+        const mappedMaterials = mapFromSupabase<Material>(allMaterialsRows || []);
+
         setProjects(mapFromSupabase<Project>(p.data || []));
-        setMaterials(mapFromSupabase<Material>(allMaterialsRows || []));
+        setMaterials(mappedMaterials);
         setServices(mapFromSupabase<ServiceType>(s.data || []));
         setOss(mapFromSupabase<OS>(o.data || []));
         setMovements(mapFromSupabase<StockMovement>(mov.data || []));
@@ -157,27 +193,49 @@ const App: React.FC = () => {
         if (savedUser) setCurrentUser(JSON.parse(savedUser));
       }
     };
+
     loadData();
   }, []);
 
+  // Função para gerenciar baixa de estoque via OS
+  // Agora suporta múltiplos locais (FIFO de locais: consome do primeiro com saldo)
   const handleStockChange = async (mId: string, qty: number, osNumber: string) => {
     let updatedMaterial: Material | null = null;
     let newMovement: StockMovement | null = null;
+
     const relatedOS = oss.find(os => os.number === osNumber);
 
     setMaterials(prev => prev.map(m => {
       if (m.id === mId) {
         let remainingToDeduct = qty;
         let newLocations: StockLocation[] = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'Geral', quantity: m.currentStock }];
+
+        // Lógica de consumo inteligente de locais
         newLocations = newLocations.map(loc => {
           if (remainingToDeduct <= 0) return loc;
-          if (loc.quantity >= remainingToDeduct) { loc.quantity -= remainingToDeduct; remainingToDeduct = 0; }
-          else { remainingToDeduct -= loc.quantity; loc.quantity = 0; }
+
+          if (loc.quantity >= remainingToDeduct) {
+            loc.quantity -= remainingToDeduct;
+            remainingToDeduct = 0;
+          } else {
+            remainingToDeduct -= loc.quantity;
+            loc.quantity = 0;
+          }
           return loc;
-        }).filter(l => l.quantity > 0 || newLocations.length === 1);
-        if (remainingToDeduct > 0 && newLocations.length > 0) newLocations[0].quantity -= remainingToDeduct;
+        }).filter(l => l.quantity > 0 || newLocations.length === 1); // Mantém pelo menos um local mesmo se zero
+
+        // Se ainda sobrou algo pra deduzir (estoque negativo global), tira do primeiro local
+        if (remainingToDeduct > 0 && newLocations.length > 0) {
+          newLocations[0].quantity -= remainingToDeduct;
+        }
+
         const newTotal = newLocations.reduce((acc, l) => acc + l.quantity, 0);
-        updatedMaterial = { ...m, currentStock: newTotal, stockLocations: newLocations };
+
+        updatedMaterial = {
+          ...m,
+          currentStock: newTotal,
+          stockLocations: newLocations
+        };
         return updatedMaterial;
       }
       return m;
@@ -186,11 +244,13 @@ const App: React.FC = () => {
     let description = `Baixa via ${osNumber}`;
     let costCenter: string | undefined;
     let projectId: string | undefined;
+
     if (relatedOS) {
       if (relatedOS.projectId) {
         const project = projects.find(p => p.id === relatedOS.projectId);
         description = `Baixa p/ Projeto: ${project?.code || 'N/A'} / OS: ${osNumber}`;
-        costCenter = project?.costCenter; projectId = relatedOS.projectId;
+        costCenter = project?.costCenter;
+        projectId = relatedOS.projectId;
       } else if (relatedOS.buildingId) {
         const building = buildings.find(b => b.id === relatedOS.buildingId);
         description = `Baixa p/ Edifício: ${building?.name || 'N/A'} / OS: ${osNumber}`;
@@ -204,18 +264,27 @@ const App: React.FC = () => {
 
     newMovement = {
       id: Math.random().toString(36).substr(2, 9),
-      type: 'OUT', materialId: mId, quantity: qty,
+      type: 'OUT',
+      materialId: mId,
+      quantity: qty,
       date: new Date().toISOString(),
       userId: currentUser?.id || 'SYSTEM',
-      osId: osNumber, description, fromLocation: 'Automático', projectId, costCenter
+      osId: osNumber,
+      description: description,
+      fromLocation: 'Automático',
+      projectId: projectId,
+      costCenter: costCenter
     };
+
     setMovements(prev => [...prev, newMovement!]);
 
+    // Salvar no Supabase
     try {
       if (updatedMaterial) {
         const { error: matError } = await supabase.from('materials').upsert(mapToSupabase(updatedMaterial));
         if (matError) throw matError;
       }
+
       if (newMovement) {
         const { error: movError } = await supabase.from('stock_movements').insert(mapToSupabaseJson(newMovement));
         if (movError) throw movError;
@@ -237,11 +306,12 @@ const App: React.FC = () => {
     localStorage.removeItem('crop_user_session');
   };
 
+  // Se não estiver logado, mostra Login
   if (!currentUser) {
     return <Login users={users} onLogin={handleLogin} />;
   }
 
-  // ✅ Executor com novos props para rastrear movimentos de material
+  // Lógica Especial para EXECUTOR: Painel Simplificado
   if (currentUser.role === 'EXECUTOR') {
     return (
       <ExecutorPanel
@@ -254,10 +324,6 @@ const App: React.FC = () => {
         onLogout={handleLogout}
         services={services}
         materials={materials}
-        setMaterials={setMaterials}
-        movements={movements}
-        setMovements={setMovements}
-        users={users}
       />
     );
   }
@@ -265,65 +331,66 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        // ✅ Dashboard agora recebe users, equipments, movements para novos KPIs
-        return (
-          <Dashboard
-            projects={projects}
-            oss={oss}
-            materials={materials}
-            services={services}
-            users={users}
-            equipments={equipments}
-            movements={movements}
-          />
-        );
+        return <Dashboard projects={projects} oss={oss} materials={materials} services={services} />;
       case 'projects':
         return (
           <ProjectList
-            projects={projects} setProjects={setProjects}
-            oss={oss} materials={materials} setMaterials={setMaterials}
-            services={services} movements={movements} currentUser={currentUser}
+            projects={projects}
+            setProjects={setProjects}
+            oss={oss}
+            materials={materials}
+            setMaterials={setMaterials}
+            services={services}
+            movements={movements}
+            currentUser={currentUser}
           />
         );
       case 'os':
         return (
           <OSList
-            oss={oss} setOss={setOss} projects={projects}
-            buildings={buildings} equipments={equipments}
-            materials={materials} setMaterials={setMaterials}
-            services={services} users={users} setUsers={setUsers}
-            movements={movements} onStockChange={handleStockChange}
+            oss={oss}
+            setOss={setOss}
+            projects={projects}
+            buildings={buildings}
+            equipments={equipments}
+            materials={materials}
+            setMaterials={setMaterials}
+            services={services}
+            users={users}
+            setUsers={setUsers}
+            movements={movements}
+            onStockChange={handleStockChange}
             currentUser={currentUser}
           />
         );
       case 'calendar':
+        // ✅ FIX 3: passa equipments/buildings (evita .find em undefined dentro do CalendarView)
         return (
           <CalendarView
-            oss={oss} projects={projects} materials={materials}
-            services={services} users={users}
-            equipments={equipments as any} buildings={buildings as any}
+            oss={oss}
+            projects={projects}
+            materials={materials}
+            services={services}
+            users={users}
+            equipments={equipments as any}
+            buildings={buildings as any}
           />
         );
       case 'buildings':
         return <BuildingManager buildings={buildings} setBuildings={setBuildings} currentUser={currentUser} />;
       case 'equipments':
-        // ✅ EquipmentManager agora recebe oss para calcular custo acumulado
-        return (
-          <EquipmentManager
-            equipments={equipments}
-            setEquipments={setEquipments}
-            currentUser={currentUser}
-            oss={oss}
-          />
-        );
+        return <EquipmentManager equipments={equipments} setEquipments={setEquipments} currentUser={currentUser} />;
       case 'inventory':
         return (
           <Inventory
-            materials={materials} movements={movements}
+            materials={materials}
+            movements={movements}
             setMaterials={setMaterials}
             onAddMovement={(m) => setMovements(p => [...p, m])}
-            currentUser={currentUser} projects={projects}
-            oss={oss} setOss={setOss}
+            currentUser={currentUser}
+            projects={projects}
+            oss={oss}
+            setOss={setOss}
           />
         );
       case 'services':
@@ -333,11 +400,17 @@ const App: React.FC = () => {
       case 'users':
         return <UserManagement users={users} setUsers={setUsers} currentUser={currentUser} />;
       case 'reports':
+        // Agora passamos os users, buildings e equipments para gerar os nomes corretos nos relatórios
         return (
           <Reports
-            materials={materials} projects={projects}
-            movements={movements} oss={oss} services={services}
-            users={users} buildings={buildings} equipments={equipments}
+            materials={materials}
+            projects={projects}
+            movements={movements}
+            oss={oss}
+            services={services}
+            users={users}
+            buildings={buildings}
+            equipments={equipments}
           />
         );
       case 'documentation':
@@ -347,11 +420,13 @@ const App: React.FC = () => {
     }
   };
 
+  // Fecha o menu mobile ao trocar de aba
   const handleTabChange = (id: TabId) => {
     setActiveTab(id);
     setIsMobileMenuOpen(false);
   };
 
+  // Função para verificar se usuário tem acesso ao módulo
   const hasModuleAccess = (moduleId: string): boolean => {
     if (!currentUser) return false;
     return canAccessModule(currentUser.role, moduleId as ModuleId);
@@ -360,13 +435,27 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-slate-100 font-sans text-slate-900 overflow-hidden">
 
+      {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />
+        <div
+          className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#001529] text-white flex flex-col border-r border-white/10 transition-transform duration-300 ease-in-out shadow-2xl md:relative md:translate-x-0 md:shadow-none ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:w-20 lg:w-72`}>
+      {/* Sidebar Navigation - CUSTOM COLOR #001529 */}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 bg-[#001529] text-white flex flex-col border-r border-white/10 transition-transform duration-300 ease-in-out shadow-2xl
+          md:relative md:translate-x-0 md:shadow-none
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:w-20 lg:w-72
+        `}
+      >
+        {/* Brand Header */}
         <div className="h-20 flex items-center px-6 border-b border-white/10 bg-[#001529] shrink-0 justify-between md:justify-center lg:justify-start relative overflow-hidden group">
           <div className="flex items-center gap-3 relative z-10">
+            {/* Logo Icon Style - imitating the fingerprint logo */}
             <div className="w-10 h-10 flex items-center justify-center text-clean-primary text-2xl group-hover:scale-110 transition-transform">
               <i className="fas fa-fingerprint"></i>
             </div>
@@ -380,16 +469,27 @@ const App: React.FC = () => {
           </button>
         </div>
 
+        {/* Menu Items (Filtered by Permissions) */}
         <nav className="flex-1 py-8 overflow-y-auto custom-scrollbar px-3 space-y-8">
           {MENU_GROUPS.map((group, groupIndex) => {
             const filteredItems = group.items.filter(item => hasModuleAccess(item.id));
+
             if (filteredItems.length === 0) return null;
+
             return (
               <div key={groupIndex}>
-                <h3 className="block md:hidden lg:block px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 mx-2">{group.title}</h3>
+                <h3 className="block md:hidden lg:block px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 mx-2">
+                  {group.title}
+                </h3>
                 <div className="space-y-1">
                   {filteredItems.map((item) => (
-                    <SidebarLink key={item.id} active={activeTab === item.id} onClick={() => handleTabChange(item.id as TabId)} icon={item.icon} label={item.label} />
+                    <SidebarLink
+                      key={item.id}
+                      active={activeTab === item.id}
+                      onClick={() => handleTabChange(item.id as TabId)}
+                      icon={item.icon}
+                      label={item.label}
+                    />
                   ))}
                 </div>
               </div>
@@ -397,6 +497,7 @@ const App: React.FC = () => {
           })}
         </nav>
 
+        {/* User Footer with Logout - Darker Shade */}
         <div className="p-4 border-t border-white/10 bg-[#000b14] shrink-0">
           <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group mb-2">
             <div className="w-10 h-10 rounded-full bg-[#001529] flex items-center justify-center text-sm font-bold text-white border border-white/20 group-hover:border-clean-primary transition-all shrink-0">
@@ -413,12 +514,18 @@ const App: React.FC = () => {
         </div>
       </aside>
 
+      {/* Main Content Wrapper */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-[#f8fafc]">
+        {/* Top Header */}
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 shrink-0 z-30 shadow-sm relative">
           <div className="flex items-center gap-4 text-base text-slate-600 overflow-hidden">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-sm transition-all">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-sm transition-all"
+            >
               <i className="fas fa-bars text-lg"></i>
             </button>
+
             <div className="flex items-center gap-2 truncate">
               <span className="font-bold text-slate-400 hidden sm:block">CropService <span className="text-clean-primary">/</span></span>
               <span className="font-bold text-slate-900 text-lg sm:text-xl truncate">
@@ -426,36 +533,60 @@ const App: React.FC = () => {
               </span>
             </div>
           </div>
+
           <div className="flex items-center gap-3 sm:gap-6">
+            {/* Status Sync */}
             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200" title="Status da Conexão com Supabase">
               <span className={`w-2 h-2 rounded-full ${syncStatus === 'online' ? 'bg-clean-primary' : syncStatus === 'syncing' ? 'bg-blue-500 animate-pulse' : syncStatus === 'error' ? 'bg-red-500' : 'bg-slate-400'}`}></span>
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                 {syncStatus === 'online' ? 'Online' : syncStatus === 'syncing' ? 'Sync...' : syncStatus === 'error' ? 'Erro' : 'Offline'}
               </span>
             </div>
+
             <button className="w-10 h-10 rounded-full bg-white hover:bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-clean-primary transition-all relative shadow-sm hover:shadow active:scale-95">
               <i className="fas fa-bell"></i>
               <span className="absolute top-2.5 right-3 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
             </button>
           </div>
         </header>
+
+        {/* Content Scroll Area */}
         <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 scroll-smooth">
-          <div className="max-w-[1920px] mx-auto pb-10">{renderContent()}</div>
+          <div className="max-w-[1920px] mx-auto pb-10">
+            {renderContent()}
+          </div>
         </main>
       </div>
     </div>
   );
 };
 
-interface SidebarLinkProps { active: boolean; onClick: () => void; icon: string; label: string; }
+interface SidebarLinkProps {
+  active: boolean;
+  onClick: () => void;
+  icon: string;
+  label: string;
+}
 
 const SidebarLink: React.FC<SidebarLinkProps> = ({ active, onClick, icon, label }) => (
-  <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group relative ${active ? 'bg-clean-primary text-white font-bold border border-white shadow-md' : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'}`} title={label}>
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group relative ${
+      active
+        ? 'bg-clean-primary text-white font-bold border border-white shadow-md'
+        : 'text-slate-400 hover:bg-white/5 hover:text-white font-medium'
+    }`}
+    title={label}
+  >
     <div className={`w-6 flex justify-center shrink-0 ${active ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>
       <i className={`fas ${icon} text-lg`}></i>
     </div>
     <span className="block md:hidden lg:block text-sm tracking-tight truncate">{label}</span>
-    <div className="hidden md:block lg:hidden absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-xl border border-slate-700 font-bold">{label}</div>
+
+    {/* Tooltip for collapsed state on Desktop */}
+    <div className="hidden md:block lg:hidden absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-xl border border-slate-700 font-bold">
+      {label}
+    </div>
   </button>
 );
 
