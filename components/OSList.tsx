@@ -109,7 +109,7 @@ const getRequesterDisplayName = (os: any) => {
   if (!os) return 'Não informado';
   if (os.requesterName && String(os.requesterName).trim()) return os.requesterName;
   const uid = os.requesterId;
-  const u: any = users.find(us => us.id === uid);
+  const u: any = (users || []).find(us => us.id === uid);
   return (u?.name || u?.full_name || u?.nome || u?.email || 'Não informado') as string;
 };
 
@@ -450,7 +450,7 @@ const getRequesterDisplayName = (os: any) => {
   const generateOSDetailPDF = (os: OS) => {
     const doc = new jsPDF();
     const context = getContextInfo(os);
-    const osExecutors = os.executorIds ? users.filter(u => os.executorIds?.includes(u.id)) : (os.executorId ? [users.find(u => u.id === os.executorId)].filter(Boolean) : []);
+    const osExecutors = os.executorIds ? users.filter(u => os.executorIds?.includes(u.id)) : (os.executorId ? [(users || []).find(u => u.id === os.executorId)].filter(Boolean) : []);
     const executorNames = osExecutors.length > 0 ? osExecutors.map(e => e?.name).join(', ') : 'Não Atribuído';
     const costs = calculateOSCosts(os, materials, services);
 
@@ -673,7 +673,7 @@ const getRequesterDisplayName = (os: any) => {
             const context = getContextInfo(os);
             const costs = calculateOSCosts(os, materials, services);
             const isOverdue = os.status !== OSStatus.COMPLETED && new Date(os.limitDate) < new Date();
-            const osExecutors = os.executorIds ? users.filter(u => os.executorIds?.includes(u.id)) : (os.executorId ? [users.find(u => u.id === os.executorId)].filter(Boolean) : []);
+            const osExecutors = os.executorIds ? users.filter(u => os.executorIds?.includes(u.id)) : (os.executorId ? [(users || []).find(u => u.id === os.executorId)].filter(Boolean) : []);
             return (
               <div key={os.id} className={`bg-white rounded-xl border p-6 shadow-sm hover:shadow-lg transition-all flex flex-col relative group ${
                 isOverdue ? 'border-l-8 border-l-red-500 border-t-slate-200 border-r-slate-200 border-b-slate-200' :
