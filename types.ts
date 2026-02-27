@@ -1,42 +1,23 @@
+export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR';
 
-export enum ProjectStatus {
-  PLANNED = 'PLANNED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  PAUSED = 'PAUSED',
-  FINISHED = 'FINISHED',
-  CANCELED = 'CANCELED'
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  password?: string;
+  photo?: string;
 }
 
-export enum OSStatus {
-  OPEN = 'OPEN',
-  IN_PROGRESS = 'IN_PROGRESS',
-  PAUSED = 'PAUSED',
-  COMPLETED = 'COMPLETED',
-  CANCELED = 'CANCELED'
-}
+export type OSType = 'CORRECTIVE' | 'PREVENTIVE' | 'IMPROVEMENT';
 
-export enum Category {
-  WORK = 'Obra',
-  MAINTENANCE = 'Manutenção',
-  IMPROVEMENT = 'Melhoria',
-  LEGAL = 'Adequação Legal',
-  ENGINEERING = 'Engenharia'
-}
+export type OSStatus = 'OPEN' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELED';
 
-export enum OSType {
-  CORRECTIVE = 'Corretiva',
-  PREVENTIVE = 'Preventiva',
-  PREDICTIVE = 'Preditiva',
-  LEGAL = 'Legal',
-  IMPROVEMENT = 'Melhoria',
-  OPERATION_SUPPORT = 'Auxiliar de operação'
-}
+export type Category = 'CONSTRUCTION' | 'MAINTENANCE' | 'IMPROVEMENT' | 'OTHER';
 
-export enum ServiceCostType {
-  HOURLY = 'Por Hora',
-  FIXED = 'Valor Fixo',
-  VARIABLE = 'Valor Variável'
-}
+export type ProjectStatus = 'OPEN' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELED';
+
+export type ServiceCostType = 'HOUR' | 'UNIT';
 
 export interface Building {
   id: string;
@@ -54,6 +35,8 @@ export interface Equipment {
   name: string;
   description: string;
   location: string; // Empresa proprietária
+  sector?: string;  // Setor (para árvore de bens)
+  parentEquipmentId?: string; // Equipamento pai (hierarquia)
   model: string;
   serialNumber: string;
   manufacturer: string;
@@ -125,11 +108,19 @@ export interface Project {
   status: ProjectStatus;
   postponementHistory: { date: string; justification: string; user: string }[];
   auditLogs: { date: string; action: string; user: string }[];
+
+  // =========================
+  // CUSTO MANUAL DO PROJETO
+  // =========================
+  // Valores digitados (manual)
   manualMaterialCost?: number;
   manualServiceCost?: number;
+
+  // Flags para escolher o cálculo efetivo:
+  // true = usar manual, false/undefined = usar automático (baixa automática via OS)
+  useManualMaterialCost?: boolean;
+  useManualServiceCost?: boolean;
 }
-
-
 
 export interface ExecutorPauseEntry {
   timestamp: string;
@@ -162,19 +153,27 @@ export interface OS {
   limitDate: string;
   status: OSStatus;
   costCenter?: string;
+
   executorIds?: string[];
   executorId?: string;
+
   executorStates?: Record<string, ExecutorState>;
+
   requesterId?: string;
   requesterName?: string;
+
   startTime?: string;
   endTime?: string;
+
   pauseReason?: string;
   pauseHistory?: { timestamp: string; reason: string; userId: string; action: 'PAUSE' | 'RESUME' }[];
+
   completionImage?: string;
   executionDescription?: string;
+
   materials: OSItem[];
   services: OSService[];
+
   manualMaterialCost?: number;
   manualServiceCost?: number;
 }
@@ -238,23 +237,5 @@ export interface PurchaseRecord {
   unitPrice: number;
   date: string;
   invoiceNumber: string;
-}
-
-// User Role Definitions
-// WAREHOUSE: Almoxarife Geral (Supervisor)
-// WAREHOUSE_BIO: Almoxarife Unidade CropBio
-// WAREHOUSE_FERT: Almoxarife Unidade CropFert
-// COORDINATOR: Coordenador (repassa serviços para executores e cadastra equipamentos)
-export type UserRole = 'ADMIN' | 'MANAGER' | 'COORDINATOR' | 'EXECUTOR' | 'USER' | 'WAREHOUSE' | 'WAREHOUSE_BIO' | 'WAREHOUSE_FERT';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  role: UserRole;
-  department?: string;
-  company?: string; // Empresa do usuário (Cropbio, Cropfert, etc)
-  active: boolean;
-  avatar?: string;
+  notes?: string;
 }
