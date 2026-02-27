@@ -1,3 +1,5 @@
+// types.ts
+
 export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR';
 
 export interface User {
@@ -10,7 +12,6 @@ export interface User {
 }
 
 export type OSType = 'CORRECTIVE' | 'PREVENTIVE' | 'IMPROVEMENT';
-
 export type OSStatus = 'OPEN' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELED';
 
 export type Category = 'CONSTRUCTION' | 'MAINTENANCE' | 'IMPROVEMENT' | 'OTHER';
@@ -31,12 +32,17 @@ export interface Building {
 
 export interface Equipment {
   id: string;
-  code: string;     // TAG do equipamento
+  code: string;
   name: string;
   description: string;
-  location: string; // Empresa proprietária
-  sector?: string;  // Setor (para árvore de bens)
-  parentEquipmentId?: string; // Equipamento pai (hierarquia)
+
+  // Empresa (usada em custo por empresa)
+  location: string;
+
+  // (opcionais) árvore de bens
+  sector?: string;
+  parentEquipmentId?: string;
+
   model: string;
   serialNumber: string;
   manufacturer: string;
@@ -58,9 +64,9 @@ export interface Material {
   unit: string;
   unitCost: number;
   minStock: number;
-  currentStock: number; // Soma total de todos os locais
-  location: string; // Local principal/padrão (display)
-  stockLocations?: StockLocation[]; // Detalhamento por local
+  currentStock: number;
+  location: string;
+  stockLocations?: StockLocation[];
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -68,7 +74,7 @@ export interface ServiceType {
   id: string;
   name: string;
   description: string;
-  team: string; /* Time/Equipe responsável */
+  team: string;
   costType: ServiceCostType;
   unitValue: number;
   category: 'INTERNAL' | 'EXTERNAL';
@@ -109,15 +115,9 @@ export interface Project {
   postponementHistory: { date: string; justification: string; user: string }[];
   auditLogs: { date: string; action: string; user: string }[];
 
-  // =========================
-  // CUSTO MANUAL DO PROJETO
-  // =========================
-  // Valores digitados (manual)
+  // ✅ custo manual por projeto (híbrido com automático)
   manualMaterialCost?: number;
   manualServiceCost?: number;
-
-  // Flags para escolher o cálculo efetivo:
-  // true = usar manual, false/undefined = usar automático (baixa automática via OS)
   useManualMaterialCost?: boolean;
   useManualServiceCost?: boolean;
 }
@@ -125,10 +125,10 @@ export interface Project {
 export interface ExecutorPauseEntry {
   timestamp: string;
   reason: string;
-  userId: string; // quem registrou a ação
-  executorId: string; // para qual executor vale
+  userId: string;
+  executorId: string;
   action: 'PAUSE' | 'RESUME';
-  worklogBeforePause?: string; // o que foi feito até antes da pausa
+  worklogBeforePause?: string;
 }
 
 export interface ExecutorState {
@@ -137,45 +137,6 @@ export interface ExecutorState {
   endTime?: string;
   pauseHistory?: ExecutorPauseEntry[];
   currentPauseReason?: string;
-}
-
-export interface OS {
-  id: string;
-  number: string;
-  projectId?: string;
-  buildingId?: string;
-  equipmentId?: string;
-  description: string;
-  type: OSType;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  slaHours: number;
-  openDate: string;
-  limitDate: string;
-  status: OSStatus;
-  costCenter?: string;
-
-  executorIds?: string[];
-  executorId?: string;
-
-  executorStates?: Record<string, ExecutorState>;
-
-  requesterId?: string;
-  requesterName?: string;
-
-  startTime?: string;
-  endTime?: string;
-
-  pauseReason?: string;
-  pauseHistory?: { timestamp: string; reason: string; userId: string; action: 'PAUSE' | 'RESUME' }[];
-
-  completionImage?: string;
-  executionDescription?: string;
-
-  materials: OSItem[];
-  services: OSService[];
-
-  manualMaterialCost?: number;
-  manualServiceCost?: number;
 }
 
 export interface OSItem {
@@ -193,6 +154,49 @@ export interface OSService {
   timestamp: string;
 }
 
+export interface OS {
+  id: string;
+  number: string;
+  projectId?: string;
+  buildingId?: string;
+  equipmentId?: string;
+
+  description: string;
+  type: OSType;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+  slaHours: number;
+  openDate: string;
+  limitDate: string;
+  status: OSStatus;
+  costCenter?: string;
+
+  executorIds?: string[];
+  executorId?: string;
+
+  // ✅ novo: status por executor
+  executorStates?: Record<string, ExecutorState>;
+
+  requesterId?: string;
+  requesterName?: string;
+
+  startTime?: string;
+  endTime?: string;
+
+  pauseReason?: string;
+  pauseHistory?: { timestamp: string; reason: string; userId: string; action: 'PAUSE' | 'RESUME' }[];
+
+  completionImage?: string;
+  executionDescription?: string;
+
+  materials: OSItem[];
+  services: OSService[];
+
+  // custos manuais da OS (já existia no seu modelo)
+  manualMaterialCost?: number;
+  manualServiceCost?: number;
+}
+
 export interface StockMovement {
   id: string;
   type: 'IN' | 'OUT' | 'ADJUST' | 'RETURN' | 'TRANSFER';
@@ -201,16 +205,16 @@ export interface StockMovement {
   date: string;
   userId: string;
   osId?: string;
-  projectId?: string; // Para baixa direta em projeto
-  costCenter?: string; // Centro de custo da OS ou Projeto
+  projectId?: string;
+  costCenter?: string;
   description: string;
-  fromLocation?: string; // Para transferências e saídas
-  toLocation?: string;   // Para transferências e entradas
+  fromLocation?: string;
+  toLocation?: string;
 }
 
 export interface SupplierDoc {
   name: string;
-  url: string; /* Base64 ou URL */
+  url: string;
   type: string;
   uploadDate: string;
 }
