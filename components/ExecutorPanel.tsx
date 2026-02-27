@@ -173,9 +173,66 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       const reason = prompt('Motivo da pausa:');
       if (!reason) return;
 
+      // Para executor: registrar também o que foi feito antes da pausa
+      const worklogBeforePause = prompt('O que foi feito até agora (antes da pausa)?') || undefined;
+
       const os = oss.find(o => o.id === osId);
       if (!os) return;
 
+      const isMultiExecutor = (os.executorIds?.length || 0) > 1;
+
+      // Modelo novo: pausa por executor (não pausa a OS inteira)
+      if (isMultiExecutor) {
+          const executorId = user.id;
+
+          const pauseEntry = {
+              timestamp: new Date().toISOString(),
+              reason,
+              userId: user.id,
+              executorId,
+              action: 'PAUSE' as const,
+              worklogBeforePause
+          };
+
+          const prevStates = os.executorStates || {};
+          const prevState = prevStates[executorId] || { status: 'IN_PROGRESS' as const, pauseHistory: [] as any[] };
+
+          const nextStates = {
+              ...prevStates,
+              [executorId]: {
+                  ...prevState,
+                  status: 'PAUSED' as const,
+                  currentPauseReason: reason,
+                  pauseHistory: [...(prevState.pauseHistory || []), pauseEntry]
+              }
+          };
+
+          // Status global: só PAUSED se todos executores estiverem pausados
+          const allPaused = (os.executorIds || []).length > 0
+            ? (os.executorIds || []).every(id => nextStates[id]?.status === 'PAUSED')
+            : false;
+
+          const updated = {
+              executorStates: nextStates,
+              status: allPaused ? OSStatus.PAUSED : (os.status || OSStatus.IN_PROGRESS)
+          };
+
+          setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
+
+          try {
+              const { error } = await supabase.from('oss').upsert(mapToSupabase({
+                  id: osId,
+                  ...os,
+                  ...updated
+              }));
+              if (error) throw error;
+          } catch (e) {
+              console.error('Erro ao pausar OS (por executor):', e);
+          }
+          return;
+      }
+
+      // Legado: pausa global (OS com 1 executor)
       const pauseEntry = {
           timestamp: new Date().toISOString(),
           reason,
@@ -209,6 +266,59 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       const os = oss.find(o => o.id === osId);
       if (!os) return;
 
+      const isMultiExecutor = (os.executorIds?.length || 0) > 1;
+
+      // Modelo novo: retoma por executor
+      if (isMultiExecutor) {
+          const executorId = user.id;
+
+          const resumeEntry = {
+              timestamp: new Date().toISOString(),
+              reason: 'Retomada',
+              userId: user.id,
+              executorId,
+              action: 'RESUME' as const
+          };
+
+          const prevStates = os.executorStates || {};
+          const prevState = prevStates[executorId] || { status: 'IN_PROGRESS' as const, pauseHistory: [] as any[] };
+
+          const nextStates = {
+              ...prevStates,
+              [executorId]: {
+                  ...prevState,
+                  status: 'IN_PROGRESS' as const,
+                  currentPauseReason: undefined,
+                  pauseHistory: [...(prevState.pauseHistory || []), resumeEntry]
+              }
+          };
+
+          // Status global: se algum executor estiver em andamento, IN_PROGRESS
+          const anyInProgress = (os.executorIds || []).length > 0
+            ? (os.executorIds || []).some(id => nextStates[id]?.status === 'IN_PROGRESS')
+            : true;
+
+          const updated = {
+              executorStates: nextStates,
+              status: anyInProgress ? OSStatus.IN_PROGRESS : os.status
+          };
+
+          setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
+
+          try {
+              const { error } = await supabase.from('oss').upsert(mapToSupabase({
+                  id: osId,
+                  ...os,
+                  ...updated
+              }));
+              if (error) throw error;
+          } catch (e) {
+              console.error('Erro ao retomar OS (por executor):', e);
+          }
+          return;
+      }
+
+      // Legado: retoma global
       const resumeEntry = {
           timestamp: new Date().toISOString(),
           reason: 'Retomada',
@@ -236,6 +346,7 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       }
   };
 
+  
   const openFinishModal = (e: React.MouseEvent, os: OS) => {
       e.stopPropagation();
       setFinishingOS(os);
