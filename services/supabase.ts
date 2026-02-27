@@ -138,6 +138,16 @@ export const mapToSupabase = <T extends { id: string }>(item: T) => {
   if ('auditLogs' in rest) normalizedData.audit_logs = rest.auditLogs;
   if ('postponementHistory' in rest) normalizedData.postponement_history = rest.postponementHistory;
 
+  // Custos manuais (opcional) - valores extras não vinculados a OS
+  if ('manualMaterialCost' in rest) normalizedData.manual_material_cost = rest.manualMaterialCost;
+  if ('manualServiceCost' in rest) normalizedData.manual_service_cost = rest.manualServiceCost;
+  if ('manualMaterialDescription' in rest) normalizedData.manual_material_description = rest.manualMaterialDescription;
+  if ('manualServiceDescription' in rest) normalizedData.manual_service_description = rest.manualServiceDescription;
+
+  // Custos manuais detalhados (itens)
+  if ('manualMaterialItems' in rest) normalizedData.manual_material_items = rest.manualMaterialItems;
+  if ('manualServiceItems' in rest) normalizedData.manual_service_items = rest.manualServiceItems;
+
   if ('cnpj' in rest) normalizedData.cnpj = rest.cnpj;
   if ('contact' in rest) normalizedData.contact = rest.contact;
   if ('phone' in rest) normalizedData.phone = rest.phone;
