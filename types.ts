@@ -129,6 +129,25 @@ export interface Project {
   manualServiceCost?: number;
 }
 
+
+
+export interface ExecutorPauseEntry {
+  timestamp: string;
+  reason: string;
+  userId: string; // quem registrou a ação
+  executorId: string; // para qual executor vale
+  action: 'PAUSE' | 'RESUME';
+  worklogBeforePause?: string; // o que foi feito até antes da pausa
+}
+
+export interface ExecutorState {
+  status: 'IN_PROGRESS' | 'PAUSED' | 'DONE';
+  startTime?: string;
+  endTime?: string;
+  pauseHistory?: ExecutorPauseEntry[];
+  currentPauseReason?: string;
+}
+
 export interface OS {
   id: string;
   number: string;
@@ -145,6 +164,7 @@ export interface OS {
   costCenter?: string;
   executorIds?: string[];
   executorId?: string;
+  executorStates?: Record<string, ExecutorState>;
   requesterId?: string;
   requesterName?: string;
   startTime?: string;
