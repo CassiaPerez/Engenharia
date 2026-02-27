@@ -1,24 +1,42 @@
-// src/types.ts
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  password?: string;
-  photo?: string;
+export enum ProjectStatus {
+  PLANNED = 'PLANNED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  PAUSED = 'PAUSED',
+  FINISHED = 'FINISHED',
+  CANCELED = 'CANCELED'
 }
 
-export type OSType = 'CORRECTIVE' | 'PREVENTIVE' | 'IMPROVEMENT';
-export type OSStatus = 'OPEN' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELED';
+export enum OSStatus {
+  OPEN = 'OPEN',
+  IN_PROGRESS = 'IN_PROGRESS',
+  PAUSED = 'PAUSED',
+  COMPLETED = 'COMPLETED',
+  CANCELED = 'CANCELED'
+}
 
-export type Category = 'CONSTRUCTION' | 'MAINTENANCE' | 'IMPROVEMENT' | 'OTHER';
+export enum Category {
+  WORK = 'Obra',
+  MAINTENANCE = 'Manutenção',
+  IMPROVEMENT = 'Melhoria',
+  LEGAL = 'Adequação Legal',
+  ENGINEERING = 'Engenharia'
+}
 
-export type ProjectStatus = 'OPEN' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELED';
+export enum OSType {
+  CORRECTIVE = 'Corretiva',
+  PREVENTIVE = 'Preventiva',
+  PREDICTIVE = 'Preditiva',
+  LEGAL = 'Legal',
+  IMPROVEMENT = 'Melhoria',
+  OPERATION_SUPPORT = 'Auxiliar de operação'
+}
 
-export type ServiceCostType = 'HOUR' | 'UNIT';
+export enum ServiceCostType {
+  HOURLY = 'Por Hora',
+  FIXED = 'Valor Fixo',
+  VARIABLE = 'Valor Variável'
+}
 
 export interface Building {
   id: string;
@@ -32,12 +50,10 @@ export interface Building {
 
 export interface Equipment {
   id: string;
-  code: string;
+  code: string;     // TAG do equipamento
   name: string;
   description: string;
-  location: string; // empresa
-  sector?: string;
-  parentEquipmentId?: string;
+  location: string; // Empresa proprietária
   model: string;
   serialNumber: string;
   manufacturer: string;
@@ -59,9 +75,9 @@ export interface Material {
   unit: string;
   unitCost: number;
   minStock: number;
-  currentStock: number;
-  location: string;
-  stockLocations?: StockLocation[];
+  currentStock: number; // Soma total de todos os locais
+  location: string; // Local principal/padrão (display)
+  stockLocations?: StockLocation[]; // Detalhamento por local
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -69,7 +85,7 @@ export interface ServiceType {
   id: string;
   name: string;
   description: string;
-  team: string;
+  team: string; /* Time/Equipe responsável */
   costType: ServiceCostType;
   unitValue: number;
   category: 'INTERNAL' | 'EXTERNAL';
@@ -109,21 +125,19 @@ export interface Project {
   status: ProjectStatus;
   postponementHistory: { date: string; justification: string; user: string }[];
   auditLogs: { date: string; action: string; user: string }[];
-
-  // custo manual por projeto (auto + manual coexistem)
   manualMaterialCost?: number;
   manualServiceCost?: number;
-  useManualMaterialCost?: boolean;
-  useManualServiceCost?: boolean;
 }
+
+
 
 export interface ExecutorPauseEntry {
   timestamp: string;
   reason: string;
-  userId: string;
-  executorId: string;
+  userId: string; // quem registrou a ação
+  executorId: string; // para qual executor vale
   action: 'PAUSE' | 'RESUME';
-  worklogBeforePause?: string;
+  worklogBeforePause?: string; // o que foi feito até antes da pausa
 }
 
 export interface ExecutorState {
@@ -132,6 +146,37 @@ export interface ExecutorState {
   endTime?: string;
   pauseHistory?: ExecutorPauseEntry[];
   currentPauseReason?: string;
+}
+
+export interface OS {
+  id: string;
+  number: string;
+  projectId?: string;
+  buildingId?: string;
+  equipmentId?: string;
+  description: string;
+  type: OSType;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  slaHours: number;
+  openDate: string;
+  limitDate: string;
+  status: OSStatus;
+  costCenter?: string;
+  executorIds?: string[];
+  executorId?: string;
+  executorStates?: Record<string, ExecutorState>;
+  requesterId?: string;
+  requesterName?: string;
+  startTime?: string;
+  endTime?: string;
+  pauseReason?: string;
+  pauseHistory?: { timestamp: string; reason: string; userId: string; action: 'PAUSE' | 'RESUME' }[];
+  completionImage?: string;
+  executionDescription?: string;
+  materials: OSItem[];
+  services: OSService[];
+  manualMaterialCost?: number;
+  manualServiceCost?: number;
 }
 
 export interface OSItem {
@@ -149,48 +194,6 @@ export interface OSService {
   timestamp: string;
 }
 
-export interface OS {
-  id: string;
-  number: string;
-  projectId?: string;
-  buildingId?: string;
-  equipmentId?: string;
-
-  description: string;
-  type: OSType;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-
-  slaHours: number;
-  openDate: string;
-  limitDate: string;
-  status: OSStatus;
-
-  costCenter?: string;
-
-  executorIds?: string[];
-  executorId?: string;
-
-  executorStates?: Record<string, ExecutorState>;
-
-  requesterId?: string;
-  requesterName?: string;
-
-  startTime?: string;
-  endTime?: string;
-
-  pauseReason?: string;
-  pauseHistory?: { timestamp: string; reason: string; userId: string; action: 'PAUSE' | 'RESUME' }[];
-
-  completionImage?: string;
-  executionDescription?: string;
-
-  materials: OSItem[];
-  services: OSService[];
-
-  manualMaterialCost?: number;
-  manualServiceCost?: number;
-}
-
 export interface StockMovement {
   id: string;
   type: 'IN' | 'OUT' | 'ADJUST' | 'RETURN' | 'TRANSFER';
@@ -199,16 +202,16 @@ export interface StockMovement {
   date: string;
   userId: string;
   osId?: string;
-  projectId?: string;
-  costCenter?: string;
+  projectId?: string; // Para baixa direta em projeto
+  costCenter?: string; // Centro de custo da OS ou Projeto
   description: string;
-  fromLocation?: string;
-  toLocation?: string;
+  fromLocation?: string; // Para transferências e saídas
+  toLocation?: string;   // Para transferências e entradas
 }
 
 export interface SupplierDoc {
   name: string;
-  url: string;
+  url: string; /* Base64 ou URL */
   type: string;
   uploadDate: string;
 }
@@ -235,5 +238,23 @@ export interface PurchaseRecord {
   unitPrice: number;
   date: string;
   invoiceNumber: string;
-  notes?: string;
+}
+
+// User Role Definitions
+// WAREHOUSE: Almoxarife Geral (Supervisor)
+// WAREHOUSE_BIO: Almoxarife Unidade CropBio
+// WAREHOUSE_FERT: Almoxarife Unidade CropFert
+// COORDINATOR: Coordenador (repassa serviços para executores e cadastra equipamentos)
+export type UserRole = 'ADMIN' | 'MANAGER' | 'COORDINATOR' | 'EXECUTOR' | 'USER' | 'WAREHOUSE' | 'WAREHOUSE_BIO' | 'WAREHOUSE_FERT';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  department?: string;
+  company?: string; // Empresa do usuário (Cropbio, Cropfert, etc)
+  active: boolean;
+  avatar?: string;
 }
