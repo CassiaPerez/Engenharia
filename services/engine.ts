@@ -1,5 +1,4 @@
-
-import { OS, Material, ServiceType, Project, OSStatus, ServiceCostType, User, Equipment } from '../types';
+import { OS, Material, ServiceType, Project, ServiceCostType, User, Equipment } from '../types';
 
 export const calculateOSCosts = (os: OS, materials: Material[], services: ServiceType[]) => {
   // Usa valor manual se definido, senão calcula pela soma dos itens
@@ -28,94 +27,81 @@ export const calculateOSCosts = (os: OS, materials: Material[], services: Servic
   };
 };
 
+/**
+ * Projeto com 2 cálculos coexistindo:
+ * - Auto (baixa automática): soma de OS do projeto
+ * - Manual (digitado): manualMaterialCost/manualServiceCost
+ * - Efetivo: definido por useManualMaterialCost/useManualServiceCost
+ */
 export const calculateProjectCosts = (project: Project, oss: OS[], materials: Material[], services: ServiceType[]) => {
   const projectOSs = oss.filter(os => os.projectId === project.id);
 
-  let totalMaterials = 0;
-  let totalServices = 0;
+  // 1) AUTOMÁTICO: soma das OS
+  let autoMaterials = 0;
+  let autoServices = 0;
 
   projectOSs.forEach(os => {
     const costs = calculateOSCosts(os, materials, services);
-    totalMaterials += costs.materialCost;
-    totalServices += costs.serviceCost;
+    autoMaterials += costs.materialCost;
+    autoServices += costs.serviceCost;
   });
 
-  // Adiciona valores manuais do projeto se definidos
-  if (project.manualMaterialCost !== undefined && project.manualMaterialCost !== null) {
-    totalMaterials += project.manualMaterialCost;
-  }
-  if (project.manualServiceCost !== undefined && project.manualServiceCost !== null) {
-    totalServices += project.manualServiceCost;
-  }
+  const autoTotal = autoMaterials + autoServices;
 
-  const totalReal = totalMaterials + totalServices;
+  // 2) MANUAL: digitado no projeto
+  const manualMaterials = project.manualMaterialCost ?? 0;
+  const manualServices = project.manualServiceCost ?? 0;
+  const manualTotal = manualMaterials + manualServices;
+
+  // 3) EFETIVO: o que vale (auto ou manual) por chave
+  const useManualMat = project.useManualMaterialCost === true;
+  const useManualSrv = project.useManualServiceCost === true;
+
+  const effectiveMaterials = useManualMat ? manualMaterials : autoMaterials;
+  const effectiveServices = useManualSrv ? manualServices : autoServices;
+  const effectiveTotal = effectiveMaterials + effectiveServices;
 
   return {
-    totalMaterials,
-    totalServices,
-    totalReal,
-    variance: project.estimatedValue - totalReal,
-    variancePercent: project.estimatedValue > 0 ? (totalReal / project.estimatedValue) * 100 : 0
+    // Auto (baixa automática)
+    autoMaterials,
+    autoServices,
+    autoTotal,
+
+    // Manual (digitado)
+    manualMaterials,
+    manualServices,
+    manualTotal,
+
+    // Efetivo (o que vale nos relatórios/dash)
+    effectiveMaterials,
+    effectiveServices,
+    effectiveTotal,
+
+    // Controle (para UI)
+    useManualMat,
+    useManualSrv,
+
+    // Comparação
+    variance: project.estimatedValue - effectiveTotal,
+    variancePercent: project.estimatedValue > 0 ? ((project.estimatedValue - effectiveTotal) / project.estimatedValue) * 100 : 0,
   };
 };
 
-export const calculatePlannedCosts = (project: Partial<Project>, materials: Material[], services: ServiceType[]) => {
-  const matCost = (project.plannedMaterials || []).reduce((acc, pm) => {
-    // Usa o custo manual definido no planejamento, ou fallback para o cadastro se não existir (compatibilidade)
-    const manualCost = pm.unitCost;
-    const catalogCost = materials.find(m => m.id === pm.materialId)?.unitCost || 0;
-    const finalCost = manualCost !== undefined ? manualCost : catalogCost;
-    
-    return acc + (pm.quantity * finalCost);
-  }, 0);
-
-  const srvCost = (project.plannedServices || []).reduce((acc, ps) => {
-    // Usa o custo manual definido no planejamento
-    const manualCost = ps.unitCost;
-    const catalogCost = services.find(s => s.id === ps.serviceTypeId)?.unitValue || 0;
-    const finalCost = manualCost !== undefined ? manualCost : catalogCost;
-
-    return acc + (ps.hours * finalCost); 
-  }, 0);
-
-  return {
-    matCost,
-    srvCost,
-    totalPlanned: matCost + srvCost
-  };
-};
-
-export const checkSLA = (limitDate: string, completionDate?: string) => {
-  const limit = new Date(limitDate);
-  const completion = completionDate ? new Date(completionDate) : new Date();
-  return completion <= limit;
-};
-
-export const formatDate = (dateStr: string) => {
-  if (!dateStr) return '---';
-  return new Date(dateStr).toLocaleDateString('pt-BR');
-};
-
-export const getStatusColor = (status: string) => {
-  switch (status) {
-    case OSStatus.COMPLETED:
-    case 'FINISHED':
-      return 'emerald';
-    case OSStatus.IN_PROGRESS:
-      return 'blue';
-    case OSStatus.OPEN:
-      return 'amber';
-    case OSStatus.CANCELED:
-      return 'slate';
+export const translateServiceCostType = (type: ServiceCostType) => {
+  switch (type) {
+    case 'HOUR':
+      return 'Por Hora';
+    case 'UNIT':
+      return 'Por Unidade';
     default:
-      return 'slate';
+      return type;
   }
 };
 
+// --------------------
+// Relatórios adicionais
+// --------------------
 
-// --------------------
-// Relatórios adicionais (incremental, sem quebrar legado)
-// --------------------
 export const resolveCompanyForOS = (
   os: OS,
   equipments: Equipment[] = [],
@@ -186,7 +172,6 @@ export const calculateExecutorHoursForOS = (os: OS, executorId: string) => {
   }
 
   const netMs = Math.max(0, grossMs - pausedMs);
-
   const msToHours = (ms: number) => ms / 3600000;
 
   return {
@@ -205,14 +190,6 @@ export const buildExecutorHoursRows = (
   const from = dateFrom ? new Date(dateFrom) : null;
   const to = dateTo ? new Date(dateTo) : null;
 
-  const within = (d?: string) => {
-    if (!d) return true;
-    const dt = new Date(d);
-    if (from && dt < from) return false;
-    if (to && dt > to) return false;
-    return true;
-  };
-
   const rows: Array<{
     executorId: string;
     executorName: string;
@@ -223,6 +200,14 @@ export const buildExecutorHoursRows = (
     pausedHours: number;
     netHours: number;
   }> = [];
+
+  const within = (d?: string) => {
+    if (!d) return true;
+    const dt = new Date(d);
+    if (from && dt < from) return false;
+    if (to && dt > to) return false;
+    return true;
+  };
 
   oss.forEach(os => {
     if (os.executorStates && Object.keys(os.executorStates).length > 0) {
