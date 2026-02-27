@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Material, Project, StockMovement, OS, ServiceType, User, Building, Equipment } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { calculateProjectCosts, calculateOSCosts } from '../services/engine';
+import { calculateProjectCosts, calculateOSCosts, groupCostsByCompany, buildExecutorHoursRows } from '../services/engine';
 
 interface Props {
   materials: Material[];
@@ -209,8 +209,23 @@ const Reports: React.FC<Props> = ({ materials, projects, movements, oss, service
       doc.setFont("helvetica", "normal");
       doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
 
-      // Filtrar e ordenar movimentações
-      const sortedMovements = [...movements].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Filtrar por período (se informado) e ordenar movimentações
+      const from = dateFrom ? new Date(dateFrom) : null;
+      const to = dateTo ? new Date(dateTo) : null;
+      const periodMovements = movements.filter(m => {
+          const d = new Date(m.date);
+          if (from && d < from) return false;
+          if (to && d > to) return false;
+          return true;
+      });
+
+      if (dateFrom || dateTo) {
+        doc.setFontSize(8);
+        doc.setTextColor(255, 255, 255);
+        doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, 280, 20, { align: 'right' });
+      }
+
+      const sortedMovements = [...periodMovements].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       const rows = sortedMovements.map(m => {
           const mat = materials.find(mt => mt.id === m.materialId);
@@ -218,7 +233,10 @@ const Reports: React.FC<Props> = ({ materials, projects, movements, oss, service
           const user = users.find(u => u.id === m.userId)?.name || 'Sistema / Importação';
           
           let reference = '-';
-          if (m.osId) reference = `OS: ${m.osId}`;
+          if (m.osId) {
+              const osRef = oss.find(o => o.id === m.osId);
+              reference = `OS: ${osRef?.number || m.osId}`;
+          }
           else if (m.projectId) {
               const p = projects.find(proj => proj.id === m.projectId);
               reference = `Proj: ${p?.code || 'N/A'}`;
@@ -238,7 +256,7 @@ const Reports: React.FC<Props> = ({ materials, projects, movements, oss, service
 
       autoTable(doc, {
           startY: 30,
-          head: [['Data', 'Tipo', 'Código', 'Material', 'Qtd', 'Responsável Reserva', 'Ref. (OS/Proj)', 'Detalhes']],
+          head: [['Data', 'Tipo', 'Código', 'Material', 'Qtd', 'Quem deu baixa', 'Ref. (OS/Proj)', 'Detalhes']],
           body: rows,
           styles: { fontSize: 8, cellPadding: 2 },
           headStyles: { fillColor: [50, 60, 70], textColor: 255, fontStyle: 'bold' },
@@ -496,3 +514,94 @@ const Reports: React.FC<Props> = ({ materials, projects, movements, oss, service
 };
 
 export default Reports;
+
+const generateExecutorHoursReport = () => {
+  const doc = new jsPDF({ orientation: 'landscape' });
+  const today = new Date().toLocaleString('pt-BR');
+
+  doc.setFillColor(50, 60, 70);
+  doc.rect(0, 0, 297, 24, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("RELATÓRIO DE HORAS POR EXECUTOR", 14, 16);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+
+  if (dateFrom || dateTo) {
+    doc.setFontSize(8);
+    doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, 280, 20, { align: 'right' });
+  }
+
+  const rowsData = buildExecutorHoursRows(oss, users || [], dateFrom, dateTo).map(r => ([
+    r.executorName,
+    r.osNumber,
+    r.startTime ? new Date(r.startTime).toLocaleString('pt-BR') : '-',
+    r.endTime ? new Date(r.endTime).toLocaleString('pt-BR') : '-',
+    r.grossHours.toFixed(2),
+    r.pausedHours.toFixed(2),
+    r.netHours.toFixed(2),
+  ]));
+
+  autoTable(doc, {
+    startY: 30,
+    head: [['Executor', 'OS', 'Início', 'Fim', 'Horas Brutas', 'Horas Pausadas', 'Horas Líquidas']],
+    body: rowsData,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [30, 41, 59] },
+  });
+
+  doc.save(`relatorio_horas_executor_${new Date().toISOString().slice(0,10)}.pdf`);
+};
+
+const generateCompanyCostReport = () => {
+  const doc = new jsPDF({ orientation: 'portrait' });
+  const today = new Date().toLocaleString('pt-BR');
+
+  doc.setFillColor(50, 60, 70);
+  doc.rect(0, 0, 210, 24, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("RELATÓRIO DE CUSTO POR EMPRESA", 14, 16);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Gerado em: ${today}`, 196, 16, { align: 'right' });
+
+  if (dateFrom || dateTo) {
+    doc.setFontSize(8);
+    doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, 196, 20, { align: 'right' });
+  }
+
+  // Filtra OS por período usando openDate como referência
+  const from = dateFrom ? new Date(dateFrom) : null;
+  const to = dateTo ? new Date(dateTo) : null;
+  const periodOS = oss.filter(o => {
+    const d = new Date(o.openDate);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+
+  const grouped = groupCostsByCompany(periodOS, materials, services, equipments || [], projects);
+
+  const rows = grouped.map(g => ([
+    g.company,
+    `R$ ${formatCurrency(g.material)}`,
+    `R$ ${formatCurrency(g.service)}`,
+    `R$ ${formatCurrency(g.total)}`
+  ]));
+
+  autoTable(doc, {
+    startY: 30,
+    head: [['Empresa', 'Materiais', 'Serviços', 'Total']],
+    body: rows,
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: [30, 41, 59] },
+  });
+
+  doc.save(`relatorio_custo_empresa_${new Date().toISOString().slice(0,10)}.pdf`);
+};
+
+
