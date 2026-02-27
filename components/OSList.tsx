@@ -78,6 +78,8 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const [searchTerm, setSearchTerm] = useState(''); 
   const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
+  const [slaFilter, setSlaFilter] = useState<'ALL' | 'SLA_OVERDUE'>('ALL');
+  const [openDateSort, setOpenDateSort] = useState<'NONE' | 'OPEN_DATE_DESC' | 'OPEN_DATE_ASC'>('NONE');
   
   const [formOS, setFormOS] = useState<Partial<OS>>({ priority: 'MEDIUM', status: OSStatus.OPEN, slaHours: 24, type: OSType.PREVENTIVE, executorIds: [] });
   const [creationContext, setCreationContext] = useState<'PROJECT' | 'BUILDING' | 'EQUIPMENT'>('PROJECT');
@@ -225,13 +227,26 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   }, [services, allocSrvSearch]);
 
   const filteredOSs = useMemo(() => {
-    return oss.filter(os => {
+    const now = new Date();
+    const filtered = oss.filter(os => {
       const matchesSearch = os.number.toLowerCase().includes(searchTerm.toLowerCase()) || os.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || os.status === statusFilter;
       const matchesPriority = priorityFilter === 'ALL' || os.priority === priorityFilter;
-      return matchesSearch && matchesStatus && matchesPriority;
+
+      const isOverdue = os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED && new Date(os.limitDate) < now;
+      const matchesSLA = slaFilter === 'ALL' || (slaFilter === 'SLA_OVERDUE' && isOverdue);
+
+      return matchesSearch && matchesStatus && matchesPriority && matchesSLA;
     });
-  }, [oss, searchTerm, statusFilter, priorityFilter]);
+
+    if (openDateSort === 'OPEN_DATE_DESC') {
+      filtered.sort((a,b) => new Date(b.openDate).getTime() - new Date(a.openDate).getTime());
+    } else if (openDateSort === 'OPEN_DATE_ASC') {
+      filtered.sort((a,b) => new Date(a.openDate).getTime() - new Date(b.openDate).getTime());
+    }
+
+    return filtered;
+  }, [oss, searchTerm, statusFilter, priorityFilter, slaFilter, openDateSort]);
 
   const filteredEquipments = useMemo(() => {
     if (!equipmentCompanyFilter) return equipments;
@@ -706,7 +721,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-200 pb-6">
         <div><h2 className="text-3xl font-bold text-slate-900 tracking-tight">Ordens de Serviço</h2><p className="text-slate-600 text-lg mt-1 font-medium">Gestão Operacional e Apontamentos.</p></div>
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-center">
-            <div className="flex gap-2 w-full md:w-auto"><div className="relative group w-full md:w-56"><i className={`fas ${searchTerm !== searchInput ? 'fa-spinner fa-spin' : 'fa-search'} absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg transition-all`}></i><input type="text" placeholder="Buscar OS..." className="w-full h-12 pl-12 pr-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={searchInput} onChange={e => setSearchInput(e.target.value)} /></div><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}><option value="ALL">Todos Status</option>{Object.values(OSStatus).map(s => <option key={s} value={s}>{s}</option>)}</select><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)}><option value="ALL">Todas Prioridades</option><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></div>
+            <div className="flex gap-2 w-full md:w-auto"><div className="relative group w-full md:w-56"><i className={`fas ${searchTerm !== searchInput ? 'fa-spinner fa-spin' : 'fa-search'} absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg transition-all`}></i><input type="text" placeholder="Buscar OS..." className="w-full h-12 pl-12 pr-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/20" value={searchInput} onChange={e => setSearchInput(e.target.value)} /></div><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}><option value="ALL">Todos Status</option>{Object.values(OSStatus).map(s => <option key={s} value={s}>{s}</option>)}</select><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)}><option value="ALL">Todas Prioridades</option><option value="LOW">Baixa</option><option value="MEDIUM">Média</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={slaFilter} onChange={e => setSlaFilter(e.target.value as any)}><option value="ALL">Todos SLA</option><option value="SLA_OVERDUE">SLA Atrasado</option></select><select className="h-12 px-4 bg-white border border-slate-300 rounded-xl text-base font-medium text-slate-700 shadow-sm focus:border-clean-primary" value={openDateSort} onChange={e => setOpenDateSort(e.target.value as any)}><option value="NONE">Sem ordenação</option><option value="OPEN_DATE_DESC">Mais recente aberta</option><option value="OPEN_DATE_ASC">Mais antiga aberta</option></select></div>
             <div className="flex gap-2 w-full md:w-auto"><button onClick={openNewOS} className="flex-1 md:flex-none bg-clean-primary text-white px-6 rounded-xl font-bold text-base uppercase tracking-wide hover:bg-clean-primary/90 transition-all shadow-lg shadow-clean-primary/20 h-12 whitespace-nowrap"><i className="fas fa-plus mr-2"></i> Abrir OS</button></div>
         </div>
       </header>
@@ -761,7 +776,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                    </p>
                  </div>
                  <div className="grid grid-cols-2 gap-4 text-base mb-6"><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Materiais</span><span className="font-bold text-slate-800 text-lg">R$ {formatCurrency(costs.materialCost)}</span></div><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Mão de Obra</span><span className="font-bold text-slate-800 text-lg">{os.services.reduce((a,b)=>a+b.quantity,0)} h</span></div></div>
-                 <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto"><span title={getStatusTooltip(os.status)} className={`text-sm font-bold uppercase px-3 py-1.5 rounded cursor-help ${os.status === 'COMPLETED' ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' : os.status === 'IN_PROGRESS' ? 'text-blue-800 bg-blue-100 border border-blue-200' : 'text-slate-700 bg-slate-100 border border-slate-200'}`}>{os.status.replace('_', ' ')}</span><button onClick={() => setSelectedOS(os)} className="text-base font-bold text-slate-700 hover:text-white hover:bg-clean-primary px-5 py-2.5 rounded-lg transition-all border border-slate-300 hover:border-clean-primary hover:shadow-md"><i className="fas fa-pen-to-square mr-2"></i> {os.status === OSStatus.COMPLETED ? 'Visualizar' : 'Gerenciar'}</button></div>
+                 <div className="grid grid-cols-2 gap-3 text-sm mb-4"><div className="bg-slate-50 p-3 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Abertura</span><span className="font-mono font-bold text-slate-800">{new Date(os.openDate).toLocaleDateString()} {new Date(os.openDate).toLocaleTimeString().slice(0,5)}</span></div><div className={`p-3 rounded-lg border ${isOverdue ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Prazo</span><span className={`font-mono font-bold ${isOverdue ? "text-red-700" : "text-slate-800"}`}>{new Date(os.limitDate).toLocaleDateString()} {new Date(os.limitDate).toLocaleTimeString().slice(0,5)}</span></div></div><div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto"><span title={getStatusTooltip(os.status)} className={`text-sm font-bold uppercase px-3 py-1.5 rounded cursor-help ${os.status === 'COMPLETED' ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' : os.status === 'IN_PROGRESS' ? 'text-blue-800 bg-blue-100 border border-blue-200' : 'text-slate-700 bg-slate-100 border border-slate-200'}`}>{os.status.replace('_', ' ')}</span><button onClick={() => setSelectedOS(os)} className="text-base font-bold text-slate-700 hover:text-white hover:bg-clean-primary px-5 py-2.5 rounded-lg transition-all border border-slate-300 hover:border-clean-primary hover:shadow-md"><i className="fas fa-pen-to-square mr-2"></i> {os.status === OSStatus.COMPLETED ? 'Visualizar' : 'Gerenciar'}</button></div>
                  {currentUser.role === 'ADMIN' && ( <button onClick={() => handleDelete(os.id)} className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-red-200 text-red-500 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 shadow-sm z-20" title="Excluir OS"><i className="fas fa-trash text-xs"></i></button> )}
               </div>
             );
