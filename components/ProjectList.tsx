@@ -50,6 +50,8 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     city: '',
     detailedDescription: '',
     description: '',
+    manualMaterialDescription: '',
+    manualServiceDescription: '',
     responsible: '',
     costCenter: '',
     area: ''
@@ -116,6 +118,10 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       city: '',
       detailedDescription: '',
       description: '',
+	      manualMaterialDescription: '',
+	      manualServiceDescription: '',
+	      manualMaterialItems: [],
+	      manualServiceItems: [],
       responsible: '',
       costCenter: '',
       area: ''
@@ -128,6 +134,20 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   const openEditProjectModal = (p: Project) => {
     setEditingProject(p);
     setModalTab('DETAILS');
+
+    // Compatibilidade: se o projeto ainda estiver no modelo antigo (1 descrição + 1 valor),
+    // converte para a lista de itens.
+    const legacyMat = (p.manualMaterialCost !== undefined && p.manualMaterialCost !== null) || (p.manualMaterialDescription || '').trim().length > 0;
+    const legacySrv = (p.manualServiceCost !== undefined && p.manualServiceCost !== null) || (p.manualServiceDescription || '').trim().length > 0;
+
+    const materialItems = (p.manualMaterialItems && p.manualMaterialItems.length > 0)
+      ? p.manualMaterialItems
+      : (legacyMat ? [{ description: (p.manualMaterialDescription || '').trim() || 'Material extra', value: Number(p.manualMaterialCost) || 0 }] : []);
+
+    const serviceItems = (p.manualServiceItems && p.manualServiceItems.length > 0)
+      ? p.manualServiceItems
+      : (legacySrv ? [{ description: (p.manualServiceDescription || '').trim() || 'Serviço extra', value: Number(p.manualServiceCost) || 0 }] : []);
+
     setFormProject({
       ...p,
       location: p.location || '',
@@ -135,6 +155,10 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       detailedDescription: p.detailedDescription || '',
       area: p.area || '',
       costCenter: p.costCenter || '',
+      manualMaterialDescription: p.manualMaterialDescription || '',
+      manualServiceDescription: p.manualServiceDescription || '',
+      manualMaterialItems: materialItems,
+      manualServiceItems: serviceItems,
       plannedMaterials: p.plannedMaterials || [],
       plannedServices: p.plannedServices || []
     });
@@ -243,11 +267,37 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     const limitDate = new Date(startDate);
     limitDate.setDate(limitDate.getDate() + slaDays);
 
+    // Normaliza itens de custos manuais (remove linhas vazias e garante number)
+    const cleanManualMaterialItems = (formProject.manualMaterialItems || [])
+      .map((it: any) => ({
+        description: String(it?.description || '').trim(),
+        value: Number(it?.value) || 0
+      }))
+      .filter((it: any) => it.description.length > 0 || it.value > 0);
+
+    const cleanManualServiceItems = (formProject.manualServiceItems || [])
+      .map((it: any) => ({
+        description: String(it?.description || '').trim(),
+        value: Number(it?.value) || 0
+      }))
+      .filter((it: any) => it.description.length > 0 || it.value > 0);
+
+    const manualMaterialTotal = cleanManualMaterialItems.reduce((acc: number, it: any) => acc + (Number(it.value) || 0), 0);
+    const manualServiceTotal = cleanManualServiceItems.reduce((acc: number, it: any) => acc + (Number(it.value) || 0), 0);
+
     try {
         if (editingProject) {
           const updated: Project = {
             ...editingProject,
             ...formProject,
+            manualMaterialItems: cleanManualMaterialItems,
+            manualServiceItems: cleanManualServiceItems,
+            // Mantém compatibilidade com relatórios legados (totais)
+            manualMaterialCost: manualMaterialTotal,
+            manualServiceCost: manualServiceTotal,
+            // Mantém descrição "legada" como resumo
+            manualMaterialDescription: cleanManualMaterialItems.map((i: any) => i.description).filter(Boolean).join('; '),
+            manualServiceDescription: cleanManualServiceItems.map((i: any) => i.description).filter(Boolean).join('; '),
             estimatedEndDate: limitDate.toISOString().split('T')[0],
             auditLogs: [...editingProject.auditLogs, { date: new Date().toISOString(), action: 'Alteração de Escopo', user: currentUser.id }]
           } as Project;
@@ -270,6 +320,12 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
             area: formProject.area || '',
             costCenter: formProject.costCenter || '',
             estimatedValue: Number(formProject.estimatedValue) || 0,
+	            manualMaterialItems: cleanManualMaterialItems,
+	            manualServiceItems: cleanManualServiceItems,
+	            manualMaterialCost: manualMaterialTotal,
+	            manualServiceCost: manualServiceTotal,
+	            manualMaterialDescription: cleanManualMaterialItems.map((i: any) => i.description).filter(Boolean).join('; '),
+	            manualServiceDescription: cleanManualServiceItems.map((i: any) => i.description).filter(Boolean).join('; '),
             plannedMaterials: formProject.plannedMaterials || [],
             plannedServices: formProject.plannedServices || [],
             startDate: startDate,
@@ -616,32 +672,159 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
                                           <h4 className="text-sm font-black text-amber-900 uppercase tracking-wide">Custos Manuais (Opcional)</h4>
                                         </div>
                                         <p className="text-xs text-amber-700 mb-4">Adicione valores extras que não estão vinculados a OSs específicas</p>
-                                        <div className="grid grid-cols-2 gap-4">
-                                          <div>
-                                            <label className="text-xs font-bold text-slate-600 uppercase mb-2 block">Materiais Extras (R$)</label>
-                                            <input
-                                              type="number"
-                                              step="0.01"
-                                              min="0"
-                                              className="w-full h-12 px-4 bg-white border border-amber-300 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
-                                              placeholder="0,00"
-                                              value={formProject.manualMaterialCost !== undefined && formProject.manualMaterialCost !== null ? formProject.manualMaterialCost : ''}
-                                              onChange={e => setFormProject({...formProject, manualMaterialCost: e.target.value === '' ? undefined : Number(e.target.value)})}
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="text-xs font-bold text-slate-600 uppercase mb-2 block">Serviços Extras (R$)</label>
-                                            <input
-                                              type="number"
-                                              step="0.01"
-                                              min="0"
-                                              className="w-full h-12 px-4 bg-white border border-amber-300 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
-                                              placeholder="0,00"
-                                              value={formProject.manualServiceCost !== undefined && formProject.manualServiceCost !== null ? formProject.manualServiceCost : ''}
-                                              onChange={e => setFormProject({...formProject, manualServiceCost: e.target.value === '' ? undefined : Number(e.target.value)})}
-                                            />
-                                          </div>
-                                        </div>
+	                                        <div className="grid grid-cols-2 gap-4">
+	                                          {/* Materiais Extras (itens) */}
+	                                          <div className="space-y-3">
+	                                            <div className="flex items-center justify-between">
+	                                              <label className="text-xs font-bold text-slate-600 uppercase block">Materiais Extras</label>
+	                                              <button
+	                                                type="button"
+	                                                className="text-xs font-black text-amber-800 hover:text-amber-900 underline"
+	                                                onClick={() => setFormProject({
+	                                                  ...formProject,
+	                                                  manualMaterialItems: [
+	                                                    ...(formProject.manualMaterialItems || []),
+	                                                    { description: '', value: 0 }
+	                                                  ]
+	                                                })}
+	                                              >
+	                                                + Adicionar item
+	                                              </button>
+	                                            </div>
+
+	                                            {(formProject.manualMaterialItems || []).length === 0 && (
+	                                              <div className="text-xs text-amber-800/80 italic">Nenhum material extra informado.</div>
+	                                            )}
+
+	                                            {(formProject.manualMaterialItems || []).map((item: any, idx: number) => (
+	                                              <div key={`mat-${idx}`} className="bg-white/70 border border-amber-200 rounded-xl p-3 space-y-2">
+	                                                <div className="flex items-center justify-between">
+	                                                  <span className="text-[11px] font-black text-slate-500 uppercase">Item {idx + 1}</span>
+	                                                  <button
+	                                                    type="button"
+	                                                    className="text-[11px] font-black text-red-600 hover:text-red-700"
+	                                                    onClick={() => setFormProject({
+	                                                      ...formProject,
+	                                                      manualMaterialItems: (formProject.manualMaterialItems || []).filter((_: any, i: number) => i !== idx)
+	                                                    })}
+	                                                  >
+	                                                    Remover
+	                                                  </button>
+	                                                </div>
+	                                                <div>
+	                                                  <label className="text-[11px] font-bold text-slate-600 uppercase mb-1 block">Descrição</label>
+	                                                  <input
+	                                                    className="w-full h-10 px-3 bg-white border border-amber-300 rounded-lg text-sm font-medium text-slate-800 shadow-sm transition-all focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+	                                                    placeholder="Ex: tinta, parafusos, placa ACM..."
+	                                                    value={item.description || ''}
+	                                                    onChange={e => {
+	                                                      const next = [...(formProject.manualMaterialItems || [])];
+	                                                      next[idx] = { ...next[idx], description: e.target.value };
+	                                                      setFormProject({ ...formProject, manualMaterialItems: next });
+	                                                    }}
+	                                                  />
+	                                                </div>
+	                                                <div>
+	                                                  <label className="text-[11px] font-bold text-slate-600 uppercase mb-1 block">Valor (R$)</label>
+	                                                  <input
+	                                                    type="number"
+	                                                    step="0.01"
+	                                                    min="0"
+	                                                    className="w-full h-10 px-3 bg-white border border-amber-300 rounded-lg text-sm font-bold text-slate-800 shadow-sm transition-all focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+	                                                    placeholder="0,00"
+	                                                    value={item.value !== undefined && item.value !== null ? item.value : ''}
+	                                                    onChange={e => {
+	                                                      const next = [...(formProject.manualMaterialItems || [])];
+	                                                      next[idx] = { ...next[idx], value: e.target.value === '' ? 0 : Number(e.target.value) };
+	                                                      setFormProject({ ...formProject, manualMaterialItems: next });
+	                                                    }}
+	                                                  />
+	                                                </div>
+	                                              </div>
+	                                            ))}
+
+	                                            <div className="flex items-center justify-between pt-1">
+	                                              <span className="text-xs font-black text-slate-600 uppercase">Total Materiais Extras</span>
+	                                              <span className="text-sm font-black text-amber-900">R$ {formatCurrency((formProject.manualMaterialItems || []).reduce((acc: number, it: any) => acc + (Number(it.value) || 0), 0))}</span>
+	                                            </div>
+	                                          </div>
+
+	                                          {/* Serviços Extras (itens) */}
+	                                          <div className="space-y-3">
+	                                            <div className="flex items-center justify-between">
+	                                              <label className="text-xs font-bold text-slate-600 uppercase block">Serviços Extras</label>
+	                                              <button
+	                                                type="button"
+	                                                className="text-xs font-black text-amber-800 hover:text-amber-900 underline"
+	                                                onClick={() => setFormProject({
+	                                                  ...formProject,
+	                                                  manualServiceItems: [
+	                                                    ...(formProject.manualServiceItems || []),
+	                                                    { description: '', value: 0 }
+	                                                  ]
+	                                                })}
+	                                              >
+	                                                + Adicionar item
+	                                              </button>
+	                                            </div>
+
+	                                            {(formProject.manualServiceItems || []).length === 0 && (
+	                                              <div className="text-xs text-amber-800/80 italic">Nenhum serviço extra informado.</div>
+	                                            )}
+
+	                                            {(formProject.manualServiceItems || []).map((item: any, idx: number) => (
+	                                              <div key={`srv-${idx}`} className="bg-white/70 border border-amber-200 rounded-xl p-3 space-y-2">
+	                                                <div className="flex items-center justify-between">
+	                                                  <span className="text-[11px] font-black text-slate-500 uppercase">Item {idx + 1}</span>
+	                                                  <button
+	                                                    type="button"
+	                                                    className="text-[11px] font-black text-red-600 hover:text-red-700"
+	                                                    onClick={() => setFormProject({
+	                                                      ...formProject,
+	                                                      manualServiceItems: (formProject.manualServiceItems || []).filter((_: any, i: number) => i !== idx)
+	                                                    })}
+	                                                  >
+	                                                    Remover
+	                                                  </button>
+	                                                </div>
+	                                                <div>
+	                                                  <label className="text-[11px] font-bold text-slate-600 uppercase mb-1 block">Descrição</label>
+	                                                  <input
+	                                                    className="w-full h-10 px-3 bg-white border border-amber-300 rounded-lg text-sm font-medium text-slate-800 shadow-sm transition-all focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+	                                                    placeholder="Ex: instalação elétrica, pintura, terceirizado..."
+	                                                    value={item.description || ''}
+	                                                    onChange={e => {
+	                                                      const next = [...(formProject.manualServiceItems || [])];
+	                                                      next[idx] = { ...next[idx], description: e.target.value };
+	                                                      setFormProject({ ...formProject, manualServiceItems: next });
+	                                                    }}
+	                                                  />
+	                                                </div>
+	                                                <div>
+	                                                  <label className="text-[11px] font-bold text-slate-600 uppercase mb-1 block">Valor (R$)</label>
+	                                                  <input
+	                                                    type="number"
+	                                                    step="0.01"
+	                                                    min="0"
+	                                                    className="w-full h-10 px-3 bg-white border border-amber-300 rounded-lg text-sm font-bold text-slate-800 shadow-sm transition-all focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+	                                                    placeholder="0,00"
+	                                                    value={item.value !== undefined && item.value !== null ? item.value : ''}
+	                                                    onChange={e => {
+	                                                      const next = [...(formProject.manualServiceItems || [])];
+	                                                      next[idx] = { ...next[idx], value: e.target.value === '' ? 0 : Number(e.target.value) };
+	                                                      setFormProject({ ...formProject, manualServiceItems: next });
+	                                                    }}
+	                                                  />
+	                                                </div>
+	                                              </div>
+	                                            ))}
+
+	                                            <div className="flex items-center justify-between pt-1">
+	                                              <span className="text-xs font-black text-slate-600 uppercase">Total Serviços Extras</span>
+	                                              <span className="text-sm font-black text-amber-900">R$ {formatCurrency((formProject.manualServiceItems || []).reduce((acc: number, it: any) => acc + (Number(it.value) || 0), 0))}</span>
+	                                            </div>
+	                                          </div>
+	                                        </div>
                                       </div>
                                     )}
                                 </div>
