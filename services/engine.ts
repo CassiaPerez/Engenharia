@@ -1,27 +1,49 @@
 // services/engine.ts
-import { OS, Material, ServiceType, Project, ServiceCostType, User, Equipment } from '../types';
+import { OS, Material, ServiceType, Project, User, Equipment, ServiceCostType } from '../types';
 
-/** Formatação simples usada no Dashboard / Relatórios */
 export const formatDate = (iso?: string) => {
   if (!iso) return '-';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '-';
-  return d.toLocaleString('pt-BR');
+  return d.toLocaleDateString('pt-BR');
 };
 
-/** Custo planejado do Projeto (planejamento) */
-export const calculatePlannedCosts = (project: Project) => {
-  const plannedMaterials = (project.plannedMaterials || []).reduce((acc, m) => acc + (m.quantity * m.unitCost), 0);
-  const plannedServices = (project.plannedServices || []).reduce((acc, s) => acc + (s.hours * s.unitCost), 0);
-  const plannedTotal = plannedMaterials + plannedServices;
+/**
+ * Planejado no formulário (Partial<Project>) + materiais/serviços para custo unitário
+ * ✅ compatível com seu useMemo:
+ * calculatePlannedCosts(formProject, materials, services)
+ */
+export const calculatePlannedCosts = (
+  projectLike: Partial<Project>,
+  materials: Material[] = [],
+  services: ServiceType[] = []
+) => {
+  const plannedMaterials = projectLike.plannedMaterials || [];
+  const plannedServices = projectLike.plannedServices || [];
 
-  return { plannedMaterials, plannedServices, plannedTotal };
+  const matCost = plannedMaterials.reduce((acc, pm) => {
+    // usa unitCost salvo no planejamento, senão tenta achar no cadastro
+    const mat = materials.find(m => m.id === pm.materialId);
+    const unit = pm.unitCost ?? mat?.unitCost ?? 0;
+    return acc + (Number(pm.quantity) || 0) * unit;
+  }, 0);
+
+  const srvCost = plannedServices.reduce((acc, ps) => {
+    const srv = services.find(s => s.id === ps.serviceTypeId);
+    const unit = ps.unitCost ?? srv?.unitValue ?? 0;
+    return acc + (Number(ps.hours) || 0) * unit;
+  }, 0);
+
+  return {
+    matCost,
+    srvCost,
+    totalPlanned: matCost + srvCost,
+  };
 };
 
-/** Custo real da OS (considera custo manual da OS quando existir) */
-export const calculateOSCosts = (os: OS, _materials: Material[], _services: ServiceType[]) => {
-  const calculatedMaterialCost = (os.materials || []).reduce((acc, item) => acc + (item.quantity * item.unitCost), 0);
-  const calculatedServiceCost = (os.services || []).reduce((acc, srv) => acc + (srv.quantity * srv.unitCost), 0);
+export const calculateOSCosts = (os: OS) => {
+  const calculatedMaterialCost = (os.materials || []).reduce((acc, item) => acc + item.quantity * item.unitCost, 0);
+  const calculatedServiceCost = (os.services || []).reduce((acc, srv) => acc + srv.quantity * srv.unitCost, 0);
 
   const materialCost = os.manualMaterialCost ?? calculatedMaterialCost;
   const serviceCost = os.manualServiceCost ?? calculatedServiceCost;
@@ -36,35 +58,54 @@ export const calculateOSCosts = (os: OS, _materials: Material[], _services: Serv
 };
 
 /**
- * ✅ Projeto com 2 cálculos:
- * - Auto: soma das OS
- * - Manual: digitado no projeto
- * - Efetivo: escolhido por flags useManual...
+ * ✅ Retorno compatível com seu código (totalReal/totalMaterials/totalServices)
+ * + adiciona auto/manual/effective
  */
-export const calculateProjectCosts = (project: Project, oss: OS[], materials: Material[], services: ServiceType[]) => {
-  const projectOSs = (oss || []).filter(os => os.projectId === project.id);
+export const calculateProjectCosts = (
+  project: Project,
+  oss: OS[] = [],
+  _materials: Material[] = [],
+  _services: ServiceType[] = []
+) => {
+  const projectOSs = oss.filter(os => os.projectId === project.id && os.status !== 'CANCELED');
 
-  // Auto (baixa automática)
+  // --- AUTO (via OS)
   let autoMaterials = 0;
   let autoServices = 0;
+
   projectOSs.forEach(os => {
-    const c = calculateOSCosts(os, materials, services);
+    const c = calculateOSCosts(os);
     autoMaterials += c.materialCost;
     autoServices += c.serviceCost;
   });
+
   const autoTotal = autoMaterials + autoServices;
 
-  // Manual (digitado)
+  // --- MANUAL (extras no projeto)
   const manualMaterials = project.manualMaterialCost ?? 0;
   const manualServices = project.manualServiceCost ?? 0;
   const manualTotal = manualMaterials + manualServices;
 
-  // Efetivo (o que vale)
+  // --- EFETIVO (decisão por flag)
   const effectiveMaterials = project.useManualMaterialCost ? manualMaterials : autoMaterials;
   const effectiveServices = project.useManualServiceCost ? manualServices : autoServices;
   const effectiveTotal = effectiveMaterials + effectiveServices;
 
+  const variance = project.estimatedValue - effectiveTotal;
+  const variancePercent = project.estimatedValue > 0 ? (variance / project.estimatedValue) * 100 : 0;
+
+  // ✅ Campos “legados” que seu ProjectList já usa:
+  const totalMaterials = effectiveMaterials;
+  const totalServices = effectiveServices;
+  const totalReal = effectiveTotal;
+
   return {
+    // legado
+    totalMaterials,
+    totalServices,
+    totalReal,
+
+    // novos detalhados
     autoMaterials,
     autoServices,
     autoTotal,
@@ -77,23 +118,24 @@ export const calculateProjectCosts = (project: Project, oss: OS[], materials: Ma
     effectiveServices,
     effectiveTotal,
 
-    variance: project.estimatedValue - effectiveTotal,
-    variancePercent: project.estimatedValue > 0 ? ((project.estimatedValue - effectiveTotal) / project.estimatedValue) * 100 : 0,
+    variance,
+    variancePercent,
   };
 };
 
+// (mantive para compatibilidade, se você usa em algum lugar)
 export const translateServiceCostType = (type: ServiceCostType) => {
   switch (type) {
-    case 'HOUR':
+    case ServiceCostType.HOUR:
       return 'Por Hora';
-    case 'UNIT':
+    case ServiceCostType.UNIT:
       return 'Por Unidade';
     default:
-      return type;
+      return String(type);
   }
 };
 
-// --------- Custo por empresa (relatório) ---------
+// Custo por empresa (se você usa em Reports)
 export const resolveCompanyForOS = (os: OS, equipments: Equipment[] = [], projects: Project[] = []) => {
   if (os.equipmentId) {
     const eq = equipments.find(e => e.id === os.equipmentId);
@@ -108,21 +150,18 @@ export const resolveCompanyForOS = (os: OS, equipments: Equipment[] = [], projec
 
 export const groupCostsByCompany = (
   oss: OS[],
-  materials: Material[],
-  services: ServiceType[],
   equipments: Equipment[] = [],
   projects: Project[] = []
 ) => {
   const byCompany: Record<string, { material: number; service: number; total: number }> = {};
 
-  (oss || []).forEach(os => {
+  oss.forEach(os => {
     const company = resolveCompanyForOS(os, equipments, projects);
-    const costs = calculateOSCosts(os, materials, services);
-
+    const c = calculateOSCosts(os);
     if (!byCompany[company]) byCompany[company] = { material: 0, service: 0, total: 0 };
-    byCompany[company].material += costs.materialCost;
-    byCompany[company].service += costs.serviceCost;
-    byCompany[company].total += costs.totalCost;
+    byCompany[company].material += c.materialCost;
+    byCompany[company].service += c.serviceCost;
+    byCompany[company].total += c.totalCost;
   });
 
   return Object.entries(byCompany)
@@ -130,20 +169,18 @@ export const groupCostsByCompany = (
     .sort((a, b) => b.total - a.total);
 };
 
-// --------- Horas por executor ---------
+// Horas por executor (se você usa em Reports)
 const safeDate = (d?: string) => (d ? new Date(d) : null);
 
 export const calculateExecutorHoursForOS = (os: OS, executorId: string) => {
   const state = os.executorStates?.[executorId];
-
   const start = safeDate(state?.startTime || os.startTime);
   const end = safeDate(state?.endTime || os.endTime);
-
   if (!start || !end) return { grossHours: 0, pausedHours: 0, netHours: 0 };
 
   const grossMs = end.getTime() - start.getTime();
-
   const history = state?.pauseHistory || [];
+
   let pausedMs = 0;
   let lastPause: Date | null = null;
 
@@ -157,8 +194,8 @@ export const calculateExecutorHoursForOS = (os: OS, executorId: string) => {
 
   if (lastPause) pausedMs += end.getTime() - lastPause.getTime();
 
-  const netMs = Math.max(0, grossMs - pausedMs);
   const msToHours = (ms: number) => ms / 3600000;
+  const netMs = Math.max(0, grossMs - pausedMs);
 
   return {
     grossHours: msToHours(grossMs),
@@ -179,19 +216,10 @@ export const buildExecutorHoursRows = (oss: OS[], users: User[], dateFrom?: stri
     return true;
   };
 
-  const rows: Array<{
-    executorId: string;
-    executorName: string;
-    osNumber: string;
-    startTime?: string;
-    endTime?: string;
-    grossHours: number;
-    pausedHours: number;
-    netHours: number;
-  }> = [];
+  const rows: any[] = [];
 
-  (oss || []).forEach(os => {
-    if (os.executorStates && Object.keys(os.executorStates).length > 0) {
+  oss.forEach(os => {
+    if (os.executorStates) {
       Object.entries(os.executorStates).forEach(([executorId, st]) => {
         const ref = st.startTime || os.openDate;
         if (!within(ref)) return;
@@ -208,25 +236,7 @@ export const buildExecutorHoursRows = (oss: OS[], users: User[], dateFrom?: stri
           ...hrs,
         });
       });
-      return;
     }
-
-    // fallback legado: executor único
-    if (!os.executorId) return;
-    const ref = os.startTime || os.openDate;
-    if (!within(ref)) return;
-
-    const name = users.find(u => u.id === os.executorId)?.name || os.executorId;
-    const hrs = calculateExecutorHoursForOS(os, os.executorId);
-
-    rows.push({
-      executorId: os.executorId,
-      executorName: name,
-      osNumber: os.number,
-      startTime: os.startTime,
-      endTime: os.endTime,
-      ...hrs,
-    });
   });
 
   return rows;
