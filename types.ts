@@ -1,4 +1,4 @@
-// types.ts
+// src/types.ts
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'EXECUTOR';
 
@@ -35,14 +35,9 @@ export interface Equipment {
   code: string;
   name: string;
   description: string;
-
-  // Empresa (usada em custo por empresa)
-  location: string;
-
-  // (opcionais) árvore de bens
+  location: string; // empresa
   sector?: string;
   parentEquipmentId?: string;
-
   model: string;
   serialNumber: string;
   manufacturer: string;
@@ -115,7 +110,7 @@ export interface Project {
   postponementHistory: { date: string; justification: string; user: string }[];
   auditLogs: { date: string; action: string; user: string }[];
 
-  // ✅ custo manual por projeto (híbrido com automático)
+  // custo manual por projeto (auto + manual coexistem)
   manualMaterialCost?: number;
   manualServiceCost?: number;
   useManualMaterialCost?: boolean;
@@ -169,12 +164,12 @@ export interface OS {
   openDate: string;
   limitDate: string;
   status: OSStatus;
+
   costCenter?: string;
 
   executorIds?: string[];
   executorId?: string;
 
-  // ✅ novo: status por executor
   executorStates?: Record<string, ExecutorState>;
 
   requesterId?: string;
@@ -192,7 +187,6 @@ export interface OS {
   materials: OSItem[];
   services: OSService[];
 
-  // custos manuais da OS (já existia no seu modelo)
   manualMaterialCost?: number;
   manualServiceCost?: number;
 }
