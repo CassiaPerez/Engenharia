@@ -687,6 +687,124 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         y = (doc as any).lastAutoTable.finalY + 10;
     }
 
+    // =========================
+    // HISTÓRICO DE PAUSAS / APONTAMENTOS (Executor)
+    // =========================
+    const getUserNameById = (id?: string) => {
+      if (!id) return '-';
+      const u = users.find(x => x.id === id || x.email === id);
+      return u?.name || id;
+    };
+
+    const pauseRows: Array<{ ts: string; executor: string; action: string; reason: string; worklog: string }> = [];
+
+    // Novo modelo: pausa por executor (executorStates[executorId].pauseHistory[])
+    const execStates = (os as any).executorStates || {};
+    Object.keys(execStates || {}).forEach((executorId: string) => {
+      const st = execStates[executorId];
+      const hist = Array.isArray(st?.pauseHistory) ? st.pauseHistory : [];
+      hist.forEach((h: any) => {
+        pauseRows.push({
+          ts: h?.timestamp ? new Date(h.timestamp).toISOString() : '',
+          executor: getUserNameById(h?.executorId || executorId || h?.userId),
+          action: String(h?.action || '').toUpperCase() === 'RESUME' ? 'RETOMADA' : 'PAUSA',
+          reason: String(h?.reason || '').trim() || '-',
+          worklog: String(h?.worklogBeforePause || '').trim() || '-',
+        });
+      });
+    });
+
+    // Legado: pausa global (pauseHistory[])
+    const legacyPauseHistory = Array.isArray((os as any).pauseHistory) ? (os as any).pauseHistory : [];
+    legacyPauseHistory.forEach((h: any) => {
+      pauseRows.push({
+        ts: h?.timestamp ? new Date(h.timestamp).toISOString() : '',
+        executor: getUserNameById(h?.userId),
+        action: String(h?.action || '').toUpperCase() === 'RESUME' ? 'RETOMADA' : 'PAUSA',
+        reason: String(h?.reason || '').trim() || '-',
+        worklog: String(h?.worklogBeforePause || '').trim() || '-',
+      });
+    });
+
+    pauseRows.sort((a, b) => (a.ts || '').localeCompare(b.ts || ''));
+
+    if (pauseRows.length > 0) {
+      if (y > 240) {
+        doc.addPage();
+        y = 40;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("HISTÓRICO DE PAUSAS / APONTAMENTOS", 14, y);
+      y += 4;
+
+      const rows = pauseRows.map(r => ([
+        r.ts ? new Date(r.ts).toLocaleString('pt-BR') : '-',
+        r.executor,
+        r.action,
+        r.reason,
+        r.worklog
+      ]));
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Data/Hora', 'Executor', 'Ação', 'Motivo', 'O que foi feito (antes da pausa)']],
+        body: rows,
+        headStyles: { fillColor: [220, 220, 220], textColor: 50 },
+        styles: { fontSize: 8 },
+        columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 35 }, 2: { cellWidth: 18 }, 3: { cellWidth: 45 }, 4: { cellWidth: 60 } }
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // =========================
+    // MATERIAIS ADICIONADOS MANUALMENTE PELOS EXECUTORES
+    // =========================
+    const execManualMaterials = (os as any).executorManualMaterials || (os as any).manualMaterialsByExecutor || [];
+    const execManualRows = Array.isArray(execManualMaterials) ? execManualMaterials : [];
+
+    if (execManualRows.length > 0) {
+      if (y > 240) {
+        doc.addPage();
+        y = 40;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("MATERIAIS ADICIONADOS PELO EXECUTOR (MANUAL)", 14, y);
+      y += 4;
+
+      const rows = execManualRows
+        .map((m: any) => ({
+          ts: m?.timestamp ? new Date(m.timestamp).toISOString() : '',
+          executor: getUserNameById(m?.executorId || m?.userId),
+          description: String(m?.description || '').trim(),
+          quantity: Number(m?.quantity) || 0,
+        }))
+        .filter((m: any) => m.description.length > 0 || m.quantity > 0)
+        .map((m: any) => ([
+          m.ts ? new Date(m.ts).toLocaleString('pt-BR') : '-',
+          m.executor,
+          m.description || '-',
+          String(m.quantity)
+        ]));
+
+      if (rows.length > 0) {
+        autoTable(doc, {
+          startY: y,
+          head: [['Data/Hora', 'Executor', 'Descrição', 'Qtd']],
+          body: rows,
+          headStyles: { fillColor: [220, 220, 220], textColor: 50 },
+          styles: { fontSize: 9 },
+          columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 45 }, 2: { cellWidth: 80 }, 3: { halign: 'right', cellWidth: 20 } }
+        });
+
+        y = (doc as any).lastAutoTable.finalY + 10;
+      }
+    }
+
 
     // Valores Manuais (itens avulsos) - visíveis no PDF
     const manualItems = (os.costItems || [])
