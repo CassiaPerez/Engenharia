@@ -687,6 +687,59 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         y = (doc as any).lastAutoTable.finalY + 10;
     }
 
+
+    // Valores Manuais (itens avulsos) - visíveis no PDF
+    const manualItems = (os.costItems || [])
+      .map((it: any) => ({
+        type: String(it?.type || '').toUpperCase(),
+        description: String(it?.description || '').trim(),
+        amount: Number(it?.amount) || 0
+      }))
+      .filter((it: any) => it.description.length > 0 || it.amount > 0);
+
+    // Compatibilidade: se ainda existir modelo legado (manualMaterialCost/manualServiceCost) e não houver itens
+    const legacyManualRows: any[] = [];
+    if (manualItems.length === 0) {
+      const legacyMat = Number((os as any).manualMaterialCost) || 0;
+      const legacySrv = Number((os as any).manualServiceCost) || 0;
+      const legacyMatDesc = String((os as any).manualMaterialDescription || '').trim();
+      const legacySrvDesc = String((os as any).manualServiceDescription || '').trim();
+
+      if (legacyMat > 0 || legacyMatDesc) legacyManualRows.push({ type: 'MATERIAL', description: legacyMatDesc || 'Material manual', amount: legacyMat });
+      if (legacySrv > 0 || legacySrvDesc) legacyManualRows.push({ type: 'SERVICE', description: legacySrvDesc || 'Serviço manual', amount: legacySrv });
+    }
+
+    const manualRowsSource = manualItems.length > 0 ? manualItems : legacyManualRows;
+
+    if (manualRowsSource.length > 0) {
+      if (y > 240) {
+        doc.addPage();
+        y = 40;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0, 0, 0);
+      doc.text("VALORES MANUAIS (ITENS AVULSOS)", 14, y);
+      y += 4;
+
+      const manualRows = manualRowsSource.map((it: any) => ([
+        it.type === 'MATERIAL' ? 'Material' : 'Serviço',
+        it.description || '-',
+        `R$ ${formatCurrency(it.amount)}`
+      ]));
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Tipo', 'Descrição', 'Valor']],
+        body: manualRows,
+        headStyles: { fillColor: [220, 220, 220], textColor: 50 },
+        styles: { fontSize: 9 },
+        columnStyles: { 2: { halign: 'right' } }
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 10;
+    }
+
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
