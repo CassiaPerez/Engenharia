@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Project, OS, Material, ServiceType, ProjectStatus, Category, OSType, OSStatus, User, StockMovement } from '../types';
 import { calculateProjectCosts, calculatePlannedCosts, formatDate } from '../services/engine';
@@ -118,10 +117,10 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
       city: '',
       detailedDescription: '',
       description: '',
-	      manualMaterialDescription: '',
-	      manualServiceDescription: '',
-	      manualMaterialItems: [],
-	      manualServiceItems: [],
+      manualMaterialDescription: '',
+      manualServiceDescription: '',
+      manualMaterialItems: [],
+      manualServiceItems: [],
       responsible: '',
       costCenter: '',
       area: ''
@@ -320,12 +319,12 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
             area: formProject.area || '',
             costCenter: formProject.costCenter || '',
             estimatedValue: Number(formProject.estimatedValue) || 0,
-	            manualMaterialItems: cleanManualMaterialItems,
-	            manualServiceItems: cleanManualServiceItems,
-	            manualMaterialCost: manualMaterialTotal,
-	            manualServiceCost: manualServiceTotal,
-	            manualMaterialDescription: cleanManualMaterialItems.map((i: any) => i.description).filter(Boolean).join('; '),
-	            manualServiceDescription: cleanManualServiceItems.map((i: any) => i.description).filter(Boolean).join('; '),
+            manualMaterialItems: cleanManualMaterialItems,
+            manualServiceItems: cleanManualServiceItems,
+            manualMaterialCost: manualMaterialTotal,
+            manualServiceCost: manualServiceTotal,
+            manualMaterialDescription: cleanManualMaterialItems.map((i: any) => i.description).filter(Boolean).join('; '),
+            manualServiceDescription: cleanManualServiceItems.map((i: any) => i.description).filter(Boolean).join('; '),
             plannedMaterials: formProject.plannedMaterials || [],
             plannedServices: formProject.plannedServices || [],
             startDate: startDate,
@@ -364,6 +363,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
   const getActualMaterialQty = (projectId: string, materialId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.materials.find(m => m.materialId === materialId)?.quantity || 0), 0);
   const getActualServiceHours = (projectId: string, serviceId: string) => oss.filter(o => o.projectId === projectId && o.status !== OSStatus.CANCELED).reduce((acc, o) => acc + (o.services.find(s => s.serviceTypeId === serviceId)?.quantity || 0), 0);
 
+  // ✅ PDF DETALHADO (COM ITENS EXTRAS + DESCRIÇÃO)
   const generateProjectDetailPDF = (project: Project) => {
     const doc = new jsPDF();
     const costs = calculateProjectCosts(project, oss, materials, services);
@@ -371,7 +371,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     // Header Color Block
     doc.setFillColor(71, 122, 127);
     doc.rect(0, 0, 210, 24, 'F');
-    
+
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
@@ -383,25 +383,25 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    
+
     let yPos = 35;
     doc.text(`Código: ${project.code}`, 14, yPos);
     doc.text(`Status: ${project.status}`, 120, yPos);
-    
+
     yPos += 6;
     doc.text(`Descrição:`, 14, yPos);
     doc.setFont("helvetica", "normal");
-    const descLines = doc.splitTextToSize(project.description, 170);
+    const descLines = doc.splitTextToSize(project.description || '', 170);
     doc.text(descLines, 35, yPos);
     yPos += descLines.length * 5;
 
     if (project.detailedDescription) {
-        doc.setFont("helvetica", "bold");
-        doc.text(`Escopo:`, 14, yPos);
-        doc.setFont("helvetica", "normal");
-        const detLines = doc.splitTextToSize(project.detailedDescription, 170);
-        doc.text(detLines, 35, yPos);
-        yPos += detLines.length * 5 + 4;
+      doc.setFont("helvetica", "bold");
+      doc.text(`Escopo:`, 14, yPos);
+      doc.setFont("helvetica", "normal");
+      const detLines = doc.splitTextToSize(project.detailedDescription, 170);
+      doc.text(detLines, 35, yPos);
+      yPos += detLines.length * 5 + 4;
     }
 
     doc.setFont("helvetica", "bold");
@@ -410,7 +410,7 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     doc.text(`Responsável: ${project.responsible || '-'} | Centro de Custo: ${project.costCenter || '-'}`, 14, yPos);
     yPos += 6;
     doc.text(`Datas: Início ${formatDate(project.startDate)} | Fim Est. ${formatDate(project.estimatedEndDate)}`, 14, yPos);
-    
+
     yPos += 10;
     doc.setDrawColor(200, 200, 200);
     doc.line(14, yPos, 196, yPos);
@@ -421,56 +421,58 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     doc.setTextColor(71, 122, 127);
     doc.text("RESUMO FINANCEIRO", 14, yPos);
     yPos += 8;
-    
+
     const summaryData = [
-        ["Orçamento Aprovado (Budget)", `R$ ${formatCurrency(project.estimatedValue)}`],
-        ["Custo Realizado (Total)", `R$ ${formatCurrency(costs.totalReal)}`],
-        ["Variação / Saldo", `R$ ${formatCurrency(costs.variance)} (${costs.variancePercent.toFixed(1)}% utilizado)`]
+      ["Orçamento Aprovado (Budget)", `R$ ${formatCurrency(project.estimatedValue || 0)}`],
+      ["Custo Realizado (Total)", `R$ ${formatCurrency(costs.totalReal || 0)}`],
+      ["Variação / Saldo", `R$ ${formatCurrency(costs.variance || 0)} (${(costs.variancePercent || 0).toFixed(1)}% utilizado)`]
     ];
-    
+
     autoTable(doc, {
-        startY: yPos,
-        head: [],
-        body: summaryData,
-        theme: 'plain',
-        styles: { fontSize: 10, cellPadding: 2 },
-        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 }, 1: { halign: 'right' } }
+      startY: yPos,
+      head: [],
+      body: summaryData,
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 2 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 }, 1: { halign: 'right' } }
     });
-    
+
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
     // Materials Table
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
     doc.text("PLANEJAMENTO DE MATERIAIS (FÍSICO)", 14, yPos);
     yPos += 5;
-    
-    const materialRows = project.plannedMaterials.map(pm => {
-        const actual = getActualMaterialQty(project.id, pm.materialId);
-        const mat = materials.find(m => m.id === pm.materialId);
-        const diff = actual - pm.quantity;
-        return [
-            mat?.code || '-',
-            mat?.description || 'Item excluído',
-            pm.quantity.toString(),
-            actual.toString(),
-            diff > 0 ? `+${diff}` : diff.toString()
-        ];
+
+    const materialRows = (project.plannedMaterials || []).map(pm => {
+      const actual = getActualMaterialQty(project.id, pm.materialId);
+      const mat = materials.find(m => m.id === pm.materialId);
+      const diff = actual - (pm.quantity || 0);
+      return [
+        mat?.code || '-',
+        mat?.description || 'Item excluído',
+        String(pm.quantity || 0),
+        String(actual || 0),
+        diff > 0 ? `+${diff}` : String(diff)
+      ];
     });
 
     if (materialRows.length > 0) {
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Cód', 'Material', 'Plan', 'Real', 'Var']],
-            body: materialRows,
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [71, 122, 127] },
-            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'center' } }
-        });
-        yPos = (doc as any).lastAutoTable.finalY + 10;
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Cód', 'Material', 'Plan', 'Real', 'Var']],
+        body: materialRows,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [71, 122, 127] },
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'center' } }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
     } else {
-        doc.setFontSize(9);
-        doc.setTextColor(150);
-        doc.text("Nenhum material planejado.", 14, yPos + 5);
-        yPos += 15;
+      doc.setFontSize(9);
+      doc.setTextColor(150);
+      doc.text("Nenhum material planejado.", 14, yPos + 5);
+      yPos += 15;
     }
 
     // Services Table
@@ -479,31 +481,88 @@ const ProjectList: React.FC<Props> = ({ projects, setProjects, oss, materials, s
     doc.text("PLANEJAMENTO DE SERVIÇOS (HH)", 14, yPos);
     yPos += 5;
 
-    const serviceRows = project.plannedServices.map(ps => {
-        const actual = getActualServiceHours(project.id, ps.serviceTypeId);
-        const srv = services.find(s => s.id === ps.serviceTypeId);
-        const diff = actual - ps.hours;
-        return [
-            srv?.name || 'Serviço excluído',
-            ps.hours.toString(),
-            actual.toString(),
-            diff > 0 ? `+${diff}` : diff.toString()
-        ];
+    const serviceRows = (project.plannedServices || []).map(ps => {
+      const actual = getActualServiceHours(project.id, ps.serviceTypeId);
+      const srv = services.find(s => s.id === ps.serviceTypeId);
+      const diff = actual - (ps.hours || 0);
+      return [
+        srv?.name || 'Serviço excluído',
+        String(ps.hours || 0),
+        String(actual || 0),
+        diff > 0 ? `+${diff}` : String(diff)
+      ];
     });
 
     if (serviceRows.length > 0) {
-        autoTable(doc, {
-            startY: yPos,
-            head: [['Serviço', 'Plan (h)', 'Real (h)', 'Var']],
-            body: serviceRows,
-            styles: { fontSize: 8 },
-            headStyles: { fillColor: [71, 122, 127] },
-            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'center' } }
-        });
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Serviço', 'Plan (h)', 'Real (h)', 'Var']],
+        body: serviceRows,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [71, 122, 127] },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'center' } }
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 10;
     } else {
-        doc.setFontSize(9);
-        doc.setTextColor(150);
-        doc.text("Nenhum serviço planejado.", 14, yPos + 5);
+      doc.setFontSize(9);
+      doc.setTextColor(150);
+      doc.text("Nenhum serviço planejado.", 14, yPos + 5);
+      yPos += 15;
+    }
+
+    // ✅ Custos Extras (lançados manualmente) - com DESCRIÇÃO
+    // Suporta modelo novo (manualMaterialItems/manualServiceItems) e legado (manualMaterialCost/manualServiceCost + descrições)
+    const matItems = ((project as any).manualMaterialItems || []) as Array<{ description?: string; value?: number }>;
+    const srvItems = ((project as any).manualServiceItems || []) as Array<{ description?: string; value?: number }>;
+
+    const legacyMatDesc = String((project as any).manualMaterialDescription || '').trim();
+    const legacySrvDesc = String((project as any).manualServiceDescription || '').trim();
+    const legacyMatVal = Number((project as any).manualMaterialCost ?? 0);
+    const legacySrvVal = Number((project as any).manualServiceCost ?? 0);
+
+    const hasLegacyMat = legacyMatDesc.length > 0 || legacyMatVal > 0;
+    const hasLegacySrv = legacySrvDesc.length > 0 || legacySrvVal > 0;
+
+    const normalizedMatItems =
+      matItems && matItems.length > 0
+        ? matItems
+        : (hasLegacyMat ? [{ description: legacyMatDesc || 'Material extra', value: legacyMatVal }] : []);
+
+    const normalizedSrvItems =
+      srvItems && srvItems.length > 0
+        ? srvItems
+        : (hasLegacySrv ? [{ description: legacySrvDesc || 'Serviço extra', value: legacySrvVal }] : []);
+
+    const extraRows: Array<[string, string, string]> = [];
+
+    normalizedMatItems.forEach((it) => {
+      const d = String(it?.description || '').trim() || 'Material extra';
+      const v = Number((it as any)?.value ?? 0);
+      if (d.length > 0 || v !== 0) extraRows.push(['Material Extra', d, `R$ ${formatCurrency(v)}`]);
+    });
+
+    normalizedSrvItems.forEach((it) => {
+      const d = String(it?.description || '').trim() || 'Serviço extra';
+      const v = Number((it as any)?.value ?? 0);
+      if (d.length > 0 || v !== 0) extraRows.push(['Serviço Extra', d, `R$ ${formatCurrency(v)}`]);
+    });
+
+    if (extraRows.length > 0) {
+      doc.setFontSize(11);
+      doc.setTextColor(71, 122, 127);
+      doc.text("CUSTOS EXTRAS (LANÇADOS MANUALMENTE)", 14, yPos);
+      yPos += 5;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Tipo', 'Descrição', 'Valor']],
+        body: extraRows,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [71, 122, 127] },
+        columnStyles: { 2: { halign: 'right' } }
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 6;
     }
 
     doc.save(`${project.code}_Detalhado.pdf`);
