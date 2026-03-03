@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { OS, User, OSStatus, Project, Building, ServiceType, Material, Equipment } from '../types';
 import ModalPortal from './ModalPortal';
@@ -15,28 +16,7 @@ interface Props {
   onLogout: () => void;
 }
 
-type PauseAction = 'PAUSE' | 'RESUME';
-
-type PauseEntry = {
-  timestamp: string;
-  reason?: string;
-  userId?: string;
-  executorId?: string;
-  action: PauseAction;
-  worklogBeforePause?: string;
-};
-
-const ExecutorPanel: React.FC<Props> = ({
-  user,
-  oss,
-  setOss,
-  projects,
-  buildings,
-  equipments = [],
-  materials = [],
-  services = [],
-  onLogout
-}) => {
+const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings, equipments = [], materials = [], services = [], onLogout }) => {
   const [activeTab, setActiveTab] = useState<'TODO' | 'DONE' | 'CALENDAR'>('TODO');
   const [finishingOS, setFinishingOS] = useState<OS | null>(null);
   const [viewDetailOS, setViewDetailOS] = useState<OS | null>(null);
@@ -44,24 +24,22 @@ const ExecutorPanel: React.FC<Props> = ({
   const [executionDescription, setExecutionDescription] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ Modal de pausa (novo)
-  const [showPauseModal, setShowPauseModal] = useState(false);
-  const [pauseTargetOS, setPauseTargetOS] = useState<OS | null>(null);
-  const [pauseReason, setPauseReason] = useState('');
-  const [pauseWorklog, setPauseWorklog] = useState('');
-  const [isPausing, setIsPausing] = useState(false);
+  // Materiais adicionados manualmente pelo executor (para baixa no almox)
+  const [manualMaterialDesc, setManualMaterialDesc] = useState<string>('');
+  const [manualMaterialQty, setManualMaterialQty] = useState<string>('');
+  const [isSavingManualMaterial, setIsSavingManualMaterial] = useState<boolean>(false);
 
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
 
   const translatePriority = (p: string) => {
-    switch (p) {
-      case 'LOW': return 'Baixa';
-      case 'MEDIUM': return 'Média';
-      case 'HIGH': return 'Alta';
-      case 'CRITICAL': return 'Crítica';
-      default: return p;
-    }
+      switch(p) {
+          case 'LOW': return 'Baixa';
+          case 'MEDIUM': return 'Média';
+          case 'HIGH': return 'Alta';
+          case 'CRITICAL': return 'Crítica';
+          default: return p;
+      }
   };
 
   const myOSs = useMemo(() => {
@@ -71,50 +49,50 @@ const ExecutorPanel: React.FC<Props> = ({
       return hasLegacyExecutor || hasMultiExecutor;
     });
   }, [oss, user]);
-
+  
   const todoList = myOSs.filter(o => o.status !== OSStatus.COMPLETED && o.status !== OSStatus.CANCELED);
   const doneList = myOSs.filter(o => o.status === OSStatus.COMPLETED);
 
   const getContext = (os: OS) => {
     if (os.projectId) {
-      const p = projects.find(x => x.id === os.projectId);
-      return { name: p?.description, type: 'PROJETO', code: p?.code, location: p?.location, city: p?.city, equipment: null as any };
+        const p = projects.find(x => x.id === os.projectId);
+        return { name: p?.description, type: 'PROJETO', code: p?.code, location: p?.location, city: p?.city, equipment: null };
     } else if (os.buildingId) {
-      const b = buildings.find(x => x.id === os.buildingId);
-      return { name: b?.name, type: 'EDIFÍCIO', code: 'FACILITIES', location: b?.address, city: b?.city, equipment: null as any };
+        const b = buildings.find(x => x.id === os.buildingId);
+        return { name: b?.name, type: 'EDIFÍCIO', code: 'FACILITIES', location: b?.address, city: b?.city, equipment: null };
     } else if (os.equipmentId) {
-      const e = equipments.find(x => x.id === os.equipmentId);
-      return { name: e?.name || 'Equipamento', type: 'EQUIPAMENTO', code: e?.code || '---', location: e?.location || '', city: '', equipment: e };
+        const e = equipments.find(x => x.id === os.equipmentId);
+        return { name: e?.name || 'Equipamento', type: 'EQUIPAMENTO', code: e?.code || '---', location: e?.location || '', city: '', equipment: e };
     }
-    return { name: 'Local Não Definido', type: '---', code: '---', location: '', city: '', equipment: null as any };
+    return { name: 'Local Não Definido', type: '---', code: '---', location: '', city: '', equipment: null };
   };
 
   const handleGoogleCalendarSync = (os: OS) => {
     const context = getContext(os);
-
+    
     const formatDateForGoogle = (dateStr: string) => {
-      return new Date(dateStr).toISOString().replace(/-|:|\.\d\d\d/g, "");
+        return new Date(dateStr).toISOString().replace(/-|:|\.\d\d\d/g, "");
     };
 
     const start = os.startTime ? formatDateForGoogle(os.startTime) : formatDateForGoogle(os.openDate);
-    const limit = new Date(os.limitDate);
+    const limit = new Date(os.limitDate); 
     const end = formatDateForGoogle(limit.toISOString());
 
     const title = encodeURIComponent(`OS ${os.number}: ${os.description.substring(0, 40)}...`);
-
+    
     const serviceList = os.services.map(s => {
-      const srv = services.find(x => x.id === s.serviceTypeId);
-      return `- ${srv?.name || 'Serviço'} (${s.quantity}h)`;
+        const srv = services.find(x => x.id === s.serviceTypeId);
+        return `- ${srv?.name || 'Serviço'} (${s.quantity}h)`;
     }).join('\n');
 
     const details = encodeURIComponent(
-      `ATIVIDADE: ${os.description}\n\n` +
-      `LOCAL: ${context.name} (${context.location}, ${context.city})\n\n` +
-      `ESCOPO DETALHADO:\n${serviceList || 'Ver no App'}\n\n` +
-      `PRIORIDADE: ${translatePriority(os.priority)}\n` +
-      `Link do Sistema: CropService`
+        `ATIVIDADE: ${os.description}\n\n` +
+        `LOCAL: ${context.name} (${context.location}, ${context.city})\n\n` +
+        `ESCOPO DETALHADO:\n${serviceList || 'Ver no App'}\n\n` +
+        `PRIORIDADE: ${translatePriority(os.priority)}\n` +
+        `Link do Sistema: CropService`
     );
-
+    
     const location = encodeURIComponent(`${context.name}, ${context.city}`);
     const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${start}/${end}&add=${user.email}`;
 
@@ -122,8 +100,8 @@ const ExecutorPanel: React.FC<Props> = ({
   };
 
   const daysInMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1).getDay();
-
+  const firstDayOfMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1).getDay(); // 0 = Domingo
+  
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const blanksArray = Array.from({ length: firstDayOfMonth }, (_, i) => i);
 
@@ -131,1037 +109,1052 @@ const ExecutorPanel: React.FC<Props> = ({
   const nextMonth = () => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
 
   const getDayStatus = (day: number) => {
-    const checkDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day);
-    const checkDateStr = checkDate.toDateString();
+      const checkDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day);
+      const checkDateStr = checkDate.toDateString();
 
-    const hasCompleted = myOSs.some(o => o.status === OSStatus.COMPLETED && o.endTime && new Date(o.endTime).toDateString() === checkDateStr);
-    const hasScheduled = myOSs.some(o => {
-      if (o.status === OSStatus.COMPLETED) return false;
-      const target = o.startTime ? new Date(o.startTime) : new Date(o.limitDate);
-      return target.toDateString() === checkDateStr;
-    });
+      const hasCompleted = myOSs.some(o => o.status === OSStatus.COMPLETED && o.endTime && new Date(o.endTime).toDateString() === checkDateStr);
+      const hasScheduled = myOSs.some(o => {
+          if (o.status === OSStatus.COMPLETED) return false;
+          const target = o.startTime ? new Date(o.startTime) : new Date(o.limitDate);
+          return target.toDateString() === checkDateStr;
+      });
 
-    return { hasCompleted, hasScheduled };
+      return { hasCompleted, hasScheduled };
   };
 
   const selectedDayOSs = useMemo(() => {
-    const dateStr = selectedDay.toDateString();
-    return myOSs.filter(o => {
-      if (o.status === OSStatus.COMPLETED && o.endTime) {
-        return new Date(o.endTime).toDateString() === dateStr;
-      }
-      const target = o.startTime ? new Date(o.startTime) : new Date(o.limitDate);
-      return target.toDateString() === dateStr;
-    });
+      const dateStr = selectedDay.toDateString();
+      return myOSs.filter(o => {
+          if (o.status === OSStatus.COMPLETED && o.endTime) {
+              return new Date(o.endTime).toDateString() === dateStr;
+          }
+          const target = o.startTime ? new Date(o.startTime) : new Date(o.limitDate);
+          return target.toDateString() === dateStr;
+      });
   }, [myOSs, selectedDay]);
 
   const getSortedList = () => {
-    if (activeTab === 'TODO') {
-      return [...todoList].sort((a, b) => {
-        const pWeight: Record<string, number> = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
-        const weightA = pWeight[a.priority] ?? 4;
-        const weightB = pWeight[b.priority] ?? 4;
-        return weightA - weightB;
-      });
-    }
-    if (activeTab === 'DONE') {
-      return [...doneList].sort((a, b) => new Date(b.endTime || 0).getTime() - new Date(a.endTime || 0).getTime());
-    }
-    return [];
+      if (activeTab === 'TODO') {
+          return [...todoList].sort((a, b) => {
+            const pWeight: Record<string, number> = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
+            const weightA = pWeight[a.priority] ?? 4;
+            const weightB = pWeight[b.priority] ?? 4;
+            return weightA - weightB;
+          });
+      }
+      if (activeTab === 'DONE') {
+          return [...doneList].sort((a, b) => new Date(b.endTime || 0).getTime() - new Date(a.endTime || 0).getTime());
+      }
+      return [];
   };
 
   const currentList = getSortedList();
 
   const handleStart = async (e: React.MouseEvent, osId: string) => {
-    e.stopPropagation();
-    const os = oss.find(o => o.id === osId);
-    if (!os) return;
+      e.stopPropagation();
+      const os = oss.find(o => o.id === osId);
+      if (!os) return;
 
-    const updated = {
-      status: OSStatus.IN_PROGRESS,
-      startTime: os.startTime || new Date().toISOString()
-    };
+      const updated = {
+        status: OSStatus.IN_PROGRESS,
+        startTime: os.startTime || new Date().toISOString()
+      };
+      setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
 
-    setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
-
-    try {
-      const { error } = await supabase.from('oss').upsert(mapToSupabase({
-        id: osId,
-        ...os,
-        ...updated
-      }));
-      if (error) throw error;
-    } catch (err) {
-      console.error('Erro ao atualizar OS:', err);
-    }
+      try {
+          const { error } = await supabase.from('oss').upsert(mapToSupabase({
+              id: osId,
+              ...os,
+              ...updated
+          }));
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao atualizar OS:', e);
+      }
   };
 
-  // ✅ abre modal de pausa
-  const handlePause = async (e: React.MouseEvent, osId: string) => {
-    e.stopPropagation();
-    const os = oss.find(o => o.id === osId);
-    if (!os) return;
+  
+  // Modal de pausa (para registrar motivo + o que foi feito antes da pausa)
+  const [pauseModalOS, setPauseModalOS] = useState<OS | null>(null);
+  const [pauseReasonInput, setPauseReasonInput] = useState<string>('');
+  const [pauseWorklogInput, setPauseWorklogInput] = useState<string>('');
 
-    setPauseTargetOS(os);
-    setPauseReason('');
-    setPauseWorklog('');
-    setShowPauseModal(true);
+  const openPauseModal = (e: React.MouseEvent, osId: string) => {
+      e.stopPropagation();
+      const os = oss.find(o => o.id === osId);
+      if (!os) return;
+      setPauseModalOS(os);
+      setPauseReasonInput('');
+      setPauseWorklogInput('');
   };
 
-  // ✅ confirma pausa e salva no Supabase (com worklog)
-  const confirmPause = async () => {
-    if (!pauseTargetOS) return;
-    const reason = pauseReason.trim();
-    if (!reason) {
-      alert('Informe o motivo da pausa.');
-      return;
-    }
+  const executePause = async (osId: string, reason: string, worklogBeforePause?: string) => {
+      const os = oss.find(o => o.id === osId);
+      if (!os) return;
 
-    setIsPausing(true);
-    const osId = pauseTargetOS.id;
-    const os = oss.find(o => o.id === osId) || pauseTargetOS;
-    const worklogBeforePause = pauseWorklog.trim() || undefined;
-
-    try {
       const isMultiExecutor = (os.executorIds?.length || 0) > 1;
-      const executorId = user.id;
 
+      // Modelo novo: pausa por executor (não pausa a OS inteira)
       if (isMultiExecutor) {
-        const pauseEntry: PauseEntry = {
+          const executorId = user.id;
+
+          const pauseEntry = {
+              timestamp: new Date().toISOString(),
+              reason,
+              userId: user.id,
+              executorId,
+              action: 'PAUSE' as const,
+              worklogBeforePause
+          };
+
+          const prevStates = os.executorStates || {};
+          const prevState = prevStates[executorId] || { status: 'IN_PROGRESS' as const, pauseHistory: [] as any[] };
+
+          const nextStates = {
+              ...prevStates,
+              [executorId]: {
+                  ...prevState,
+                  status: 'PAUSED' as const,
+                  currentPauseReason: reason,
+                  pauseHistory: [...(prevState.pauseHistory || []), pauseEntry]
+              }
+          };
+
+          // Status global: só PAUSED se todos executores estiverem pausados
+          const allPaused = (os.executorIds || []).length > 0
+            ? (os.executorIds || []).every(id => nextStates[id]?.status === 'PAUSED')
+            : false;
+
+          const updated = {
+              executorStates: nextStates,
+              status: allPaused ? OSStatus.PAUSED : (os.status || OSStatus.IN_PROGRESS)
+          };
+
+          setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
+
+          try {
+              const { error } = await supabase.from('oss').upsert(mapToSupabase({
+                  id: osId,
+                  ...os,
+                  ...updated
+              }));
+              if (error) throw error;
+          } catch (e) {
+              console.error('Erro ao pausar OS (por executor):', e);
+          }
+          return;
+      }
+
+      // Legado: pausa global (OS com 1 executor)
+      const pauseEntry = {
           timestamp: new Date().toISOString(),
           reason,
           userId: user.id,
-          executorId,
-          action: 'PAUSE',
-          worklogBeforePause
-        };
-
-        const prevStates = (os as any).executorStates || {};
-        const prevState = prevStates[executorId] || { status: 'IN_PROGRESS' as const, pauseHistory: [] as PauseEntry[] };
-
-        const nextStates = {
-          ...prevStates,
-          [executorId]: {
-            ...prevState,
-            status: 'PAUSED' as const,
-            currentPauseReason: reason,
-            pauseHistory: [...(prevState.pauseHistory || []), pauseEntry]
-          }
-        };
-
-        const allPaused = (os.executorIds || []).length > 0
-          ? (os.executorIds || []).every(id => nextStates[id]?.status === 'PAUSED')
-          : false;
-
-        const updated = {
-          ...(os as any),
-          executorStates: nextStates,
-          status: allPaused ? OSStatus.PAUSED : (os.status || OSStatus.IN_PROGRESS)
-        };
-
-        setOss(prev => prev.map(o => o.id === osId ? updated : o));
-        if (viewDetailOS?.id === osId) setViewDetailOS(updated as any);
-
-        const { error } = await supabase.from('oss').upsert(mapToSupabase({
-          id: osId,
-          ...updated
-        }));
-        if (error) throw error;
-
-      } else {
-        // Legado: pausa global
-        const pauseEntry: PauseEntry = {
-          timestamp: new Date().toISOString(),
-          reason,
-          userId: user.id,
-          action: 'PAUSE',
-          worklogBeforePause
-        };
-
-        const updated = {
-          ...(os as any),
-          status: OSStatus.PAUSED,
-          pauseReason: reason,
-          pauseHistory: [...(((os as any).pauseHistory) || []), pauseEntry]
-        };
-
-        setOss(prev => prev.map(o => o.id === osId ? updated : o));
-        if (viewDetailOS?.id === osId) setViewDetailOS(updated as any);
-
-        const { error } = await supabase.from('oss').upsert(mapToSupabase({
-          id: osId,
-          ...updated
-        }));
-        if (error) throw error;
-      }
-
-      setShowPauseModal(false);
-      setPauseTargetOS(null);
-      setPauseReason('');
-      setPauseWorklog('');
-
-    } catch (err) {
-      console.error('Erro ao pausar OS:', err);
-      alert('Erro ao pausar. Tente novamente.');
-    } finally {
-      setIsPausing(false);
-    }
-  };
-
-  const handleResume = async (e: React.MouseEvent, osId: string) => {
-    e.stopPropagation();
-
-    const os = oss.find(o => o.id === osId);
-    if (!os) return;
-
-    const isMultiExecutor = (os.executorIds?.length || 0) > 1;
-
-    try {
-      if (isMultiExecutor) {
-        const executorId = user.id;
-
-        const resumeEntry: PauseEntry = {
-          timestamp: new Date().toISOString(),
-          reason: 'Retomada',
-          userId: user.id,
-          executorId,
-          action: 'RESUME'
-        };
-
-        const prevStates = (os as any).executorStates || {};
-        const prevState = prevStates[executorId] || { status: 'IN_PROGRESS' as const, pauseHistory: [] as PauseEntry[] };
-
-        const nextStates = {
-          ...prevStates,
-          [executorId]: {
-            ...prevState,
-            status: 'IN_PROGRESS' as const,
-            currentPauseReason: undefined,
-            pauseHistory: [...(prevState.pauseHistory || []), resumeEntry]
-          }
-        };
-
-        const anyInProgress = (os.executorIds || []).length > 0
-          ? (os.executorIds || []).some(id => nextStates[id]?.status === 'IN_PROGRESS')
-          : true;
-
-        const updated = {
-          ...(os as any),
-          executorStates: nextStates,
-          status: anyInProgress ? OSStatus.IN_PROGRESS : os.status
-        };
-
-        setOss(prev => prev.map(o => o.id === osId ? updated : o));
-        if (viewDetailOS?.id === osId) setViewDetailOS(updated as any);
-
-        const { error } = await supabase.from('oss').upsert(mapToSupabase({
-          id: osId,
-          ...updated
-        }));
-        if (error) throw error;
-
-        return;
-      }
-
-      const resumeEntry: PauseEntry = {
-        timestamp: new Date().toISOString(),
-        reason: 'Retomada',
-        userId: user.id,
-        action: 'RESUME'
+          action: 'PAUSE' as const
       };
 
       const updated = {
-        ...(os as any),
-        status: OSStatus.IN_PROGRESS,
-        pauseReason: undefined,
-        pauseHistory: [...(((os as any).pauseHistory) || []), resumeEntry]
+          status: OSStatus.PAUSED,
+          pauseReason: reason,
+          pauseHistory: [...(os.pauseHistory || []), pauseEntry]
       };
 
-      setOss(prev => prev.map(o => o.id === osId ? updated : o));
-      if (viewDetailOS?.id === osId) setViewDetailOS(updated as any);
+      setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
 
-      const { error } = await supabase.from('oss').upsert(mapToSupabase({
-        id: osId,
-        ...updated
-      }));
-      if (error) throw error;
-
-    } catch (err) {
-      console.error('Erro ao retomar OS:', err);
-      alert('Erro ao retomar. Tente novamente.');
-    }
+      try {
+          const { error } = await supabase.from('oss').upsert(mapToSupabase({
+              id: osId,
+              ...os,
+              ...updated
+          }));
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao pausar OS:', e);
+      }
   };
 
+  const confirmPause = async () => {
+      if (!pauseModalOS) return;
+      const reason = (pauseReasonInput || '').trim();
+      if (!reason) {
+          alert('Informe o motivo da pausa.');
+          return;
+      }
+      const worklog = (pauseWorklogInput || '').trim() || undefined;
+      const osId = pauseModalOS.id;
+
+      // fecha modal antes (para UX)
+      setPauseModalOS(null);
+      setPauseReasonInput('');
+      setPauseWorklogInput('');
+
+      await executePause(osId, reason, worklog);
+  };
+
+  const handlePause = async (e: React.MouseEvent, osId: string) => {
+      // mantém a assinatura original para não quebrar o resto do código
+      openPauseModal(e, osId);
+  };
+
+  const handleResume = async (e: React.MouseEvent, osId: string) => {
+      e.stopPropagation();
+
+      const os = oss.find(o => o.id === osId);
+      if (!os) return;
+
+      const isMultiExecutor = (os.executorIds?.length || 0) > 1;
+
+      // Modelo novo: retoma por executor
+      if (isMultiExecutor) {
+          const executorId = user.id;
+
+          const resumeEntry = {
+              timestamp: new Date().toISOString(),
+              reason: 'Retomada',
+              userId: user.id,
+              executorId,
+              action: 'RESUME' as const
+          };
+
+          const prevStates = os.executorStates || {};
+          const prevState = prevStates[executorId] || { status: 'IN_PROGRESS' as const, pauseHistory: [] as any[] };
+
+          const nextStates = {
+              ...prevStates,
+              [executorId]: {
+                  ...prevState,
+                  status: 'IN_PROGRESS' as const,
+                  currentPauseReason: undefined,
+                  pauseHistory: [...(prevState.pauseHistory || []), resumeEntry]
+              }
+          };
+
+          // Status global: se algum executor estiver em andamento, IN_PROGRESS
+          const anyInProgress = (os.executorIds || []).length > 0
+            ? (os.executorIds || []).some(id => nextStates[id]?.status === 'IN_PROGRESS')
+            : true;
+
+          const updated = {
+              executorStates: nextStates,
+              status: anyInProgress ? OSStatus.IN_PROGRESS : os.status
+          };
+
+          setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
+
+          try {
+              const { error } = await supabase.from('oss').upsert(mapToSupabase({
+                  id: osId,
+                  ...os,
+                  ...updated
+              }));
+              if (error) throw error;
+          } catch (e) {
+              console.error('Erro ao retomar OS (por executor):', e);
+          }
+          return;
+      }
+
+      // Legado: retoma global
+      const resumeEntry = {
+          timestamp: new Date().toISOString(),
+          reason: 'Retomada',
+          userId: user.id,
+          action: 'RESUME' as const
+      };
+
+      const updated = {
+          status: OSStatus.IN_PROGRESS,
+          pauseReason: undefined,
+          pauseHistory: [...(os.pauseHistory || []), resumeEntry]
+      };
+
+      setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
+
+      try {
+          const { error } = await supabase.from('oss').upsert(mapToSupabase({
+              id: osId,
+              ...os,
+              ...updated
+          }));
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao retomar OS:', e);
+      }
+  };
+
+  
   const openFinishModal = (e: React.MouseEvent, os: OS) => {
-    e.stopPropagation();
-    setFinishingOS(os);
-    setPhotoPreview(null);
-    setExecutionDescription('');
+      e.stopPropagation();
+      setFinishingOS(os);
+      setPhotoPreview(null);
+      setExecutionDescription('');
   };
 
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (evt) => setPhotoPreview(evt.target?.result as string);
-      reader.readAsDataURL(file);
-    }
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onload = (evt) => setPhotoPreview(evt.target?.result as string);
+          reader.readAsDataURL(file);
+      }
   };
 
   const confirmFinish = async () => {
-    if (!finishingOS || !photoPreview) return;
-    const updated = {
-      ...finishingOS,
-      status: OSStatus.COMPLETED,
-      endTime: new Date().toISOString(),
-      completionImage: photoPreview,
-      executionDescription: executionDescription || undefined
-    };
+      if (!finishingOS || !photoPreview) return;
+      const updated = {
+          ...finishingOS,
+          status: OSStatus.COMPLETED,
+          endTime: new Date().toISOString(),
+          completionImage: photoPreview,
+          executionDescription: executionDescription || undefined
+      };
+      setOss(prev => prev.map(o => o.id === finishingOS.id ? updated : o));
 
-    setOss(prev => prev.map(o => o.id === finishingOS.id ? updated : o));
+      try {
+          const { error } = await supabase.from('oss').upsert(mapToSupabase({
+              id: finishingOS.id,
+              ...updated
+          }));
+          if (error) throw error;
+      } catch (e) {
+          console.error('Erro ao finalizar OS:', e);
+      }
 
-    try {
-      const { error } = await supabase.from('oss').upsert(mapToSupabase({
-        id: finishingOS.id,
-        ...updated
-      }));
-      if (error) throw error;
-    } catch (err) {
-      console.error('Erro ao finalizar OS:', err);
-    }
-
-    setFinishingOS(null);
-    setPhotoPreview(null);
-    setExecutionDescription('');
+      setFinishingOS(null);
+      setPhotoPreview(null);
+      setExecutionDescription('');
   };
 
   const handlePriorityChange = async (osId: string, newPriority: string) => {
-    const p = newPriority as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-    setOss(prev => prev.map(o => o.id === osId ? { ...o, priority: p } : o));
-    if (viewDetailOS && viewDetailOS.id === osId) {
-      setViewDetailOS({ ...viewDetailOS, priority: p });
-    }
-
-    try {
-      const os = oss.find(o => o.id === osId);
-      if (os) {
-        const { error } = await supabase.from('oss').upsert(mapToSupabase({ ...os, priority: p }));
-        if (error) throw error;
+      const p = newPriority as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      setOss(prev => prev.map(o => o.id === osId ? { ...o, priority: p } : o));
+      if (viewDetailOS && viewDetailOS.id === osId) {
+          setViewDetailOS({ ...viewDetailOS, priority: p });
       }
-    } catch (err) {
-      console.error('Erro ao atualizar prioridade:', err);
-    }
+
+      try {
+          const os = oss.find(o => o.id === osId);
+          if (os) {
+              const { error } = await supabase.from('oss').upsert(mapToSupabase({ ...os, priority: p }));
+              if (error) throw error;
+          }
+      } catch (e) {
+          console.error('Erro ao atualizar prioridade:', e);
+      }
+  };
+
+  const handleAddExecutorManualMaterial = async (osId: string) => {
+      const desc = manualMaterialDesc.trim();
+      const qty = Number(String(manualMaterialQty).replace(',', '.'));
+      if (!desc || !Number.isFinite(qty) || qty <= 0) {
+          alert('Informe a descrição e uma quantidade válida (> 0).');
+          return;
+      }
+
+      const os = oss.find(o => o.id === osId);
+      if (!os) return;
+
+      setIsSavingManualMaterial(true);
+
+      const entry = {
+          timestamp: new Date().toISOString(),
+          executorId: user.id,
+          userId: user.id,
+          description: desc,
+          quantity: qty,
+          source: 'EXECUTOR_MANUAL'
+      };
+
+      const prev = (os as any).executorManualMaterials || (os as any).manualMaterialsByExecutor || [];
+      const nextArr = Array.isArray(prev) ? [...prev, entry] : [entry];
+
+      const updated = { ...(os as any), executorManualMaterials: nextArr };
+      setOss(prevList => prevList.map(o => o.id === osId ? ({ ...o, ...(updated as any) }) : o));
+      if (viewDetailOS && viewDetailOS.id === osId) {
+          setViewDetailOS({ ...(viewDetailOS as any), ...(updated as any) });
+      }
+
+      try {
+          const payload = mapToSupabase({
+              id: osId,
+              ...(os as any),
+              executorManualMaterials: nextArr,
+          });
+
+          const { error } = await supabase.from('oss').upsert(payload);
+          if (error) throw error;
+
+          setManualMaterialDesc('');
+          setManualMaterialQty('');
+      } catch (e) {
+          console.error('Erro ao salvar material manual do executor:', e);
+          alert('Não foi possível salvar o material.');
+      } finally {
+          setIsSavingManualMaterial(false);
+      }
   };
 
   const getPriorityColor = (p: string) => {
-    switch (p) {
-      case 'CRITICAL': return 'bg-red-500 text-white border-red-600';
-      case 'HIGH': return 'bg-orange-500 text-white border-orange-600';
-      case 'MEDIUM': return 'bg-blue-500 text-white border-blue-600';
-      default: return 'bg-slate-400 text-white border-slate-500';
-    }
-  };
-
-  // ✅ histórico de pausas para o executor atual
-  const getMyPauseHistory = (os: OS): PauseEntry[] => {
-    const isMultiExecutor = (os.executorIds?.length || 0) > 1;
-    if (isMultiExecutor) {
-      const states = (os as any).executorStates || {};
-      const myState = states[user.id] || states[user.email] || {};
-      const list = (myState.pauseHistory || []) as PauseEntry[];
-      return [...list].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    }
-    const legacy = (((os as any).pauseHistory) || []) as PauseEntry[];
-    return [...legacy].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      switch(p) {
+          case 'CRITICAL': return 'bg-red-500 text-white border-red-600';
+          case 'HIGH': return 'bg-orange-500 text-white border-orange-600';
+          case 'MEDIUM': return 'bg-blue-500 text-white border-blue-600';
+          default: return 'bg-slate-400 text-white border-slate-500';
+      }
   };
 
   const renderOSCard = (os: OS) => {
-    const context = getContext(os);
-    return (
-      <div
-        key={os.id}
-        className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 relative overflow-hidden mb-4 group hover:shadow-md transition-shadow"
-      >
-        <div
-          className={`absolute top-0 left-0 bottom-0 w-1.5 ${
-            os.status === OSStatus.IN_PROGRESS
-              ? 'bg-blue-500 animate-pulse'
-              : os.status === OSStatus.COMPLETED
-                ? 'bg-clean-primary'
-                : 'bg-slate-300'
-          }`}
-        ></div>
+      const context = getContext(os);
+      return (
+        <div key={os.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 relative overflow-hidden mb-4 group hover:shadow-md transition-shadow">
+            <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${os.status === OSStatus.IN_PROGRESS ? 'bg-blue-500 animate-pulse' : os.status === OSStatus.COMPLETED ? 'bg-clean-primary' : 'bg-slate-300'}`}></div>
 
-        <div className="pl-3">
-          <div className="flex justify-between items-start mb-2">
-            <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-              {os.number}
-            </span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${getPriorityColor(os.priority)}`}>
-              {translatePriority(os.priority)}
-            </span>
-          </div>
-
-          <h3 className="text-lg font-bold text-slate-900 leading-tight mb-1">{os.description}</h3>
-          <p className="text-xs font-bold text-clean-primary mb-2 uppercase tracking-wide truncate">
-            {context.code} - {context.type}
-          </p>
-
-          <div className="space-y-2 mb-4">
-            <div className="flex items-center gap-2 text-xs bg-purple-50 border border-purple-100 p-2 rounded-lg">
-              <i className="fas fa-wrench text-purple-600"></i>
-              <span className="font-bold text-purple-900">{os.type}</span>
-            </div>
-
-            {context.equipment && (
-              <div className="flex items-center gap-2 text-xs bg-blue-50 border border-blue-100 p-2 rounded-lg">
-                <i className="fas fa-cogs text-blue-600"></i>
-                <div className="flex-1">
-                  <span className="font-bold text-blue-900">{context.equipment.name}</span>
-                  <span className="text-blue-600 ml-2">• {context.equipment.code}</span>
-                  {context.equipment.location && (
-                    <span className="text-blue-500 ml-2 text-[10px]">({context.equipment.location})</span>
-                  )}
+            <div className="pl-3">
+                <div className="flex justify-between items-start mb-2">
+                    <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{os.number}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${getPriorityColor(os.priority)}`}>{translatePriority(os.priority)}</span>
                 </div>
-              </div>
-            )}
 
-            {!context.equipment && context.city && (
-              <div className="flex items-center gap-2 text-xs bg-slate-50 border border-slate-100 p-2 rounded-lg">
-                <i className="fas fa-map-marker-alt text-slate-600"></i>
-                <span className="font-medium text-slate-700">{context.city}</span>
-              </div>
-            )}
-          </div>
+                <h3 className="text-lg font-bold text-slate-900 leading-tight mb-1">{os.description}</h3>
+                <p className="text-xs font-bold text-clean-primary mb-2 uppercase tracking-wide truncate">{context.code} - {context.type}</p>
 
-          <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mb-4 bg-slate-50 p-3 rounded-lg">
-            <div className="flex items-center gap-1.5">
-              <i className="fas fa-calendar"></i>
-              {new Date(os.limitDate).toLocaleDateString()}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <i className="fas fa-clock"></i>
-              {os.status === OSStatus.COMPLETED ? 'Finalizada' : `${os.slaHours}h SLA`}
-            </div>
-          </div>
+                <div className="space-y-2 mb-4">
+                    <div className="flex items-center gap-2 text-xs bg-purple-50 border border-purple-100 p-2 rounded-lg">
+                        <i className="fas fa-wrench text-purple-600"></i>
+                        <span className="font-bold text-purple-900">{os.type}</span>
+                    </div>
 
-          <div className="flex gap-2">
-            {os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED && (
-              <>
-                {os.status === OSStatus.OPEN ? (
-                  <button
-                    onClick={(e) => handleStart(e, os.id)}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-                  >
-                    <i className="fas fa-play"></i> Iniciar
-                  </button>
-                ) : os.status === OSStatus.PAUSED ? (
-                  <button
-                    onClick={(e) => handleResume(e, os.id)}
-                    className="flex-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-                  >
-                    <i className="fas fa-play"></i> Retomar
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={(e) => handlePause(e, os.id)}
-                      className="flex-1 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-                    >
-                      <i className="fas fa-pause"></i> Pausar
-                    </button>
-                    <button
-                      onClick={(e) => openFinishModal(e, os)}
-                      className="flex-1 bg-clean-primary hover:bg-green-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-                    >
-                      <i className="fas fa-camera"></i> Finalizar
-                    </button>
-                  </>
+                    {context.equipment && (
+                        <div className="flex items-center gap-2 text-xs bg-blue-50 border border-blue-100 p-2 rounded-lg">
+                            <i className="fas fa-cogs text-blue-600"></i>
+                            <div className="flex-1">
+                                <span className="font-bold text-blue-900">{context.equipment.name}</span>
+                                <span className="text-blue-600 ml-2">• {context.equipment.code}</span>
+                                {context.equipment.location && (
+                                    <span className="text-blue-500 ml-2 text-[10px]">({context.equipment.location})</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {!context.equipment && context.city && (
+                        <div className="flex items-center gap-2 text-xs bg-slate-50 border border-slate-100 p-2 rounded-lg">
+                            <i className="fas fa-map-marker-alt text-slate-600"></i>
+                            <span className="font-medium text-slate-700">{context.city}</span>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-4 text-xs text-slate-500 font-medium mb-4 bg-slate-50 p-3 rounded-lg">
+                    <div className="flex items-center gap-1.5">
+                        <i className="fas fa-calendar"></i>
+                        {new Date(os.limitDate).toLocaleDateString()}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <i className="fas fa-clock"></i>
+                        {os.status === OSStatus.COMPLETED ? 'Finalizada' : `${os.slaHours}h SLA`}
+                    </div>
+                </div>
+
+                <div className="flex gap-2">
+                   {os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED && (
+                       <>
+                        {os.status === OSStatus.OPEN ? (
+                            <button onClick={(e) => handleStart(e, os.id)} className="flex-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                                <i className="fas fa-play"></i> Iniciar
+                            </button>
+                        ) : os.status === OSStatus.PAUSED ? (
+                            <button onClick={(e) => handleResume(e, os.id)} className="flex-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                                <i className="fas fa-play"></i> Retomar
+                            </button>
+                        ) : (
+                             <>
+                                <button onClick={(e) => handlePause(e, os.id)} className="flex-1 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                                    <i className="fas fa-pause"></i> Pausar
+                                </button>
+                                <button onClick={(e) => openFinishModal(e, os)} className="flex-1 bg-clean-primary hover:bg-green-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                                    <i className="fas fa-camera"></i> Finalizar
+                                </button>
+                             </>
+                        )}
+                       </>
+                   )}
+                   <button onClick={() => setViewDetailOS(os)} className="flex-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                       <i className="fas fa-eye"></i> Detalhes
+                   </button>
+                </div>
+                
+                {os.status === OSStatus.COMPLETED && os.completionImage && (
+                    <div className="mt-2 relative">
+                        <img src={os.completionImage} alt="Evidência" className="w-full h-32 object-cover rounded-lg border border-slate-200 opacity-80" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm"><i className="fas fa-check-circle text-clean-primary mr-1"></i> Evidência Enviada</span>
+                        </div>
+                    </div>
                 )}
-              </>
-            )}
-            <button
-              onClick={() => setViewDetailOS(os)}
-              className="flex-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
-            >
-              <i className="fas fa-eye"></i> Detalhes
-            </button>
-          </div>
-
-          {os.status === OSStatus.COMPLETED && (os as any).completionImage && (
-            <div className="mt-2 relative">
-              <img
-                src={(os as any).completionImage}
-                alt="Evidência"
-                className="w-full h-32 object-cover rounded-lg border border-slate-200 opacity-80"
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm">
-                  <i className="fas fa-check-circle text-clean-primary mr-1"></i> Evidência Enviada
-                </span>
-              </div>
             </div>
-          )}
         </div>
-      </div>
-    );
+      );
   };
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
-
+      
       {/* --- SIDEBAR (Desktop/Tablet) --- */}
       <aside className="hidden md:flex w-72 bg-[#001529] text-white flex-col border-r border-white/10 shadow-2xl relative z-20">
-        <div className="h-24 flex items-center px-6 border-b border-white/10 bg-[#001529] shrink-0 gap-3">
-          <div className="w-10 h-10 flex items-center justify-center text-clean-primary text-2xl">
-            <i className="fas fa-fingerprint"></i>
+          <div className="h-24 flex items-center px-6 border-b border-white/10 bg-[#001529] shrink-0 gap-3">
+              <div className="w-10 h-10 flex items-center justify-center text-clean-primary text-2xl">
+                  <i className="fas fa-fingerprint"></i>
+              </div>
+              <div>
+                  <h1 className="text-lg font-black text-white tracking-tighter leading-none">CropService</h1>
+                  <span className="text-[10px] text-clean-primary font-bold uppercase tracking-widest block">Executor</span>
+              </div>
           </div>
-          <div>
-            <h1 className="text-lg font-black text-white tracking-tighter leading-none">CropService</h1>
-            <span className="text-[10px] text-clean-primary font-bold uppercase tracking-widest block">Executor</span>
+
+          <nav className="flex-1 py-8 px-4 space-y-2">
+              <button 
+                  onClick={() => setActiveTab('TODO')}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${activeTab === 'TODO' ? 'bg-clean-primary text-white border border-white shadow-md' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                  <i className="fas fa-clipboard-list w-6 text-center text-lg"></i>
+                  <span>Minhas Tarefas</span>
+                  {todoList.length > 0 && <span className="ml-auto bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full">{todoList.length}</span>}
+              </button>
+
+              <button 
+                  onClick={() => setActiveTab('CALENDAR')}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${activeTab === 'CALENDAR' ? 'bg-clean-primary text-white border border-white shadow-md' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                  <i className="fas fa-calendar-days w-6 text-center text-lg"></i>
+                  <span>Agenda</span>
+              </button>
+
+              <button 
+                  onClick={() => setActiveTab('DONE')}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${activeTab === 'DONE' ? 'bg-clean-primary text-white border border-white shadow-md' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+              >
+                  <i className="fas fa-clock-rotate-left w-6 text-center text-lg"></i>
+                  <span>Histórico</span>
+              </button>
+          </nav>
+
+          <div className="p-4 border-t border-white/10 bg-[#000b14]">
+              <div className="flex items-center gap-3 p-3 mb-2 rounded-xl bg-[#001529] border border-white/20">
+                  <div className="w-10 h-10 rounded-full bg-[#000b14] flex items-center justify-center font-bold text-white shadow-md border-2 border-blue-600">
+                      {user.avatar || user.name.substr(0,2)}
+                  </div>
+                  <div className="overflow-hidden">
+                      <p className="text-sm font-bold text-white truncate">{user.name}</p>
+                      <p className="text-xs text-white/70 truncate">Prestador</p>
+                  </div>
+              </div>
+              <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors uppercase tracking-wider">
+                  <i className="fas fa-sign-out-alt"></i> Sair do Sistema
+              </button>
           </div>
-        </div>
-
-        <nav className="flex-1 py-8 px-4 space-y-2">
-          <button
-            onClick={() => setActiveTab('TODO')}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${
-              activeTab === 'TODO'
-                ? 'bg-clean-primary text-white border border-white shadow-md'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            <i className="fas fa-clipboard-list w-6 text-center text-lg"></i>
-            <span>Minhas Tarefas</span>
-            {todoList.length > 0 && <span className="ml-auto bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full">{todoList.length}</span>}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('CALENDAR')}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${
-              activeTab === 'CALENDAR'
-                ? 'bg-clean-primary text-white border border-white shadow-md'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            <i className="fas fa-calendar-days w-6 text-center text-lg"></i>
-            <span>Agenda</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('DONE')}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all text-sm font-bold ${
-              activeTab === 'DONE'
-                ? 'bg-clean-primary text-white border border-white shadow-md'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            <i className="fas fa-clock-rotate-left w-6 text-center text-lg"></i>
-            <span>Histórico</span>
-          </button>
-        </nav>
-
-        <div className="p-4 border-t border-white/10 bg-[#000b14]">
-          <div className="flex items-center gap-3 p-3 mb-2 rounded-xl bg-[#001529] border border-white/20">
-            <div className="w-10 h-10 rounded-full bg-[#000b14] flex items-center justify-center font-bold text-white shadow-md border-2 border-blue-600">
-              {(user as any).avatar || user.name.substr(0, 2)}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-bold text-white truncate">{user.name}</p>
-              <p className="text-xs text-white/70 truncate">Prestador</p>
-            </div>
-          </div>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors uppercase tracking-wider"
-          >
-            <i className="fas fa-sign-out-alt"></i> Sair do Sistema
-          </button>
-        </div>
       </aside>
 
       {/* --- MAIN CONTENT AREA --- */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-100">
+          
+          {/* Header Mobile (Only visible on small screens) */}
+          <header className="md:hidden bg-[#001529] text-white p-6 shadow-md rounded-b-3xl shrink-0 z-10 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-clean-primary flex items-center justify-center font-bold text-white border-2 border-blue-900 shadow-md">
+                      {user.avatar || user.name.substr(0,2)}
+                  </div>
+                  <div>
+                      <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Olá, Prestador</p>
+                      <h1 className="text-lg font-bold leading-none">{user.name.split(' ')[0]}</h1>
+                  </div>
+              </div>
+              <button onClick={onLogout} className="w-10 h-10 bg-blue-800 rounded-full flex items-center justify-center text-blue-300 hover:text-white transition-colors">
+                  <i className="fas fa-sign-out-alt"></i>
+              </button>
+          </header>
 
-        {/* Header Mobile */}
-        <header className="md:hidden bg-[#001529] text-white p-6 shadow-md rounded-b-3xl shrink-0 z-10 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-clean-primary flex items-center justify-center font-bold text-white border-2 border-blue-900 shadow-md">
-              {(user as any).avatar || user.name.substr(0, 2)}
-            </div>
-            <div>
-              <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Olá, Prestador</p>
-              <h1 className="text-lg font-bold leading-none">{user.name.split(' ')[0]}</h1>
-            </div>
-          </div>
-          <button onClick={onLogout} className="w-10 h-10 bg-blue-800 rounded-full flex items-center justify-center text-blue-300 hover:text-white transition-colors">
-            <i className="fas fa-sign-out-alt"></i>
-          </button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar pb-24 md:pb-8">
-          <div className="max-w-4xl mx-auto">
-
-            <div className="hidden md:block mb-8">
-              <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
-                {activeTab === 'TODO' ? 'Tarefas Pendentes' : activeTab === 'CALENDAR' ? 'Minha Agenda' : 'Histórico de Atividades'}
-              </h2>
-              <p className="text-slate-500">
-                {activeTab === 'TODO'
-                  ? 'Gerencie suas ordens de serviço ativas.'
-                  : activeTab === 'CALENDAR'
-                    ? 'Visualize seus compromissos futuros.'
-                    : 'Registro de serviços concluídos.'}
-              </p>
-            </div>
-
-            {/* TAB: CALENDAR */}
-            {activeTab === 'CALENDAR' && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <button onClick={prevMonth} className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
-                      <i className="fas fa-chevron-left"></i>
-                    </button>
-                    <h2 className="font-bold text-xl text-slate-800 capitalize">
-                      {calendarDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                    </h2>
-                    <button onClick={nextMonth} className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
-                      <i className="fas fa-chevron-right"></i>
-                    </button>
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar pb-24 md:pb-8">
+              <div className="max-w-4xl mx-auto">
+                  
+                  {/* Page Title (Desktop only) */}
+                  <div className="hidden md:block mb-8">
+                      <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
+                          {activeTab === 'TODO' ? 'Tarefas Pendentes' : activeTab === 'CALENDAR' ? 'Minha Agenda' : 'Histórico de Atividades'}
+                      </h2>
+                      <p className="text-slate-500">
+                          {activeTab === 'TODO' ? 'Gerencie suas ordens de serviço ativas.' : activeTab === 'CALENDAR' ? 'Visualize seus compromissos futuros.' : 'Registro de serviços concluídos.'}
+                      </p>
                   </div>
 
-                  <div className="grid grid-cols-7 mb-2 text-center">
-                    {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (
-                      <div key={i} className="text-xs font-bold text-slate-400 uppercase">{d}</div>
-                    ))}
-                  </div>
+                  {/* TAB: CALENDAR */}
+                  {activeTab === 'CALENDAR' && (
+                      <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 mb-6">
+                              <div className="flex justify-between items-center mb-6">
+                                  <button onClick={prevMonth} className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition-colors"><i className="fas fa-chevron-left"></i></button>
+                                  <h2 className="font-bold text-xl text-slate-800 capitalize">{calendarDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2>
+                                  <button onClick={nextMonth} className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded-full transition-colors"><i className="fas fa-chevron-right"></i></button>
+                              </div>
 
-                  <div className="grid grid-cols-7 gap-1 md:gap-2">
-                    {blanksArray.map(b => <div key={`blank-${b}`} className="aspect-square"></div>)}
-                    {daysArray.map(day => {
-                      const date = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day);
-                      const isSelected = date.toDateString() === selectedDay.toDateString();
-                      const isToday = date.toDateString() === new Date().toDateString();
-                      const { hasCompleted, hasScheduled } = getDayStatus(day);
+                              <div className="grid grid-cols-7 mb-2 text-center">
+                                  {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (
+                                      <div key={i} className="text-xs font-bold text-slate-400 uppercase">{d}</div>
+                                  ))}
+                              </div>
 
-                      return (
-                        <button
-                          key={day}
-                          onClick={() => setSelectedDay(date)}
-                          className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all ${
-                            isSelected ? 'bg-slate-800 text-white shadow-lg scale-105 z-10' : 'hover:bg-slate-50 text-slate-700 bg-slate-50/50'
-                          }`}
-                        >
-                          <span className={`text-sm font-bold ${isToday && !isSelected ? 'text-clean-primary' : ''}`}>{day}</span>
-                          <div className="flex gap-0.5 mt-1.5 h-2">
-                            {hasCompleted && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-emerald-500'}`}></div>}
-                            {hasScheduled && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-blue-400' : 'bg-blue-500'}`}></div>}
+                              <div className="grid grid-cols-7 gap-1 md:gap-2">
+                                  {blanksArray.map(b => <div key={`blank-${b}`} className="aspect-square"></div>)}
+                                  {daysArray.map(day => {
+                                      const date = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day);
+                                      const isSelected = date.toDateString() === selectedDay.toDateString();
+                                      const isToday = date.toDateString() === new Date().toDateString();
+                                      const { hasCompleted, hasScheduled } = getDayStatus(day);
+
+                                      return (
+                                          <button 
+                                              key={day} 
+                                              onClick={() => setSelectedDay(date)}
+                                              className={`aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all ${isSelected ? 'bg-slate-800 text-white shadow-lg scale-105 z-10' : 'hover:bg-slate-50 text-slate-700 bg-slate-50/50'}`}
+                                          >
+                                              <span className={`text-sm font-bold ${isToday && !isSelected ? 'text-clean-primary' : ''}`}>{day}</span>
+                                              <div className="flex gap-0.5 mt-1.5 h-2">
+                                                  {hasCompleted && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-emerald-500'}`}></div>}
+                                                  {hasScheduled && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-blue-400' : 'bg-blue-500'}`}></div>}
+                                              </div>
+                                          </button>
+                                      );
+                                  })}
+                              </div>
+                              <div className="flex justify-center gap-6 mt-6 text-[10px] font-bold uppercase text-slate-500">
+                                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Agendado</div>
+                                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Concluído</div>
+                              </div>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
 
-                  <div className="flex justify-center gap-6 mt-6 text-[10px] font-bold uppercase text-slate-500">
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Agendado</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Concluído</div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 px-1 flex items-center gap-2">
-                    <i className="fas fa-calendar-day"></i> Agenda de {selectedDay.toLocaleDateString('pt-BR')}
-                  </h3>
-                  {selectedDayOSs.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400 bg-white rounded-2xl border border-slate-200 border-dashed">
-                      <i className="far fa-calendar-times text-3xl mb-3 opacity-50"></i>
-                      <p className="font-medium">Nenhuma atividade agendada.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4">
-                      {selectedDayOSs.map(renderOSCard)}
-                    </div>
+                          <div>
+                              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 px-1 flex items-center gap-2">
+                                  <i className="fas fa-calendar-day"></i> Agenda de {selectedDay.toLocaleDateString('pt-BR')}
+                              </h3>
+                              {selectedDayOSs.length === 0 ? (
+                                  <div className="text-center py-12 text-slate-400 bg-white rounded-2xl border border-slate-200 border-dashed">
+                                      <i className="far fa-calendar-times text-3xl mb-3 opacity-50"></i>
+                                      <p className="font-medium">Nenhuma atividade agendada.</p>
+                                  </div>
+                              ) : (
+                                  <div className="grid grid-cols-1 gap-4">
+                                    {selectedDayOSs.map(renderOSCard)}
+                                  </div>
+                              )}
+                          </div>
+                      </div>
                   )}
-                </div>
-              </div>
-            )}
 
-            {/* TAB: LISTS */}
-            {(activeTab === 'TODO' || activeTab === 'DONE') && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                {currentList.length === 0 && (
-                  <div className="text-center py-20 opacity-60 bg-white rounded-2xl border border-dashed border-slate-200">
-                    <i className="fas fa-clipboard-check text-5xl mb-4 text-slate-300"></i>
-                    <p className="font-bold text-slate-500 text-lg">Tudo limpo por aqui!</p>
-                    <p className="text-sm text-slate-400">Nenhuma ordem de serviço encontrada.</p>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 gap-4">
-                  {currentList.map(renderOSCard)}
-                </div>
+                  {/* TAB: LISTS */}
+                  {(activeTab === 'TODO' || activeTab === 'DONE') && (
+                      <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        {currentList.length === 0 && (
+                            <div className="text-center py-20 opacity-60 bg-white rounded-2xl border border-dashed border-slate-200">
+                                <i className="fas fa-clipboard-check text-5xl mb-4 text-slate-300"></i>
+                                <p className="font-bold text-slate-500 text-lg">Tudo limpo por aqui!</p>
+                                <p className="text-sm text-slate-400">Nenhuma ordem de serviço encontrada.</p>
+                            </div>
+                        )}
+                        <div className="grid grid-cols-1 gap-4">
+                            {currentList.map(renderOSCard)}
+                        </div>
+                      </div>
+                  )}
               </div>
-            )}
-
           </div>
-        </div>
       </main>
 
       {/* --- BOTTOM NAVIGATION (Mobile Only) --- */}
       <nav className="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 flex justify-around p-2 z-30 pb-safe">
-        <button onClick={() => setActiveTab('TODO')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'TODO' ? 'text-clean-primary bg-green-50' : 'text-slate-400'}`}>
-          <i className="fas fa-clipboard-list text-xl"></i>
-          <span className="text-[10px] font-bold uppercase">Tarefas</span>
-        </button>
-        <button onClick={() => setActiveTab('CALENDAR')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'CALENDAR' ? 'text-clean-primary bg-green-50' : 'text-slate-400'}`}>
-          <i className="fas fa-calendar-days text-xl"></i>
-          <span className="text-[10px] font-bold uppercase">Agenda</span>
-        </button>
-        <button onClick={() => setActiveTab('DONE')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'DONE' ? 'text-clean-primary bg-green-50' : 'text-slate-400'}`}>
-          <i className="fas fa-clock-rotate-left text-xl"></i>
-          <span className="text-[10px] font-bold uppercase">Histórico</span>
-        </button>
+          <button onClick={() => setActiveTab('TODO')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'TODO' ? 'text-clean-primary bg-green-50' : 'text-slate-400'}`}>
+              <i className="fas fa-clipboard-list text-xl"></i>
+              <span className="text-[10px] font-bold uppercase">Tarefas</span>
+          </button>
+          <button onClick={() => setActiveTab('CALENDAR')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'CALENDAR' ? 'text-clean-primary bg-green-50' : 'text-slate-400'}`}>
+              <i className="fas fa-calendar-days text-xl"></i>
+              <span className="text-[10px] font-bold uppercase">Agenda</span>
+          </button>
+          <button onClick={() => setActiveTab('DONE')} className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${activeTab === 'DONE' ? 'text-clean-primary bg-green-50' : 'text-slate-400'}`}>
+              <i className="fas fa-clock-rotate-left text-xl"></i>
+              <span className="text-[10px] font-bold uppercase">Histórico</span>
+          </button>
       </nav>
 
-      {/* ✅ MODAL DE PAUSA (Novo) */}
-      {showPauseModal && pauseTargetOS && (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[10000]">
-            <div
-              className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm"
-              onClick={() => {
-                if (isPausing) return;
-                setShowPauseModal(false);
-                setPauseTargetOS(null);
-              }}
-            />
-            <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-center">
-              <div className="relative bg-white rounded-2xl w-full max-w-lg mx-auto overflow-hidden shadow-2xl">
-                <div className="p-5 border-b border-slate-200 bg-slate-50 flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-slate-800 text-white font-mono text-xs font-bold px-2 py-0.5 rounded">{pauseTargetOS.number}</span>
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-orange-50 text-orange-700 border-orange-200">
-                        Registrar pausa
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-lg text-slate-900 leading-tight">{pauseTargetOS.description}</h3>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Preencha o motivo e o que foi feito antes da pausa.
-                    </p>
-                  </div>
-                  <button
-                    disabled={isPausing}
-                    onClick={() => {
-                      setShowPauseModal(false);
-                      setPauseTargetOS(null);
-                    }}
-                    className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center transition-colors disabled:opacity-50"
-                  >
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
-
-                <div className="p-5 space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Motivo da pausa</label>
-                    <input
-                      autoFocus
-                      value={pauseReason}
-                      onChange={(e) => setPauseReason(e.target.value)}
-                      className="w-full h-11 px-4 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
-                      placeholder="Ex: aguardando peça, falta de energia, almoço..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">O que foi feito até agora (antes da pausa)</label>
-                    <textarea
-                      value={pauseWorklog}
-                      onChange={(e) => setPauseWorklog(e.target.value)}
-                      className="w-full h-28 px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-orange-200 focus:border-orange-400 resize-none"
-                      placeholder="Ex: desmontado motor, realizado teste, trocado componente..."
-                    />
-                  </div>
-                </div>
-
-                <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3">
-                  <button
-                    disabled={isPausing}
-                    onClick={() => {
-                      setShowPauseModal(false);
-                      setPauseTargetOS(null);
-                    }}
-                    className="flex-1 py-3 text-slate-600 font-bold text-sm bg-white border border-slate-300 rounded-xl hover:bg-slate-100 disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    disabled={isPausing}
-                    onClick={confirmPause}
-                    className="flex-1 py-3 bg-orange-600 text-white font-bold text-sm rounded-xl hover:bg-orange-700 shadow-md disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isPausing ? (<><i className="fas fa-spinner fa-spin"></i> Salvando...</>) : (<><i className="fas fa-pause"></i> Pausar e Registrar</>)}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
-
-      {/* --- DETAIL MODAL --- */}
+      {/* --- DETAIL MODAL (Novo) --- */}
       {viewDetailOS && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[10000]">
-            <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md transition-opacity" onClick={() => setViewDetailOS(null)} />
-            <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-center">
-              <div className="relative bg-white rounded-2xl w-full max-w-lg mx-auto overflow-hidden animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                <div className="p-5 border-b border-slate-200 bg-slate-50 flex justify-between items-start shrink-0">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-slate-800 text-white font-mono text-xs font-bold px-2 py-0.5 rounded">{viewDetailOS.number}</span>
-                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${viewDetailOS.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                        {translatePriority(viewDetailOS.priority)}
-                      </span>
+            <div className="fixed inset-0 z-[10000]">
+              <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md transition-opacity" onClick={() => setViewDetailOS(null)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-center">
+                <div className="relative bg-white rounded-2xl w-full max-w-lg mx-auto overflow-hidden animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                    <div className="p-5 border-b border-slate-200 bg-slate-50 flex justify-between items-start shrink-0">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="bg-slate-800 text-white font-mono text-xs font-bold px-2 py-0.5 rounded">{viewDetailOS.number}</span>
+                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${viewDetailOS.priority === 'CRITICAL' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{translatePriority(viewDetailOS.priority)}</span>
+                            </div>
+                            <h3 className="font-bold text-lg text-slate-900 leading-tight">{viewDetailOS.description}</h3>
+                        </div>
+                        <button onClick={() => setViewDetailOS(null)} className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center transition-colors"><i className="fas fa-times"></i></button>
                     </div>
-                    <h3 className="font-bold text-lg text-slate-900 leading-tight">{viewDetailOS.description}</h3>
-                  </div>
-                  <button onClick={() => setViewDetailOS(null)} className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 hover:bg-slate-300 flex items-center justify-center transition-colors">
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
+                    
+                    <div className="p-5 overflow-y-auto custom-scrollbar space-y-6 min-h-0">
+                        {/* Contexto Local */}
+                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                            <h4 className="text-xs font-black text-blue-800 uppercase tracking-wide mb-2 flex items-center gap-1.5"><i className="fas fa-map-marker-alt"></i> Local de Execução</h4>
+                            <div className="text-sm text-slate-700 space-y-1">
+                                <p><span className="font-bold">Vínculo:</span> {getContext(viewDetailOS).name}</p>
+                                <p><span className="font-bold">Endereço:</span> {getContext(viewDetailOS).location}</p>
+                                <p><span className="font-bold">Cidade:</span> {getContext(viewDetailOS).city}</p>
+                            </div>
+                            <button 
+                                onClick={() => handleGoogleCalendarSync(viewDetailOS)}
+                                className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-sm shadow-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <i className="fab fa-google"></i> Adicionar à Minha Agenda
+                            </button>
+                        </div>
 
-                <div className="p-5 overflow-y-auto custom-scrollbar space-y-6 min-h-0">
-                  {/* Contexto Local */}
-                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                    <h4 className="text-xs font-black text-blue-800 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                      <i className="fas fa-map-marker-alt"></i> Local de Execução
-                    </h4>
-                    <div className="text-sm text-slate-700 space-y-1">
-                      <p><span className="font-bold">Vínculo:</span> {getContext(viewDetailOS).name}</p>
-                      <p><span className="font-bold">Endereço:</span> {getContext(viewDetailOS).location}</p>
-                      <p><span className="font-bold">Cidade:</span> {getContext(viewDetailOS).city}</p>
-                    </div>
-                    <button
-                      onClick={() => handleGoogleCalendarSync(viewDetailOS)}
-                      className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg font-bold text-sm shadow-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <i className="fab fa-google"></i> Adicionar à Minha Agenda
-                    </button>
-                  </div>
+                        
+                        {(() => {
+                          const isMulti = (viewDetailOS.executorIds?.length || 0) > 1;
+                          const execKey =
+                            (viewDetailOS.executorStates && viewDetailOS.executorStates[user.id]) ? user.id :
+                            ((user.email && viewDetailOS.executorStates && viewDetailOS.executorStates[user.email]) ? user.email : user.id);
 
-                  {/* ✅ Histórico de Pausas do Executor */}
-                  <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                      <i className="fas fa-pause-circle text-orange-500"></i> Histórico de Pausas (Meu)
-                    </h4>
+                          const entries = isMulti
+                            ? (viewDetailOS.executorStates?.[execKey]?.pauseHistory || [])
+                            : (viewDetailOS.pauseHistory || []);
 
-                    {(() => {
-                      const hist = getMyPauseHistory(viewDetailOS);
-                      if (!hist || hist.length === 0) {
-                        return <p className="text-sm text-slate-400 italic">Nenhuma pausa registrada por você nesta OS.</p>;
-                      }
+                          if (!entries || entries.length === 0) return null;
 
-                      return (
-                        <div className="space-y-3">
-                          {hist.map((h, idx) => {
-                            const isPause = h.action === 'PAUSE';
-                            return (
-                              <div key={`${h.timestamp}-${idx}`} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className={`text-[11px] font-black uppercase px-2 py-0.5 rounded border ${
-                                    isPause ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  }`}>
-                                    {isPause ? 'PAUSA' : 'RETOMADA'}
-                                  </span>
-                                  <span className="text-[11px] font-mono text-slate-500">
-                                    {new Date(h.timestamp).toLocaleString('pt-BR')}
-                                  </span>
+                          return (
+                            <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
+                              <h4 className="text-xs font-black text-orange-900 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <i className="fas fa-pause-circle"></i> Histórico de Pausas
+                              </h4>
+
+                              <div className="space-y-3">
+                                {entries.slice().reverse().map((h: any, idx: number) => {
+                                  const when = new Date(h.timestamp).toLocaleString('pt-BR');
+                                  const isPause = h.action === 'PAUSE';
+                                  return (
+                                    <div key={`${h.timestamp}-${idx}`} className="bg-white/80 border border-orange-200 rounded-xl p-3">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <span className={`text-[11px] font-black uppercase px-2 py-0.5 rounded border ${
+                                          isPause ? 'bg-orange-100 text-orange-800 border-orange-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                        }`}>
+                                          {isPause ? 'Pausa' : 'Retomada'}
+                                        </span>
+                                        <span className="text-[11px] font-mono text-slate-500">{when}</span>
+                                      </div>
+
+                                      <div className="mt-2 text-sm text-slate-800">
+                                        <span className="font-black">Motivo:</span> {h.reason || '-'}
+                                      </div>
+
+                                      {isPause && (h.worklogBeforePause || '').trim().length > 0 && (
+                                        <div className="mt-2 text-sm text-slate-700">
+                                          <div className="text-[11px] font-black text-slate-600 uppercase mb-1">O que foi feito antes da pausa</div>
+                                          <div className="whitespace-pre-wrap bg-slate-50 border border-slate-200 rounded-lg p-3">{h.worklogBeforePause}</div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+{/* Seleção de Prioridade (Nova Funcionalidade) */}
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
+                                <i className="fas fa-flag"></i> Informar Nível de Prioridade
+                            </label>
+                            <div className="flex gap-2">
+                                {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((p) => {
+                                    const isSelected = viewDetailOS.priority === p;
+                                    return (
+                                        <button
+                                            key={p}
+                                            onClick={() => handlePriorityChange(viewDetailOS.id, p)}
+                                            className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase transition-all border ${
+                                                isSelected 
+                                                ? getPriorityColor(p) + ' shadow-md scale-105' 
+                                                : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                            {translatePriority(p)}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Checklist Serviços */}
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
+                                <i className="fas fa-tasks text-clean-primary"></i> Checklist de Atividades
+                            </h4>
+                            <ul className="space-y-2">
+                                {viewDetailOS.services.length > 0 ? viewDetailOS.services.map((s, idx) => {
+                                    const srv = services?.find(x => x.id === s.serviceTypeId);
+                                    return (
+                                        <li key={idx} className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                            <div className="w-5 h-5 rounded border-2 border-slate-300 mt-0.5"></div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-800 leading-tight">{srv?.name || 'Serviço'}</p>
+                                                <p className="text-xs text-slate-500 mt-0.5">{srv?.description || 'Executar conforme padrão.'}</p>
+                                                <span className="inline-block mt-1 text-[10px] bg-slate-200 px-1.5 rounded font-bold text-slate-600">Estimado: {s.quantity}h</span>
+                                            </div>
+                                        </li>
+                                    );
+                                }) : <p className="text-sm text-slate-400 italic">Nenhum serviço específico listado. Seguir descrição geral.</p>}
+                            </ul>
+                        </div>
+
+                        {/* Lista de Materiais */}
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
+                                <i className="fas fa-box-open text-orange-500"></i> Materiais Necessários
+                            </h4>
+                            <ul className="space-y-2">
+                                {viewDetailOS.materials.length > 0 ? viewDetailOS.materials.map((m, idx) => {
+                                    const mat = materials?.find(x => x.id === m.materialId);
+                                    return (
+                                        <li key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
+                                            <span className="font-medium text-slate-700">{mat?.description || 'Material'}</span>
+                                            <span className="font-bold text-slate-900 bg-white px-2 py-1 rounded border border-slate-200">{m.quantity} {mat?.unit}</span>
+                                        </li>
+                                    );
+                                }) : <p className="text-sm text-slate-400 italic">Nenhum material alocado previamente.</p>}
+                            </ul>
+
+                            {/* Materiais adicionados manualmente pelo executor (para baixa no almox) */}
+                            <div className="mt-5 bg-amber-50 rounded-xl p-4 border border-amber-100">
+                                <h5 className="text-xs font-black text-amber-900 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <i className="fas fa-warehouse text-amber-700"></i> Baixa Manual (Executor)
+                                </h5>
+
+                                {/* Lista do que já foi adicionado */}
+                                {Array.isArray((viewDetailOS as any).executorManualMaterials) && (viewDetailOS as any).executorManualMaterials.length > 0 && (
+                                  <div className="mb-4 space-y-2">
+                                    {(viewDetailOS as any).executorManualMaterials
+                                      .slice(-6)
+                                      .reverse()
+                                      .map((mm: any, i: number) => (
+                                        <div key={i} className="flex items-start justify-between gap-3 bg-white/70 border border-amber-100 rounded-lg p-3 text-xs">
+                                          <div className="min-w-0">
+                                            <p className="font-bold text-slate-800 truncate">{mm?.description || 'Material'}</p>
+                                            <p className="text-[10px] text-slate-500 mt-0.5">
+                                              {mm?.timestamp ? new Date(mm.timestamp).toLocaleString('pt-BR') : ''}
+                                            </p>
+                                          </div>
+                                          <div className="shrink-0 font-black text-amber-900">{Number(mm?.quantity) || 0}</div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] font-black text-amber-900 uppercase mb-1 block">Descrição</label>
+                                        <input
+                                            value={manualMaterialDesc}
+                                            onChange={(e) => setManualMaterialDesc(e.target.value)}
+                                            placeholder="Ex: Parafuso 6mm, cabo 2,5mm, fita isolante..."
+                                            className="w-full h-11 px-4 bg-white border border-amber-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-amber-900 uppercase mb-1 block">Qtd</label>
+                                        <input
+                                            value={manualMaterialQty}
+                                            onChange={(e) => setManualMaterialQty(e.target.value)}
+                                            placeholder="0"
+                                            inputMode="decimal"
+                                            className="w-full h-11 px-4 bg-white border border-amber-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15"
+                                        />
+                                    </div>
                                 </div>
 
-                                {h.reason && (
-                                  <p className="text-sm text-slate-700 mt-2">
-                                    <span className="font-bold">Motivo:</span> {h.reason}
-                                  </p>
-                                )}
-
-                                {h.worklogBeforePause && (
-                                  <p className="text-sm text-slate-700 mt-2">
-                                    <span className="font-bold">O que foi feito:</span> {h.worklogBeforePause}
-                                  </p>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Prioridade */}
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center gap-2">
-                      <i className="fas fa-flag"></i> Informar Nível de Prioridade
-                    </label>
-                    <div className="flex gap-2">
-                      {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((p) => {
-                        const isSelected = viewDetailOS.priority === p;
-                        return (
-                          <button
-                            key={p}
-                            onClick={() => handlePriorityChange(viewDetailOS.id, p)}
-                            className={`flex-1 py-2.5 rounded-lg text-[10px] font-bold uppercase transition-all border ${
-                              isSelected
-                                ? getPriorityColor(p) + ' shadow-md scale-105'
-                                : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {translatePriority(p)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Checklist Serviços */}
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                      <i className="fas fa-tasks text-clean-primary"></i> Checklist de Atividades
-                    </h4>
-                    <ul className="space-y-2">
-                      {viewDetailOS.services.length > 0 ? viewDetailOS.services.map((s, idx) => {
-                        const srv = services?.find(x => x.id === s.serviceTypeId);
-                        return (
-                          <li key={idx} className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <div className="w-5 h-5 rounded border-2 border-slate-300 mt-0.5"></div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-800 leading-tight">{srv?.name || 'Serviço'}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">{(srv as any)?.description || 'Executar conforme padrão.'}</p>
-                              <span className="inline-block mt-1 text-[10px] bg-slate-200 px-1.5 rounded font-bold text-slate-600">
-                                Estimado: {(s as any).quantity}h
-                              </span>
+                                <button
+                                    type="button"
+                                    disabled={isSavingManualMaterial}
+                                    onClick={() => handleAddExecutorManualMaterial(viewDetailOS.id)}
+                                    className="mt-3 w-full h-11 rounded-xl font-black text-sm bg-amber-600 text-white hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <i className="fas fa-plus"></i>
+                                    {isSavingManualMaterial ? 'Salvando...' : 'Adicionar material para baixa'}
+                                </button>
+                                <p className="text-[10px] text-amber-800/80 mt-2 font-semibold">
+                                    Esses itens ficam registrados na OS e aparecem no PDF. A baixa no almoxarifado pode ser processada pela rotina do sistema.
+                                </p>
                             </div>
-                          </li>
-                        );
-                      }) : <p className="text-sm text-slate-400 italic">Nenhum serviço específico listado. Seguir descrição geral.</p>}
-                    </ul>
-                  </div>
+                        </div>
+                    </div>
 
-                  {/* Lista de Materiais */}
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                      <i className="fas fa-box-open text-orange-500"></i> Materiais Necessários
-                    </h4>
-                    <ul className="space-y-2">
-                      {viewDetailOS.materials.length > 0 ? viewDetailOS.materials.map((m, idx) => {
-                        const mat = materials?.find(x => x.id === (m as any).materialId);
-                        return (
-                          <li key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
-                            <span className="font-medium text-slate-700">{mat?.description || 'Material'}</span>
-                            <span className="font-bold text-slate-900 bg-white px-2 py-1 rounded border border-slate-200">
-                              {(m as any).quantity} {mat?.unit}
-                            </span>
-                          </li>
-                        );
-                      }) : <p className="text-sm text-slate-400 italic">Nenhum material alocado previamente.</p>}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3 shrink-0">
-                  <button onClick={() => setViewDetailOS(null)} className="flex-1 py-3 text-slate-600 font-bold text-sm bg-white border border-slate-300 rounded-xl hover:bg-slate-100">
-                    Fechar
-                  </button>
-                  {viewDetailOS.status === OSStatus.OPEN && (
-                    <button onClick={(e) => { handleStart(e, viewDetailOS.id); setViewDetailOS(null); }} className="flex-1 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 shadow-md">
-                      Iniciar Agora
-                    </button>
-                  )}
-                  {viewDetailOS.status === OSStatus.IN_PROGRESS && (
-                    <button onClick={(e) => { setViewDetailOS(null); openFinishModal(e, viewDetailOS); }} className="flex-1 py-3 bg-clean-primary text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow-md">
-                      Finalizar
-                    </button>
-                  )}
+                    <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3 shrink-0">
+                        <button onClick={() => setViewDetailOS(null)} className="flex-1 py-3 text-slate-600 font-bold text-sm bg-white border border-slate-300 rounded-xl hover:bg-slate-100">Fechar</button>
+                        {viewDetailOS.status === OSStatus.OPEN && (
+                            <button onClick={(e) => { handleStart(e, viewDetailOS.id); setViewDetailOS(null); }} className="flex-1 py-3 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 shadow-md">Iniciar Agora</button>
+                        )}
+                        {viewDetailOS.status === OSStatus.IN_PROGRESS && (
+                            <button onClick={(e) => { setViewDetailOS(null); openFinishModal(e, viewDetailOS); }} className="flex-1 py-3 bg-clean-primary text-white font-bold text-sm rounded-xl hover:bg-emerald-700 shadow-md">Finalizar</button>
+                        )}
+                    </div>
                 </div>
               </div>
             </div>
-          </div>
         </ModalPortal>
       )}
 
       {/* --- FINISH MODAL --- */}
-      {finishingOS && (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[10000]">
-            <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md transition-opacity" onClick={() => setFinishingOS(null)} />
-            <div className="absolute inset-0 overflow-y-auto p-4 flex flex-col justify-end md:justify-center items-center">
-              <div className="relative w-full bg-white rounded-t-3xl md:rounded-3xl p-6 md:max-w-md md:mx-auto animate-in slide-in-from-bottom-10 duration-300 shadow-2xl">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-slate-900">Finalizar Serviço</h3>
-                  <button onClick={() => setFinishingOS(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
-                    <i className="fas fa-times"></i>
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-2">
-                      <span className="bg-slate-200 px-2 py-0.5 rounded text-xs">{finishingOS.number}</span>
-                      <span className="truncate flex-1">{finishingOS.description}</span>
-                    </p>
+      
+        {pauseModalOS && (
+          <ModalPortal>
+            <div className="fixed inset-0 z-[10000]">
+              <div
+                className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity"
+                onClick={() => setPauseModalOS(null)}
+              />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                <div className="relative w-full max-w-lg my-8 bg-white rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight">Pausar OS</h3>
+                      <p className="text-xs text-slate-500 mt-1 font-medium">{pauseModalOS.number} — {pauseModalOS.description}</p>
+                    </div>
+                    <button
+                      onClick={() => setPauseModalOS(null)}
+                      className="w-9 h-9 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
+                      type="button"
+                    >
+                      <i className="fas fa-times"></i>
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-bold text-slate-900 mb-3">Descrição dos Serviços Executados</label>
-                    <textarea
-                      value={executionDescription}
-                      onChange={(e) => setExecutionDescription(e.target.value)}
-                      placeholder="Descreva detalhadamente os serviços realizados..."
-                      className="w-full h-32 px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-clean-primary focus:border-clean-primary resize-none text-sm"
-                    />
+                  <div className="p-6 space-y-4 bg-slate-50/50">
+                    <div>
+                      <label className="text-[11px] font-black text-slate-600 uppercase mb-1 block">Motivo da pausa</label>
+                      <input
+                        className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm transition-all focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/15"
+                        placeholder="Ex: aguardando peça, chuva, falta de energia..."
+                        value={pauseReasonInput}
+                        onChange={(e) => setPauseReasonInput(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-black text-slate-600 uppercase mb-1 block">O que foi feito até antes da pausa</label>
+                      <textarea
+                        className="w-full min-h-[110px] p-4 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 shadow-sm transition-all focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/15"
+                        placeholder="Descreva o que foi executado até o momento..."
+                        value={pauseWorklogInput}
+                        onChange={(e) => setPauseWorklogInput(e.target.value)}
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Esse texto entra no <b>histórico de pausas</b> do executor.
+                      </p>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-bold text-slate-900 mb-3">Evidência Fotográfica (Obrigatório)</label>
-
-                    {!photoPreview ? (
-                      <button onClick={() => fileInputRef.current?.click()} className="w-full h-48 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center gap-3 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:border-clean-primary hover:text-clean-primary transition-all group">
-                        <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-2xl mb-1 group-hover:scale-110 transition-transform">
-                          <i className="fas fa-camera"></i>
-                        </div>
-                        <span className="font-bold">Tirar Foto / Upload</span>
-                      </button>
-                    ) : (
-                      <div className="relative group">
-                        <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover rounded-2xl border border-slate-200 shadow-sm" />
-                        <button onClick={() => setPhotoPreview(null)} className="absolute top-3 right-3 bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform">
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      ref={fileInputRef}
-                      className="hidden"
-                      onChange={handlePhotoCapture}
-                    />
+                  <div className="px-6 py-5 bg-white border-t border-slate-100 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPauseModalOS(null)}
+                      className="px-5 py-2.5 rounded-xl text-sm font-black text-slate-600 hover:bg-slate-50 border border-slate-200"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmPause}
+                      className="px-6 py-2.5 rounded-xl text-sm font-black bg-orange-600 text-white hover:bg-orange-700 shadow-sm"
+                    >
+                      Pausar e Registrar
+                    </button>
                   </div>
-
-                  <button
-                    onClick={confirmFinish}
-                    disabled={!photoPreview}
-                    className="w-full py-4 bg-clean-primary disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-xl shadow-clean-primary/30 transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-emerald-700"
-                  >
-                    <i className="fas fa-check-double"></i> Confirmar Conclusão
-                  </button>
                 </div>
               </div>
             </div>
-          </div>
-        </ModalPortal>
+          </ModalPortal>
+        )}
+
+{finishingOS && (
+          <ModalPortal>
+            <div className="fixed inset-0 z-[10000]">
+              <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md transition-opacity" onClick={() => setFinishingOS(null)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex flex-col justify-end md:justify-center items-center">
+                  <div className="relative w-full bg-white rounded-t-3xl md:rounded-3xl p-6 md:max-w-md md:mx-auto animate-in slide-in-from-bottom-10 duration-300 shadow-2xl">
+                      <div className="flex justify-between items-center mb-6">
+                          <h3 className="text-xl font-bold text-slate-900">Finalizar Serviço</h3>
+                          <button onClick={() => setFinishingOS(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"><i className="fas fa-times"></i></button>
+                      </div>
+
+                      <div className="space-y-6">
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                              <p className="text-sm font-bold text-slate-700 mb-1 flex items-center gap-2">
+                                  <span className="bg-slate-200 px-2 py-0.5 rounded text-xs">{finishingOS.number}</span>
+                                  <span className="truncate flex-1">{finishingOS.description}</span>
+                              </p>
+                          </div>
+
+                          <div>
+                              <label className="block text-sm font-bold text-slate-900 mb-3">Descrição dos Serviços Executados</label>
+                              <textarea
+                                  value={executionDescription}
+                                  onChange={(e) => setExecutionDescription(e.target.value)}
+                                  placeholder="Descreva detalhadamente os serviços realizados..."
+                                  className="w-full h-32 px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-clean-primary focus:border-clean-primary resize-none text-sm"
+                              />
+                          </div>
+
+                          <div>
+                              <label className="block text-sm font-bold text-slate-900 mb-3">Evidência Fotográfica (Obrigatório)</label>
+
+                              {!photoPreview ? (
+                                  <button onClick={() => fileInputRef.current?.click()} className="w-full h-48 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center gap-3 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:border-clean-primary hover:text-clean-primary transition-all group">
+                                      <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-2xl mb-1 group-hover:scale-110 transition-transform">
+                                          <i className="fas fa-camera"></i>
+                                      </div>
+                                      <span className="font-bold">Tirar Foto / Upload</span>
+                                  </button>
+                              ) : (
+                                  <div className="relative group">
+                                      <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover rounded-2xl border border-slate-200 shadow-sm" />
+                                      <button onClick={() => setPhotoPreview(null)} className="absolute top-3 right-3 bg-red-500 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform"><i className="fas fa-trash"></i></button>
+                                  </div>
+                              )}
+                              <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  ref={fileInputRef}
+                                  className="hidden"
+                                  onChange={handlePhotoCapture}
+                              />
+                          </div>
+
+                          <button 
+                              onClick={confirmFinish} 
+                              disabled={!photoPreview}
+                              className="w-full py-4 bg-clean-primary disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-xl shadow-clean-primary/30 transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-emerald-700"
+                          >
+                              <i className="fas fa-check-double"></i> Confirmar Conclusão
+                          </button>
+                      </div>
+                  </div>
+              </div>
+            </div>
+          </ModalPortal>
       )}
     </div>
   );
