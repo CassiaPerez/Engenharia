@@ -1,389 +1,1596 @@
-import React, { useMemo, useState } from 'react';
+
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Material, StockMovement, StockLocation, User, Project, OS, OSItem } from '../types';
+import * as XLSX from 'xlsx';
 import { supabase, mapToSupabase } from '../services/supabase';
-import { Material, StockMovement, User } from '../types';
+import { useBatchSave } from '../hooks/useBatchSave';
+import { usePermissions } from '../hooks/usePermissions';
 import ModalPortal from './ModalPortal';
 
-type Props = {
+interface Props {
   materials: Material[];
-  setMaterials: React.Dispatch<React.SetStateAction<Material[]>>;
   movements: StockMovement[];
-  setMovements: React.Dispatch<React.SetStateAction<StockMovement[]>>;
+  setMaterials: React.Dispatch<React.SetStateAction<Material[]>>;
+  onAddMovement: (mov: StockMovement) => void;
   currentUser: User;
+  projects?: Project[];
+  oss?: OS[];
+  setOss?: React.Dispatch<React.SetStateAction<OS[]>>;
+}
+
+const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddMovement, currentUser, projects = [], oss = [], setOss }) => {
+  const [view, setView] = useState<'stock' | 'history'>('stock');
+  const [allOS, setAllOS] = useState<OS[]>([]);
+  const [osPage, setOsPage] = useState(0);
+  const [osHasMore, setOsHasMore] = useState(true);
+  const [osLoading, setOsLoading] = useState(false);
+  const [osSearch, setOsSearch] = useState('');
+  const OS_PAGE_SIZE = 100;
+
+  const { queueOperation, flush } = useBatchSave(1500);
+  const { getWarehouses, canAccessWarehouse } = usePermissions(currentUser.role, 'inventory', currentUser.id);
+
+  const allowedWarehouses = getWarehouses();
+  const canAccessCropbio = canAccessWarehouse('Cropbio');
+  const canAccessCropfert = canAccessWarehouse('Cropfert');
+  const canAccessCentral = canAccessWarehouse('Central');
+
+  const addMovementWithSync = async (mov: StockMovement) => {
+    onAddMovement(mov);
+    queueOperation('stock_movements', 'insert', mov);
+  };
+  
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [showModal, setShowModal] = useState(false);
+  const [newMaterial, setNewMaterial] = useState<Partial<Material>>({
+    status: 'ACTIVE',
+    minStock: 10,
+    currentStock: 0,
+    unitCost: 0,
+    group: 'Geral',
+    unit: 'Un',
+    code: ''
+  });
+
+
+// --- EDIÇÃO DE MATERIAL (cadastros existentes) ---
+const [showEditModal, setShowEditModal] = useState(false);
+const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+const [editMaterial, setEditMaterial] = useState<Partial<Material>>({
+  status: 'ACTIVE',
+  minStock: 10,
+  unitCost: 0,
+  group: 'Geral',
+  unit: 'Un',
+  code: '',
+  description: '',
+  location: ''
+});
+
+  const [selectedMaterialForLoc, setSelectedMaterialForLoc] = useState<Material | null>(null);
+  const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW'>('VIEW');
+  const [outType, setOutType] = useState<'OS' | 'PROJECT' | 'GENERAL'>('OS');
+  const [locForm, setLocForm] = useState({
+      location: '',
+      toLocation: '',
+      quantity: '',
+      reason: '',
+      osNumber: '',
+      projectId: ''
+  });
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      setSearchTerm(searchInput);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchInput]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      loadOS(0, false).catch(err => console.error('Failed to reload OS:', err));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [osSearch]);
+
+  useEffect(() => {
+    loadOS(0, false).catch(err => {
+      console.error('Failed to load OS in background:', err);
+    });
+  }, []);
+
+  const loadOS = async (page: number = 0, append: boolean = false) => {
+    try {
+      setOsLoading(true);
+
+      const from = page * OS_PAGE_SIZE;
+      const to = from + OS_PAGE_SIZE - 1;
+
+      let query = supabase
+        .from('oss')
+        .select('id, number, type, status, priority, description, equipment_id, cost_center, open_date, limit_date, close_date, sla_hours, executor_ids, requester_id, services, materials')
+        .order('open_date', { ascending: false })
+        .range(from, to);
+
+      const q = osSearch.trim();
+      if (q) {
+        query = query.or(`number.ilike.%${q}%,description.ilike.%${q}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error loading OS:', error);
+        setAllOS([]);
+        setOsHasMore(false);
+        return;
+      }
+
+      const osList: OS[] = (data || []).map(item => ({
+        id: item.id,
+        number: item.number,
+        type: item.type,
+        status: item.status,
+        priority: item.priority,
+        description: item.description,
+        equipmentId: item.equipment_id,
+        costCenter: item.cost_center,
+        openDate: item.open_date,
+        limitDate: item.limit_date,
+        closeDate: item.close_date,
+        slaHours: item.sla_hours,
+        executorIds: item.executor_ids || [],
+        requesterId: item.requester_id,
+        services: item.services || [],
+        materials: item.materials || []
+      }));
+
+      setAllOS(prev => (append ? [...prev, ...osList] : osList));
+      setOsHasMore(osList.length === OS_PAGE_SIZE);
+      setOsPage(page);
+    } catch (e) {
+      console.error('Error loading OS:', e);
+      setAllOS([]);
+      setOsHasMore(false);
+    } finally {
+      setOsLoading(false);
+    }
+  };
+
+  const globalLocations = useMemo(() => {
+    const locs = new Set<string>();
+    materials.forEach(m => {
+        if (m.location) locs.add(m.location);
+        m.stockLocations?.forEach(l => locs.add(l.name));
+    });
+    // Locais por Empresa
+    if (currentUser.company === 'Cropbio') {
+      locs.add('Cropbio');
+      locs.add('Laboratório de defensivos');
+    } else if (currentUser.company === 'Cropfert') {
+      locs.add('Cropfert');
+    } else {
+      // Admin vê todos
+      locs.add('Cropbio');
+      locs.add('Cropfert');
+      locs.add('Laboratório de defensivos');
+    }
+    return Array.from(locs).sort();
+  }, [materials, currentUser.company]);
+
+  const generateUniqueSKU = () => {
+      const prefix = 'MAT';
+      const year = new Date().getFullYear().toString().substr(-2);
+      let unique = false;
+      let code = '';
+      let attempts = 0;
+
+      while (!unique && attempts < 1000) {
+          const random = Math.floor(1000 + Math.random() * 9000); 
+          code = `${prefix}-${year}-${random}`;
+          
+          const exists = materials.some(m => m.code === code);
+          if (!exists) {
+              unique = true;
+          }
+          attempts++;
+      }
+      
+      return code;
+  };
+
+  const openNewItemModal = () => {
+      let defaultGroup = 'Geral';
+      let defaultLoc = 'CD - Central';
+
+      // Preenchimento inteligente baseado no perfil
+      if (currentUser.role === 'WAREHOUSE_BIO') {
+          defaultGroup = 'CropBio';
+          defaultLoc = 'Cropbio';
+      } else if (currentUser.role === 'WAREHOUSE_FERT') {
+          defaultGroup = 'CropFert';
+          defaultLoc = 'Cropfert';
+      }
+
+      setNewMaterial({
+        status: 'ACTIVE',
+        minStock: 10,
+        currentStock: 0,
+        unitCost: 0,
+        group: defaultGroup,
+        unit: 'Un',
+        description: '',
+        location: defaultLoc,
+        code: generateUniqueSKU()
+      });
+      setShowModal(true);
+  };
+
+
+const openEditItemModal = (m: Material) => {
+    // Permissão: por padrão, apenas ADMIN edita cadastros (evita quebrar estoque/Kardex).
+    if (currentUser.role !== 'ADMIN') {
+        alert('Apenas administradores podem editar o cadastro de materiais.');
+        return;
+    }
+
+    setEditingMaterial(m);
+    setEditMaterial({
+      id: m.id,
+      code: m.code || '',
+      description: m.description || '',
+      group: m.group || 'Geral',
+      unit: m.unit || 'Un',
+      unitCost: Number(m.unitCost) || 0,
+      minStock: Number(m.minStock) || 0,
+      status: m.status || 'ACTIVE',
+      location: m.location || ''
+    });
+    setShowEditModal(true);
 };
 
-const formatCurrency = (val: number) =>
-  (val || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const handleUpdateMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMaterial) return;
 
-const parseBRL = (v: string) => {
-  const n = Number(String(v ?? '').replace(/\./g, '').replace(',', '.'));
-  return Number.isFinite(n) ? n : NaN;
+    const code = (editMaterial.code || '').trim().toUpperCase();
+    const description = (editMaterial.description || '').trim();
+
+    if (!code || !description) {
+        alert('Erro: Código e Descrição são obrigatórios.');
+        return;
+    }
+
+    // Duplicidade: ignora o próprio item
+    const duplicated = materials.some(m => m.code === code && m.id !== editingMaterial.id);
+    if (duplicated) {
+        alert('Erro: Este código SKU já existe. Edite o código e tente novamente.');
+        return;
+    }
+
+    try {
+        const payload = {
+            code,
+            description,
+            unit: (editMaterial.unit || 'Un').trim(),
+            group: (editMaterial.group || 'Geral').trim(),
+            location: (editMaterial.location || editingMaterial.location || 'CD - Central').trim(),
+            status: (editMaterial.status || 'ACTIVE') as any,
+            min_stock: Number(editMaterial.minStock) || 0,
+            unit_cost: Number(editMaterial.unitCost) || 0
+            // NÃO alterar current_stock e stock_locations aqui (saldo deve ser via movimentação)
+        };
+
+        const { error } = await supabase
+            .from('materials')
+            .update(payload)
+            .eq('id', editingMaterial.id);
+
+        if (error) {
+            console.error('Erro ao atualizar material:', error);
+            alert('Erro ao atualizar material: ' + error.message);
+            return;
+        }
+
+        // Atualiza estado local mantendo estoque e locais existentes
+        setMaterials(prev => prev.map(m => {
+            if (m.id !== editingMaterial.id) return m;
+            const updated: Material = {
+                ...m,
+                code,
+                description,
+                unit: (editMaterial.unit || m.unit || 'Un') as any,
+                group: (editMaterial.group || m.group || 'Geral') as any,
+                location: (editMaterial.location || m.location) as any,
+                status: (editMaterial.status || m.status) as any,
+                minStock: Number(editMaterial.minStock) || 0,
+                unitCost: Number(editMaterial.unitCost) || 0
+            };
+            return updated;
+        }));
+
+        // Fila de sync (se você estiver usando batch save)
+        queueOperation('materials', 'upsert', {
+            id: editingMaterial.id,
+            code,
+            description,
+            unit: (editMaterial.unit || 'Un').trim(),
+            group: (editMaterial.group || 'Geral').trim(),
+            location: (editMaterial.location || editingMaterial.location || 'CD - Central').trim(),
+            status: (editMaterial.status || 'ACTIVE'),
+            minStock: Number(editMaterial.minStock) || 0,
+            unitCost: Number(editMaterial.unitCost) || 0
+        } as any, editingMaterial.id);
+
+        await flush();
+        setShowEditModal(false);
+        setEditingMaterial(null);
+        alert('Material atualizado com sucesso!');
+    } catch (err: any) {
+        console.error('Exceção ao atualizar material:', err);
+        alert(`Erro ao atualizar material: ${err?.message || 'Erro desconhecido'}`);
+    }
 };
 
-const InventoryManager: React.FC<Props> = ({ materials, setMaterials, movements, setMovements, currentUser }) => {
-  const [search, setSearch] = useState('');
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
 
-  const [showInModal, setShowInModal] = useState(false);
-  const [showOutModal, setShowOutModal] = useState(false);
+  const openLocationManager = (m: Material) => {
+      if (!m.stockLocations || m.stockLocations.length === 0) {
+          const defaultLocs = [{ name: m.location || 'CD - Central', quantity: m.currentStock }];
+          const updatedM = { ...m, stockLocations: defaultLocs };
+          setSelectedMaterialForLoc(updatedM);
+      } else {
+          setSelectedMaterialForLoc(m);
+      }
+      setLocAction('VIEW');
+      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '', osNumber: '' });
+      setOutType('OS');
+  };
 
-  // Entrada
-  const [inQty, setInQty] = useState<number>(1);
-  const [inUnitCost, setInUnitCost] = useState<string>('');
-  const [inDesc, setInDesc] = useState<string>('');
+  const handleDeleteMaterial = async (material: Material) => {
+      if (currentUser.role !== 'ADMIN') {
+          alert('Apenas administradores podem excluir materiais.');
+          return;
+      }
 
-  // Saída
-  const [outQty, setOutQty] = useState<number>(1);
-  const [outDesc, setOutDesc] = useState<string>('');
+      const confirm = window.confirm(
+          `Tem certeza que deseja excluir o material:\n\n` +
+          `Código: ${material.code}\n` +
+          `Descrição: ${material.description}\n\n` +
+          `Esta ação não pode ser desfeita.`
+      );
 
-  const selectedMaterial = useMemo(
-    () => materials.find(m => m.id === selectedMaterialId) || null,
-    [materials, selectedMaterialId]
-  );
+      if (!confirm) return;
 
+      try {
+          const { error } = await supabase
+              .from('materials')
+              .delete()
+              .eq('id', material.id);
+
+          if (error) {
+              console.error('Erro ao excluir material:', error);
+              alert('Erro ao excluir material: ' + error.message);
+              return;
+          }
+
+          setMaterials(prev => prev.filter(m => m.id !== material.id));
+          alert('Material excluído com sucesso!');
+          console.log('✅ Material deleted:', material.code);
+      } catch (e) {
+          console.error('Erro ao excluir material:', e);
+          alert('Erro ao excluir material. Verifique o console para mais detalhes.');
+      }
+  };
+
+  const handleLocationSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedMaterialForLoc) return;
+
+      const qty = Number(locForm.quantity);
+
+      if (locAction !== 'ADD' && (isNaN(qty) || qty <= 0)) {
+          alert('Quantidade inválida.');
+          return;
+      }
+
+      let updatedMaterial: Material | null = null;
+
+      setMaterials(prev => prev.map(m => {
+          if (m.id === selectedMaterialForLoc.id) {
+              let newLocations = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'CD - Central', quantity: m.currentStock }];
+
+              if (locAction === 'ADD') {
+                  if (!locForm.location) return m;
+                  if (newLocations.some(l => l.name === locForm.location)) {
+                      alert('Este local já existe para este material.');
+                      return m;
+                  }
+
+                  const initialQty = qty || 0;
+                  newLocations.push({ name: locForm.location, quantity: initialQty });
+
+                  if (initialQty > 0) {
+                      addMovementWithSync({
+                          id: Math.random().toString(36).substr(2, 9),
+                          type: 'IN',
+                          materialId: m.id,
+                          quantity: initialQty,
+                          date: new Date().toISOString(),
+                          userId: currentUser.id,
+                          description: locForm.reason || 'Cadastro de Local com Saldo',
+                          toLocation: locForm.location
+                      });
+                  }
+
+              } else if (locAction === 'IN') {
+                  const targetLocIndex = newLocations.findIndex(l => l.name === locForm.location);
+                  if (targetLocIndex >= 0) {
+                      newLocations[targetLocIndex].quantity += qty;
+                  } else {
+                      newLocations.push({ name: locForm.location, quantity: qty });
+                  }
+
+                  addMovementWithSync({
+                      id: Math.random().toString(36).substr(2, 9),
+                      type: 'IN',
+                      materialId: m.id,
+                      quantity: qty,
+                      date: new Date().toISOString(),
+                      userId: currentUser.id,
+                      description: locForm.reason || 'Entrada Manual',
+                      toLocation: locForm.location
+                  });
+
+              } else if (locAction === 'OUT') {
+                  const targetLocIndex = newLocations.findIndex(l => l.name === locForm.location);
+                  if (targetLocIndex >= 0 && newLocations[targetLocIndex].quantity >= qty) {
+                      newLocations[targetLocIndex].quantity -= qty;
+                  } else {
+                      alert('Saldo insuficiente no local selecionado.');
+                      return m;
+                  }
+
+                   let desc = locForm.reason || 'Baixa Manual';
+                   let costCenter: string | undefined;
+                   let projectId: string | undefined;
+                   let osId: string | undefined;
+
+                   if (outType === 'OS' && locForm.osNumber) {
+                       osId = locForm.osNumber;
+                       const selectedOS = allOS.find(os => os.number === locForm.osNumber);
+                       if (selectedOS) {
+                           if (selectedOS.projectId) {
+                               const project = projects.find(p => p.id === selectedOS.projectId);
+                               desc = `Baixa p/ Projeto: ${project?.code || 'N/A'} / OS: ${locForm.osNumber}`;
+                               costCenter = project?.costCenter;
+                               projectId = selectedOS.projectId;
+                           } else if (selectedOS.buildingId) {
+                               const building = projects.find(p => p.id === selectedOS.buildingId);
+                               desc = `Baixa p/ Edificio: ${building?.code || 'N/A'} / OS: ${locForm.osNumber}`;
+                               costCenter = selectedOS.costCenter;
+                           } else if (selectedOS.equipmentId) {
+                               desc = `Baixa p/ Equipamento / OS: ${locForm.osNumber}`;
+                               costCenter = selectedOS.costCenter;
+                           }
+                       }
+                   } else if (outType === 'PROJECT' && locForm.projectId) {
+                       const project = projects.find(p => p.id === locForm.projectId);
+                       if (project) {
+                           desc = `Baixa p/ Projeto: ${project.code} - ${locForm.reason || 'Consumo direto'}`;
+                           costCenter = project.costCenter;
+                           projectId = project.id;
+                       }
+                   } else if (outType === 'GENERAL') {
+                       desc = locForm.reason || 'Saida avulsa';
+                   }
+
+                   addMovementWithSync({
+                      id: Math.random().toString(36).substr(2, 9),
+                      type: 'OUT',
+                      materialId: m.id,
+                      quantity: qty,
+                      date: new Date().toISOString(),
+                      userId: currentUser.id,
+                      description: desc,
+                      fromLocation: locForm.location,
+                      projectId: projectId,
+                      osId: osId,
+                      costCenter: costCenter
+                  });
+
+                  if (osId && setOss) {
+                      setOss(prevOss => prevOss.map(os => {
+                          if (os.number === locForm.osNumber) {
+                              const newMaterial: OSItem = {
+                                  materialId: m.id,
+                                  quantity: qty,
+                                  unitCost: m.unitCost,
+                                  timestamp: new Date().toISOString()
+                              };
+
+                              const updatedOS = {
+                                  ...os,
+                                  materials: [...(os.materials || []), newMaterial]
+                              };
+
+                              queueOperation('oss', 'upsert', updatedOS, updatedOS.id);
+
+                              return updatedOS;
+                          }
+                          return os;
+                      }));
+                  }
+
+              } else if (locAction === 'TRANSFER') {
+                  const fromIndex = newLocations.findIndex(l => l.name === locForm.location);
+                  if (fromIndex >= 0 && newLocations[fromIndex].quantity >= qty) {
+                      newLocations[fromIndex].quantity -= qty;
+
+                      const toIndex = newLocations.findIndex(l => l.name === locForm.toLocation);
+                      if (toIndex >= 0) {
+                          newLocations[toIndex].quantity += qty;
+                      } else {
+                          newLocations.push({ name: locForm.toLocation, quantity: qty });
+                      }
+
+                       addMovementWithSync({
+                          id: Math.random().toString(36).substr(2, 9),
+                          type: 'TRANSFER',
+                          materialId: m.id,
+                          quantity: qty,
+                          date: new Date().toISOString(),
+                          userId: currentUser.id,
+                          description: locForm.reason || 'Transferência entre Locais',
+                          fromLocation: locForm.location,
+                          toLocation: locForm.toLocation
+                      });
+
+                  } else {
+                      alert('Saldo insuficiente na origem.');
+                      return m;
+                  }
+              }
+
+              const newTotal = newLocations.reduce((acc, l) => acc + l.quantity, 0);
+
+              const updatedM = { ...m, currentStock: newTotal, stockLocations: newLocations };
+              setSelectedMaterialForLoc(updatedM);
+              updatedMaterial = updatedM;
+
+              return updatedM;
+          }
+          return m;
+      }));
+
+      if (updatedMaterial) {
+          queueOperation('materials', 'upsert', updatedMaterial, updatedMaterial.id);
+      }
+
+      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', osNumber: '', projectId: '' });
+      setLocAction('VIEW');
+      setOutType('OS');
+  };
+
+  const handleCreateMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    console.log('=== INICIANDO CADASTRO DE MATERIAL ===');
+    console.log('Dados do formulário:', newMaterial);
+    console.log('ENV Check - VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+    console.log('ENV Check - VITE_SUPABASE_ANON_KEY exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+    console.log('ENV Check - VITE_SUPABASE_ANON_KEY (primeiros 30 chars):', import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 30) + '...');
+
+    if (!newMaterial.code || !newMaterial.description) {
+        console.error('Validação falhou: campos obrigatórios vazios');
+        alert('Erro: Código e Descrição são obrigatórios.');
+        return;
+    }
+
+    const code = (newMaterial.code || '').trim().toUpperCase();
+
+    if (materials.some(m => m.code === code)) {
+        console.warn('Código duplicado detectado:', code);
+        alert('Erro: Este código SKU já existe. Edite o código e tente novamente.');
+        return;
+    }
+
+    const id = Math.random().toString(36).substr(2, 9);
+    const initialQty = Number(newMaterial.currentStock) || 0;
+    const initialLoc = newMaterial.location || 'CD - Central';
+
+    const material: Material = {
+        id,
+        code: code,
+        description: newMaterial.description,
+        group: newMaterial.group || 'Geral',
+        unit: newMaterial.unit || 'Un',
+        unitCost: Number(newMaterial.unitCost) || 0,
+        minStock: Number(newMaterial.minStock) || 0,
+        currentStock: initialQty,
+        location: initialLoc,
+        stockLocations: [{ name: initialLoc, quantity: initialQty }],
+        status: 'ACTIVE'
+    };
+
+    console.log('Material preparado para inserção:', material);
+
+    try {
+        console.log('Tentando inserir no Supabase...');
+        const { data, error } = await supabase.from('materials').insert({
+            id: material.id,
+            code: material.code,
+            description: material.description,
+            unit: material.unit,
+            group: material.group,
+            location: material.location,
+            status: material.status,
+            current_stock: material.currentStock || 0,
+            min_stock: material.minStock || 0,
+            unit_cost: material.unitCost || 0,
+            stock_locations: material.stockLocations || {}
+        }).select();
+
+        console.log('Resposta do Supabase:', { data, error });
+
+        if (error) {
+            console.error('Erro do Supabase:', error);
+            alert(`Erro ao salvar no banco de dados: ${error.message}\n\nDetalhes: ${error.hint || 'Verifique sua conexão com o banco de dados.'}`);
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            console.error('Nenhum dado retornado do Supabase após inserção');
+            alert('Erro: O material não foi salvo corretamente no banco de dados. Tente novamente.');
+            return;
+        }
+
+        console.log('Material salvo com sucesso no banco!');
+        setMaterials(prev => {
+            const updated = [...prev, material];
+            console.log('Estado materials atualizado. Total de itens:', updated.length);
+            return updated;
+        });
+
+        if (material.currentStock > 0) {
+            console.log('Registrando movimento de estoque inicial...');
+            await addMovementWithSync({
+                id: Math.random().toString(36).substr(2, 9),
+                type: 'IN',
+                materialId: id,
+                quantity: material.currentStock,
+                date: new Date().toISOString(),
+                userId: currentUser.id,
+                description: 'Saldo Inicial (Cadastro Manual)',
+                toLocation: initialLoc
+            });
+            console.log('Movimento registrado!');
+        }
+
+        console.log('Fechando modal e limpando formulário...');
+        await flush();
+        setShowModal(false);
+        setNewMaterial({ status: 'ACTIVE', minStock: 10, currentStock: 0, unitCost: 0, group: 'Geral', unit: 'Un', code: '' });
+        alert('Material cadastrado com sucesso!');
+        console.log('=== CADASTRO CONCLUÍDO COM SUCESSO ===');
+    } catch (e: any) {
+        console.error('Exceção capturada:', e);
+        alert(`Erro ao salvar no banco de dados: ${e.message || 'Erro desconhecido'}`);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+
+      const importedMaterials: Material[] = [];
+      let generatedCount = 0;
+      
+      data.forEach((row: any) => {
+        let code = row['Codigo'] || row['SKU'] || row['Code'];
+        const desc = row['Descricao'] || row['Description'];
+        
+        if (desc) {
+            if (!code) {
+                code = generateUniqueSKU(); 
+                while (importedMaterials.some(im => im.code === code) || materials.some(m => m.code === code)) {
+                     const random = Math.floor(1000 + Math.random() * 9000);
+                     const year = new Date().getFullYear().toString().substr(-2);
+                     code = `MAT-${year}-${random}`;
+                }
+                generatedCount++;
+            }
+
+            if (materials.some(m => m.code === code)) return;
+            
+            const qty = Number(row['Estoque']) || 0;
+            const loc = row['Local'] || 'CD - Central';
+
+            const newMat: Material = {
+                id: Math.random().toString(36).substr(2, 9),
+                code: String(code),
+                description: String(desc),
+                group: row['Grupo'] || 'Geral',
+                unit: row['Unidade'] || 'Un',
+                unitCost: Number(row['Custo']) || 0,
+                minStock: Number(row['Minimo']) || 10,
+                currentStock: qty,
+                location: loc,
+                stockLocations: [{ name: loc, quantity: qty }],
+                status: 'ACTIVE'
+            };
+            importedMaterials.push(newMat);
+
+            if (newMat.currentStock > 0) {
+                addMovementWithSync({
+                    id: Math.random().toString(36).substr(2, 9),
+                    type: 'IN',
+                    materialId: newMat.id,
+                    quantity: newMat.currentStock,
+                    date: new Date().toISOString(),
+                    userId: currentUser.id,
+                    description: 'Importação via Planilha',
+                    toLocation: loc
+                });
+            }
+        }
+      });
+
+      if (importedMaterials.length > 0) {
+          setMaterials(prev => [...prev, ...importedMaterials]);
+          alert(`${importedMaterials.length} itens importados com sucesso! (${generatedCount} códigos gerados automaticamente)`);
+      } else {
+          alert('Nenhum item novo encontrado ou formato inválido. Use colunas: Codigo, Descricao, Grupo, Unidade, Custo, Estoque');
+      }
+      
+      if(fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const downloadTemplate = () => {
+      const templateData = [
+          {
+              Codigo: 'EX-001',
+              Descricao: 'Exemplo Material A',
+              Grupo: 'Manutenção',
+              Unidade: 'Un',
+              Custo: 10.50,
+              Estoque: 100,
+              Minimo: 10,
+              Local: 'CD - Central'
+          },
+          {
+              Codigo: '', 
+              Descricao: 'Exemplo Material B (Gerar Codigo)',
+              Grupo: 'Elétrica',
+              Unidade: 'M',
+              Custo: 5.25,
+              Estoque: 200,
+              Minimo: 50,
+              Local: 'CD - Central'
+          }
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Modelo Importacao");
+      
+      const wscols = [{wch: 15}, {wch: 30}, {wch: 15}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 15}];
+      ws['!cols'] = wscols;
+
+      XLSX.writeFile(wb, "Modelo_Importacao_Estoque.xlsx");
+  };
+
+  // --- FILTRAGEM INTELIGENTE POR PERFIL E EMPRESA ---
   const filteredMaterials = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return materials;
-    return materials.filter(m =>
-      `${m.code} ${m.description}`.toLowerCase().includes(s)
-    );
-  }, [materials, search]);
+      // 1. Filtro de Texto
+      let textFiltered = materials.filter(m =>
+        m.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.code.toLowerCase().includes(searchTerm.toLowerCase())
+      );
 
-  const openIn = (materialId: string) => {
-    setSelectedMaterialId(materialId);
-    setInQty(1);
-    setInUnitCost('');
-    setInDesc('');
-    setShowInModal(true);
-  };
+      // 2. Filtro por Permissões de Warehouse (apenas para usuários warehouse específicos)
+      // APENAS restringe se o usuário tem permissões limitadas (WAREHOUSE_BIO ou WAREHOUSE_FERT)
+      const isRestrictedWarehouseUser = currentUser.role === 'WAREHOUSE_BIO' || currentUser.role === 'WAREHOUSE_FERT';
 
-  const openOut = (materialId: string) => {
-    setSelectedMaterialId(materialId);
-    setOutQty(1);
-    setOutDesc('');
-    setShowOutModal(true);
-  };
+      if (isRestrictedWarehouseUser) {
+        textFiltered = textFiltered.filter(m => {
+          // Verifica se o material está em um dos almoxarifados permitidos
+          if (allowedWarehouses.includes('Cropbio') && (m.location === 'Cropbio' || m.location === 'Laboratório de defensivos')) {
+            return true;
+          }
+          if (allowedWarehouses.includes('Cropfert') && (m.location === 'Cropfert' || m.location === 'Cropfert Jandaia')) {
+            return true;
+          }
+          if (allowedWarehouses.includes('Central') && m.location === 'CD - Central') {
+            return true;
+          }
+          return false;
+        });
+      }
 
-  const reloadMaterialFromDb = async (materialId: string) => {
-    // Recarrega o material atualizado (estoque e custo médio após trigger)
-    const { data, error } = await supabase
-      .from('materials')
-      .select('*')
-      .eq('id', materialId)
-      .single();
+      // 3. Filtro por Almoxarifado Selecionado no Dropdown (aplicado para todos)
+      if (warehouseFilter !== 'ALL') {
+        if (warehouseFilter === 'Cropbio') {
+          textFiltered = textFiltered.filter(m => m.location === 'Cropbio' || m.location === 'Laboratório de defensivos');
+        } else if (warehouseFilter === 'Cropfert') {
+          textFiltered = textFiltered.filter(m => m.location === 'Cropfert' || m.location === 'Cropfert Jandaia');
+        } else if (warehouseFilter === 'Central') {
+          textFiltered = textFiltered.filter(m => m.location === 'CD - Central');
+        }
+      }
 
-    if (error) throw error;
-    setMaterials(prev => prev.map(m => (m.id === materialId ? data : m)));
-    return data as Material;
-  };
+      return textFiltered;
+  }, [materials, searchTerm, currentUser.role, allowedWarehouses, warehouseFilter]);
 
-  const handleSaveIn = async () => {
-    if (!selectedMaterial) return;
+  const filteredMovements = useMemo(() => {
+      // Filtrar IDs dos materiais permitidos para este usuário
+      const allowedMaterialIds = new Set(filteredMaterials.map(m => m.id));
 
-    const unitCost = parseBRL(inUnitCost);
+      // Filtrar movimentos apenas dos materiais permitidos
+      const filtered = movements.filter(mov => allowedMaterialIds.has(mov.materialId));
 
-    if (!inQty || inQty <= 0) {
-      alert('Informe uma quantidade válida.');
-      return;
-    }
-    if (!Number.isFinite(unitCost) || unitCost < 0) {
-      alert('Informe um valor unitário válido.');
-      return;
-    }
+      const sorted = filtered.sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
 
-    const payload: Partial<StockMovement> & any = {
-      type: 'IN',
-      materialId: selectedMaterial.id,
-      quantity: inQty,
-      unitCost, // 👈 obrigatório para IN
-      date: new Date().toISOString(),
-      description: inDesc || null,
-      userId: currentUser?.id || null,
-    };
+      return sorted;
+  }, [movements, materials, currentUser.role, filteredMaterials]);
 
-    const { data, error } = await supabase
-      .from('stock_movements')
-      .insert(mapToSupabase(payload))
-      .select('*')
-      .single();
-
-    if (error) {
-      console.error(error);
-      alert(error.message || 'Erro ao registrar entrada.');
-      return;
-    }
-
-    setMovements(prev => [data as any, ...prev]);
-
-    try {
-      await reloadMaterialFromDb(selectedMaterial.id);
-    } catch (e) {
-      console.error('Falha ao recarregar material:', e);
-    }
-
-    setShowInModal(false);
-  };
-
-  const handleSaveOut = async () => {
-    if (!selectedMaterial) return;
-
-    if (!outQty || outQty <= 0) {
-      alert('Informe uma quantidade válida.');
-      return;
-    }
-
-    const payload: Partial<StockMovement> & any = {
-      type: 'OUT',
-      materialId: selectedMaterial.id,
-      quantity: outQty,
-      date: new Date().toISOString(),
-      description: outDesc || null,
-      userId: currentUser?.id || null,
-    };
-
-    const { data, error } = await supabase
-      .from('stock_movements')
-      .insert(mapToSupabase(payload))
-      .select('*')
-      .single();
-
-    if (error) {
-      console.error(error);
-      alert(error.message || 'Erro ao registrar saída.');
-      return;
-    }
-
-    setMovements(prev => [data as any, ...prev]);
-
-    try {
-      await reloadMaterialFromDb(selectedMaterial.id);
-    } catch (e) {
-      console.error('Falha ao recarregar material:', e);
-    }
-
-    setShowOutModal(false);
-  };
+  const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <div className="space-y-8">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Almoxarifado</h2>
-          <p className="text-sm text-slate-500">
-            Entradas com valor unitário atualizam o <strong>custo médio</strong> automaticamente.
-          </p>
-        </div>
-
-        <div className="w-full md:w-96">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por código ou descrição..."
-            className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm"
-          />
-        </div>
-      </header>
-
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="grid grid-cols-12 bg-slate-50 text-xs font-bold text-slate-500 uppercase px-4 py-3 border-b border-slate-200">
-          <div className="col-span-2">Código</div>
-          <div className="col-span-5">Descrição</div>
-          <div className="col-span-1 text-right">Estoque</div>
-          <div className="col-span-2 text-right">Custo Médio</div>
-          <div className="col-span-2 text-right">Ações</div>
-        </div>
-
-        <div className="divide-y divide-slate-100">
-          {filteredMaterials.map(mat => (
-            <div key={mat.id} className="grid grid-cols-12 px-4 py-3 items-center text-sm">
-              <div className="col-span-2 font-mono font-bold text-slate-700">{mat.code}</div>
-              <div className="col-span-5 text-slate-800">{mat.description}</div>
-              <div className="col-span-1 text-right font-bold text-slate-700">
-                {mat.stockQty ?? 0} {mat.unit}
-              </div>
-              <div className="col-span-2 text-right font-bold text-slate-900">
-                R$ {formatCurrency(mat.unitCost ?? 0)}
-              </div>
-              <div className="col-span-2 flex justify-end gap-2">
-                <button
-                  onClick={() => openIn(mat.id)}
-                  className="h-9 px-3 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700"
-                >
-                  Entrada
-                </button>
-                <button
-                  onClick={() => openOut(mat.id)}
-                  className="h-9 px-3 rounded-lg bg-rose-600 text-white font-bold text-xs hover:bg-rose-700"
-                >
-                  Saída
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {filteredMaterials.length === 0 && (
-            <div className="p-10 text-center text-slate-400">
-              Nenhum material encontrado.
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
+            {allowedWarehouses.length === 1 && allowedWarehouses[0] === 'Cropbio' && 'Almoxarifado Cropbio'}
+            {allowedWarehouses.length === 1 && allowedWarehouses[0] === 'Cropfert' && 'Almoxarifado Cropfert'}
+            {allowedWarehouses.length === 1 && allowedWarehouses[0] === 'Central' && 'Almoxarifado Central'}
+            {allowedWarehouses.length > 1 && 'Controle de Almoxarifados'}
+            {allowedWarehouses.length === 0 && 'Almoxarifado'}
+          </h2>
+          {allowedWarehouses.length > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              <p className="text-slate-500 text-sm font-medium">
+                Acesso a:
+              </p>
+              {canAccessCropbio && <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-1 rounded border border-emerald-200 uppercase flex items-center gap-1"><i className="fas fa-leaf"></i> Cropbio</span>}
+              {canAccessCropfert && <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded border border-blue-200 uppercase flex items-center gap-1"><i className="fas fa-seedling"></i> Cropfert</span>}
+              {canAccessCentral && <span className="bg-slate-100 text-slate-800 text-xs font-bold px-2 py-1 rounded border border-slate-200 uppercase flex items-center gap-1"><i className="fas fa-building"></i> Central</span>}
             </div>
           )}
         </div>
-      </div>
+        <div className="flex flex-wrap gap-3">
+            <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                <button onClick={() => setView('stock')} className={`px-6 py-3 rounded-lg text-sm font-bold uppercase transition-all ${view === 'stock' ? 'bg-white text-slate-800 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-700'}`}>Saldo Atual</button>
+                <button onClick={() => setView('history')} className={`px-6 py-3 rounded-lg text-sm font-bold uppercase transition-all ${view === 'history' ? 'bg-white text-slate-800 shadow-md transform scale-105' : 'text-slate-500 hover:text-slate-700'}`}>Kardex</button>
+            </div>
+            
+            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx, .xls, .csv" />
+            
+            <div className="flex bg-white rounded-xl border border-emerald-100 shadow-sm p-1">
+                <button onClick={downloadTemplate} className="px-4 py-2 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg text-sm font-bold transition-all flex items-center gap-2 border-r border-slate-100 mr-1" title="Baixar planilha modelo">
+                    <i className="fas fa-download"></i> Modelo
+                </button>
+                <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-all flex items-center gap-2">
+                    <i className="fas fa-file-excel"></i> Importar
+                </button>
+            </div>
 
-      {/* MODAL ENTRADA */}
-      {showInModal && selectedMaterial && (
+            <button onClick={openNewItemModal} className="bg-clean-primary text-white px-6 py-3 rounded-xl font-bold text-sm uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2 transition-all h-[52px]">
+                <i className="fas fa-plus"></i> Novo Item
+            </button>
+        </div>
+      </header>
+
+      {view === 'stock' ? (
+        <>
+          <div className="flex gap-4 items-center">
+            <div className="relative flex-1 max-w-lg group">
+              <i className={`fas ${searchInput !== searchTerm ? 'fa-spinner fa-spin text-clean-primary' : 'fa-search text-slate-400'} absolute left-4 top-1/2 -translate-y-1/2 text-lg transition-colors`}></i>
+              <input
+                  type="text"
+                  placeholder="Filtrar materiais por nome ou código..."
+                  className="w-full pl-12 pr-4 h-14 bg-white border border-slate-300 rounded-xl text-lg text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary placeholder:text-slate-400 font-medium transition-all"
+                  value={searchInput}
+                  onChange={e => setSearchInput(e.target.value)}
+              />
+            </div>
+
+            <div className="relative">
+              <i className="fas fa-warehouse absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none"></i>
+              <select
+                value={warehouseFilter}
+                onChange={e => setWarehouseFilter(e.target.value)}
+                className="pl-12 pr-10 h-14 bg-white border border-slate-300 rounded-xl text-base text-slate-800 shadow-sm focus:ring-2 focus:ring-clean-primary/20 focus:border-clean-primary font-medium transition-all appearance-none cursor-pointer min-w-[220px]"
+              >
+                <option value="ALL">Todos os Almoxarifados</option>
+                <option value="Central">Central</option>
+                <option value="Cropbio">Cropbio</option>
+                <option value="Cropfert">Cropfert</option>
+              </select>
+              <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+            </div>
+          </div>
+
+          {warehouseFilter !== 'ALL' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-3">
+              <i className="fas fa-filter text-amber-600"></i>
+              <div className="flex-1 text-sm">
+                <span className="font-bold text-amber-900">Filtro ativo:</span>{' '}
+                <span className="text-amber-800">
+                  Exibindo apenas itens do almoxarifado{' '}
+                  <span className="font-bold">{warehouseFilter}</span>
+                </span>
+              </div>
+              <button
+                onClick={() => setWarehouseFilter('ALL')}
+                className="px-3 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-2"
+              >
+                <i className="fas fa-times"></i>
+                Limpar Filtro
+              </button>
+            </div>
+          )}
+
+          {/* DEBUG INFO */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <h4 className="font-bold text-blue-900 mb-2">🔍 Informações de Debug</h4>
+            <div className="text-sm text-blue-800 space-y-1">
+              <p><strong>Role:</strong> {currentUser.role}</p>
+              <p><strong>Total de materiais carregados:</strong> {materials.length}</p>
+              <p><strong>Almoxarifados permitidos:</strong> {allowedWarehouses.join(', ') || 'Nenhum'}</p>
+              <p><strong>Filtro ativo:</strong> {warehouseFilter}</p>
+              <p><strong>Materiais após filtro:</strong> {filteredMaterials.length}</p>
+              <p><strong>Materiais por localização:</strong></p>
+              <ul className="ml-4">
+                {Object.entries(materials.reduce((acc, m) => {
+                  acc[m.location] = (acc[m.location] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>)).map(([loc, count]) => (
+                  <li key={loc}>• {loc}: {count}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-600">
+              Exibindo <span className="font-bold text-slate-900">{filteredMaterials.length}</span> {filteredMaterials.length === 1 ? 'item' : 'itens'}
+              {warehouseFilter !== 'ALL' && materials.length > filteredMaterials.length && (
+                <span className="text-amber-600 ml-1">
+                  (filtrado de {materials.length})
+                </span>
+              )}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+             <table className="w-full text-base text-left">
+                <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-xs tracking-wider">
+                   <tr>
+                      <th className="px-8 py-5">Código</th>
+                      <th className="px-8 py-5">Descrição</th>
+                      <th className="px-8 py-5">Grupo</th>
+                      <th className="px-8 py-5 text-right">Mínimo</th>
+                      <th className="px-8 py-5 text-right">Saldo Total</th>
+                      <th className="px-8 py-5 text-center">Locais</th>
+                      <th className="px-8 py-5 text-right">Valor Unit.</th>
+                      <th className="px-8 py-5 text-center">Status</th>
+                      <th className="px-8 py-5 text-center">Ações</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                   {filteredMaterials.map(m => {
+                       const locCount = m.stockLocations ? m.stockLocations.length : 1;
+                       return (
+                           <tr key={m.id} className="hover:bg-slate-50 transition-colors group">
+                               <td className="px-8 py-5 font-mono text-base text-slate-500 font-bold">{m.code}</td>
+                               <td className="px-8 py-5 font-bold text-slate-800">{m.description}</td>
+                               <td className="px-8 py-5 text-slate-500 font-medium">{m.group}</td>
+                               <td className="px-8 py-5 text-right text-slate-400 font-medium">{m.minStock}</td>
+                               <td className="px-8 py-5 text-right font-black text-slate-800 text-xl">
+                                   {m.currentStock} 
+                                   <span className="text-xs text-slate-400 font-bold uppercase ml-1">{m.unit}</span>
+                               </td>
+                               <td className="px-8 py-5 text-center">
+                                    <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-md text-xs font-bold border border-slate-200">
+                                        {locCount} Local(is)
+                                    </span>
+                               </td>
+                               <td className="px-8 py-5 text-right font-medium text-slate-600">R$ {formatCurrency(m.unitCost)}</td>
+                               <td className="px-8 py-5 text-center">
+                                   {m.currentStock <= m.minStock ? (
+                                       <span className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide border border-red-200">Repor</span>
+                                   ) : (
+                                       <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide border border-emerald-200">OK</span>
+                                   )}
+                               </td>
+                               <td className="px-8 py-5 text-center">
+                                   <div className="flex items-center justify-center gap-2">
+                                       {currentUser.role === 'ADMIN' && (
+                                           <button onClick={() => openEditItemModal(m)} className="bg-white border border-slate-300 text-slate-600 hover:text-blue-700 hover:border-blue-500 font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2">
+                                               <i className="fas fa-pen"></i> Editar
+                                           </button>
+                                       )}
+<button onClick={() => openLocationManager(m)} className="bg-white border border-slate-300 text-slate-600 hover:text-clean-primary hover:border-clean-primary font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2">
+                                           <i className="fas fa-boxes-stacked"></i> Gerenciar
+                                       </button>
+                                       {currentUser.role === 'ADMIN' && (
+                                           <button
+                                               onClick={() => handleDeleteMaterial(m)}
+                                               className="bg-white border border-red-300 text-red-600 hover:text-white hover:bg-red-600 hover:border-red-600 font-bold text-xs px-3 py-2 rounded-lg transition-all shadow-sm flex items-center gap-2"
+                                               title="Excluir material"
+                                           >
+                                               <i className="fas fa-trash"></i>
+                                           </button>
+                                       )}
+                                   </div>
+                               </td>
+                           </tr>
+                       );
+                   })}
+                   {filteredMaterials.length === 0 && (
+                       <tr>
+                           <td colSpan={9} className="px-8 py-12 text-center text-slate-400 italic">
+                               Nenhum material encontrado para o seu perfil de acesso.
+                           </td>
+                       </tr>
+                   )}
+                </tbody>
+             </table>
+          </div>
+        </>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
+           <h3 className="font-bold text-xl text-slate-800 mb-6 flex items-center gap-2"><i className="fas fa-history text-clean-primary"></i> Histórico de Movimentação (Kardex)</h3>
+           <div className="overflow-x-auto">
+               <table className="w-full text-base text-left">
+                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs tracking-wider"><tr className="border-b border-slate-200"><th className="p-5">Data</th><th className="p-5">Tipo</th><th className="p-5">Material</th><th className="p-5 text-right">Qtd</th><th className="p-5">Locais (Origem &rarr; Destino)</th><th className="p-5">Responsável</th><th className="p-5">Justificativa / Centro de Custo</th></tr></thead>
+                   <tbody className="divide-y divide-slate-100">
+                       {filteredMovements.map(mov => (
+                           <tr key={mov.id} className="hover:bg-slate-50">
+                               <td className="p-5 text-slate-500 font-mono font-medium">{new Date(mov.date).toLocaleString()}</td>
+                               <td className="p-5"><span className={`font-black text-xs px-3 py-1.5 rounded-lg border uppercase tracking-wide ${mov.type==='IN'?'bg-emerald-50 text-emerald-700 border-emerald-200':mov.type==='OUT'?'bg-amber-50 text-amber-700 border-amber-200':mov.type==='TRANSFER'?'bg-purple-50 text-purple-700 border-purple-200':'bg-blue-50 text-blue-700 border-blue-200'}`}>{mov.type}</span></td>
+                               <td className="p-5 font-bold text-slate-700">{materials.find(m=>m.id===mov.materialId)?.description || '---'}</td>
+                               <td className="p-5 text-right font-mono font-bold text-lg">{mov.quantity}</td>
+                               <td className="p-5 text-sm text-slate-600">
+                                   {mov.type === 'TRANSFER' ? (
+                                       <span className="flex items-center gap-2">
+                                           <span className="bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">{mov.fromLocation}</span>
+                                           <i className="fas fa-arrow-right text-slate-400"></i>
+                                           <span className="bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">{mov.toLocation}</span>
+                                       </span>
+                                   ) : (
+                                       <span>{mov.toLocation || mov.fromLocation || '-'}</span>
+                                   )}
+                               </td>
+                               <td className="p-5 text-slate-700 font-medium">{mov.userId}</td>
+                               <td className="p-5 text-slate-500 font-medium">
+                                   {mov.description}
+                                   <div className="flex gap-2 mt-1">
+                                       {mov.projectId && (
+                                           <span className="text-[10px] font-bold text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 w-fit">
+                                               Proj: {projects.find(p => p.id === mov.projectId)?.code || '---'}
+                                           </span>
+                                       )}
+                                       {mov.costCenter && (
+                                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 rounded px-1.5 py-0.5 w-fit border border-emerald-200">
+                                               CC: {mov.costCenter}
+                                           </span>
+                                       )}
+                                   </div>
+                               </td>
+                           </tr>
+                       ))}
+                   </tbody>
+               </table>
+           </div>
+        </div>
+      )}
+
+      {/* MODAL DE CRIAÇÃO (Premium Style) */}
+      {showModal && (
         <ModalPortal>
-          <div className="fixed inset-0 z-[10000]">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setShowInModal(false)} />
-            <div className="absolute inset-0 p-4 flex items-center justify-center">
-              <div className="w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
-                <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900">Entrada de Material</h3>
-                    <p className="text-xs text-slate-500">
-                      {selectedMaterial.code} — {selectedMaterial.description}
-                    </p>
-                  </div>
-                  <button
-                    className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300"
-                    onClick={() => setShowInModal(false)}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="p-5 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Quantidade</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={inQty}
-                        onChange={(e) => setInQty(Number(e.target.value))}
-                        className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium"
-                      />
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => setShowModal(false)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                <div className="relative w-full max-w-2xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
+                    <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
+                        <div>
+                            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Novo Item de Estoque</h3>
+                            <p className="text-sm text-slate-500 mt-1">Cadastro de material no almoxarifado.</p>
+                        </div>
+                        <button onClick={() => setShowModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-lg"></i></button>
                     </div>
+                    <div className="flex-1 overflow-y-auto bg-slate-50/50 min-h-0">
+                        <form onSubmit={handleCreateMaterial} className="p-8 space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Código (SKU) <span className="text-xs font-normal text-emerald-600 ml-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100"><i className="fas fa-lock text-[10px]"></i> Sistema</span></label>
+                                    <div className="relative">
+                                        <input
+                                            className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-bold shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all uppercase"
+                                            value={newMaterial.code || ''}
+                                            placeholder="Ex: MAT-26-1234"
+                                            onChange={(e) => {
+                                              const v = e.target.value
+                                                .toUpperCase()
+                                                .replace(/\s+/g, '-')
+                                                .replace(/[^A-Z0-9-]/g, '')
+                                                .slice(0, 30);
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
-                        Valor unitário (R$)
-                      </label>
-                      <input
-                        type="text"
-                        value={inUnitCost}
-                        onChange={(e) => setInUnitCost(e.target.value)}
-                        placeholder="Ex: 12,50"
-                        className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium"
-                      />
+                                              setNewMaterial({ ...newMaterial, code: v });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Grupo / Categoria</label>
+                                    <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Elétrica" value={newMaterial.group} onChange={e => setNewMaterial({...newMaterial, group: e.target.value})} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Descrição Completa</label>
+                                <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Cabo Flexível 2.5mm Preto" value={newMaterial.description} onChange={e => setNewMaterial({...newMaterial, description: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-3 gap-6">
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Unidade</label>
+                                    <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Un, Kg, M" value={newMaterial.unit} onChange={e => setNewMaterial({...newMaterial, unit: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Custo Unit. (R$)</label>
+                                    <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.unitCost} onChange={e => setNewMaterial({...newMaterial, unitCost: Number(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Local Padrão</label>
+                                    <select required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.location} onChange={e => setNewMaterial({...newMaterial, location: e.target.value})}>
+                                        <option value="">Selecione o local...</option>
+                                        {globalLocations.map(loc => (
+                                            <option key={loc} value={loc}>{loc}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-slate-400 mt-1.5 ml-1">O material só será visível neste local/empresa.</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Estoque Mínimo</label>
+                                    <input type="number" min="0" required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.minStock} onChange={e => setNewMaterial({...newMaterial, minStock: Number(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 mb-2 block">Estoque Inicial</label>
+                                    <input type="number" min="0" required className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={newMaterial.currentStock} onChange={e => setNewMaterial({...newMaterial, currentStock: Number(e.target.value)})} />
+                                    <p className="text-xs text-slate-400 mt-1.5 ml-1">Será adicionado ao Local Padrão.</p>
+                                </div>
+                            </div>
+                        </form>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Descrição (opcional)</label>
-                    <input
-                      type="text"
-                      value={inDesc}
-                      onChange={(e) => setInDesc(e.target.value)}
-                      placeholder="Ex: NF 12345 / Lote X"
-                      className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium"
-                    />
-                  </div>
-
-                  <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    Ao salvar, o sistema recalcula automaticamente o <strong>custo médio</strong> do material.
-                  </div>
-                </div>
-
-                <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3">
-                  <button
-                    onClick={() => setShowInModal(false)}
-                    className="flex-1 h-11 rounded-xl bg-white border border-slate-300 font-bold text-sm text-slate-700 hover:bg-slate-100"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleSaveIn}
-                    className="flex-1 h-11 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700"
-                  >
-                    Salvar Entrada
-                  </button>
+                    <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-end gap-4 rounded-b-2xl shrink-0">
+                        <button type="button" onClick={() => setShowModal(false)} className="px-8 py-3.5 text-base font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">Cancelar</button>
+                        <button type="submit" onClick={handleCreateMaterial} className="px-10 py-3.5 text-base font-bold text-white bg-clean-primary hover:bg-clean-primary/90 rounded-xl shadow-xl shadow-clean-primary/30 transition-all transform hover:-translate-y-1 active:scale-95 flex items-center gap-2">
+                            <i className="fas fa-check"></i> Cadastrar Material
+                        </button>
+                    </div>
                 </div>
               </div>
             </div>
-          </div>
         </ModalPortal>
       )}
 
-      {/* MODAL SAÍDA */}
-      {showOutModal && selectedMaterial && (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[10000]">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setShowOutModal(false)} />
-            <div className="absolute inset-0 p-4 flex items-center justify-center">
-              <div className="w-full max-w-lg bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
-                <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-start justify-between">
+
+
+{/* MODAL DE EDIÇÃO (Premium Style) */}
+{showEditModal && editingMaterial && (
+  <ModalPortal>
+      <div className="fixed inset-0 z-[9999]">
+        <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => { setShowEditModal(false); setEditingMaterial(null); }} />
+        <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+          <div className="relative w-full max-w-2xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">Saída de Material</h3>
-                    <p className="text-xs text-slate-500">
-                      {selectedMaterial.code} — {selectedMaterial.description}
-                    </p>
+                      <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Editar Item de Estoque</h3>
+                      <p className="text-sm text-slate-500 mt-1">Atualize os dados cadastrais do material (sem alterar saldos).</p>
                   </div>
-                  <button
-                    className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300"
-                    onClick={() => setShowOutModal(false)}
-                  >
-                    ✕
+                  <button onClick={() => { setShowEditModal(false); setEditingMaterial(null); }} className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-lg"></i></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto bg-slate-50/50 min-h-0">
+                  <form onSubmit={handleUpdateMaterial} className="p-8 space-y-6">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-3">
+                        <i className="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                        <div className="text-sm text-blue-800">
+                          <p className="font-bold">Importante</p>
+                          <p>Saldos e distribuição por locais devem ser ajustados pelo <b>Gerenciar</b> (Entrada / Saída / Transferência). Aqui você edita apenas cadastro.</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Código (SKU)</label>
+                              <input
+                                className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-bold shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all uppercase"
+                                value={editMaterial.code || ''}
+                                placeholder="Ex: MAT-26-1234"
+                                onChange={(e) => {
+                                  const v = e.target.value
+                                    .toUpperCase()
+                                    .replace(/\s+/g, '-')
+                                    .replace(/[^A-Z0-9-]/g, '')
+                                    .slice(0, 30);
+
+                                  setEditMaterial({ ...editMaterial, code: v });
+                                }}
+                              />
+                              <p className="text-xs text-slate-400 mt-1.5 ml-1">SKU deve ser único.</p>
+                          </div>
+
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Grupo / Categoria</label>
+                              <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Elétrica" value={editMaterial.group || ''} onChange={e => setEditMaterial({...editMaterial, group: e.target.value})} />
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="text-sm font-bold text-slate-700 mb-2 block">Descrição Completa</label>
+                          <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Ex: Cabo Flexível 2.5mm Preto" value={editMaterial.description || ''} onChange={e => setEditMaterial({...editMaterial, description: e.target.value})} />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-6">
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Unidade</label>
+                              <input required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" placeholder="Un, Kg, M" value={editMaterial.unit || ''} onChange={e => setEditMaterial({...editMaterial, unit: e.target.value})} />
+                          </div>
+
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Custo Unit. (R$)</label>
+                              <input type="number" step="0.01" min="0" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={Number(editMaterial.unitCost) || 0} onChange={e => setEditMaterial({...editMaterial, unitCost: Number(e.target.value)})} />
+                          </div>
+
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Estoque Mínimo</label>
+                              <input type="number" min="0" required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={Number(editMaterial.minStock) || 0} onChange={e => setEditMaterial({...editMaterial, minStock: Number(e.target.value)})} />
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Local Padrão</label>
+                              <select required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={editMaterial.location || ''} onChange={e => setEditMaterial({...editMaterial, location: e.target.value})}>
+                                  <option value="">Selecione o local...</option>
+                                  {globalLocations.map(loc => (
+                                      <option key={loc} value={loc}>{loc}</option>
+                                  ))}
+                              </select>
+                          </div>
+
+                          <div>
+                              <label className="text-sm font-bold text-slate-700 mb-2 block">Status</label>
+                              <select required className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base text-slate-900 font-medium shadow-sm focus:border-clean-primary focus:ring-4 focus:ring-clean-primary/10 transition-all" value={(editMaterial.status as any) || 'ACTIVE'} onChange={e => setEditMaterial({...editMaterial, status: e.target.value as any})}>
+                                  <option value="ACTIVE">Ativo</option>
+                                  <option value="INACTIVE">Inativo</option>
+                              </select>
+                          </div>
+                      </div>
+
+                  </form>
+              </div>
+
+              <div className="px-8 py-5 bg-white border-t border-slate-100 flex justify-end gap-4 rounded-b-2xl shrink-0">
+                  <button type="button" onClick={() => { setShowEditModal(false); setEditingMaterial(null); }} className="px-8 py-3.5 text-base font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">Cancelar</button>
+                  <button type="submit" onClick={handleUpdateMaterial} className="px-10 py-3.5 text-base font-bold text-white bg-clean-primary hover:bg-clean-primary/90 rounded-xl shadow-xl shadow-clean-primary/30 transition-all transform hover:-translate-y-1 active:scale-95 flex items-center gap-2">
+                      <i className="fas fa-save"></i> Salvar Alterações
                   </button>
-                </div>
+              </div>
+          </div>
+        </div>
+      </div>
+  </ModalPortal>
+)}
 
-                <div className="p-5 space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Quantidade</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={outQty}
-                      onChange={(e) => setOutQty(Number(e.target.value))}
-                      className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium"
-                    />
-                  </div>
+      {/* MODAL DE GESTÃO DE LOCAIS (Premium Style) */}
+      {selectedMaterialForLoc && (
+          <ModalPortal>
+            <div className="fixed inset-0 z-[9999]">
+              <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => setSelectedMaterialForLoc(null)} />
+              <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-start">
+                <div className="relative w-full max-w-3xl my-8 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
+                    <div className="px-8 py-6 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
+                        <div>
+                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Gestão de Armazenagem</p>
+                            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedMaterialForLoc.description}</h3>
+                        </div>
+                        <button onClick={() => setSelectedMaterialForLoc(null)} className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-slate-500 transition-colors border border-transparent hover:border-slate-200"><i className="fas fa-times text-lg"></i></button>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar min-h-0">
+                        {/* Resumo de Estoque */}
+                        <div className="grid grid-cols-2 gap-4 mb-8">
+                            <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 flex flex-col justify-center">
+                                <span className="block text-xs font-bold text-emerald-600 uppercase tracking-wide">Saldo Total</span>
+                                <span className="text-4xl font-black text-emerald-800 mt-1">{selectedMaterialForLoc.currentStock} <span className="text-sm font-bold text-emerald-600 align-middle">{selectedMaterialForLoc.unit}</span></span>
+                            </div>
+                            <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 flex flex-col justify-center">
+                                    <span className="block text-xs font-bold text-blue-600 uppercase tracking-wide">Locais Ativos</span>
+                                    <span className="text-4xl font-black text-blue-800 mt-1">{selectedMaterialForLoc.stockLocations?.filter(l => l.quantity > 0).length || 0}</span>
+                            </div>
+                        </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Descrição (opcional)</label>
-                    <input
-                      type="text"
-                      value={outDesc}
-                      onChange={(e) => setOutDesc(e.target.value)}
-                      placeholder="Ex: Retirada para manutenção"
-                      className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium"
-                    />
-                  </div>
+                        {/* Lista de Locais */}
+                        <h4 className="font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><i className="fas fa-map-marker-alt text-clean-primary"></i> Distribuição Física</h4>
+                        <div className="space-y-3 mb-8">
+                            {selectedMaterialForLoc.stockLocations?.map((loc, idx) => (
+                                <div key={idx} className="flex justify-between items-center p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400"><i className="fas fa-warehouse"></i></div>
+                                        <span className="font-bold text-slate-700 text-lg">{loc.name}</span>
+                                    </div>
+                                    <span className="font-mono font-bold text-xl text-slate-900 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">{loc.quantity} <span className="text-xs text-slate-400 font-sans">{selectedMaterialForLoc.unit}</span></span>
+                                </div>
+                            ))}
+                            {(!selectedMaterialForLoc.stockLocations || selectedMaterialForLoc.stockLocations.length === 0) && (
+                                <p className="text-center text-slate-400 italic py-6 bg-slate-50 rounded-xl border border-slate-100 border-dashed">Nenhum local registrado.</p>
+                            )}
+                        </div>
 
-                  <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    A saída <strong>não altera</strong> o custo médio — apenas reduz o saldo.
-                  </div>
-                </div>
+                        {/* Ações */}
+                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                            <div className="flex flex-wrap bg-white p-1 rounded-xl border border-slate-200 mb-6 shadow-sm">
+                                <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
+                                <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
+                                <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
+                                <button onClick={() => { setLocAction('OUT'); setOutType('OS'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa / Saida</button>
+                            </div>
 
-                <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3">
-                  <button
-                    onClick={() => setShowOutModal(false)}
-                    className="flex-1 h-11 rounded-xl bg-white border border-slate-300 font-bold text-sm text-slate-700 hover:bg-slate-100"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleSaveOut}
-                    className="flex-1 h-11 rounded-xl bg-rose-600 text-white font-bold text-sm hover:bg-rose-700"
-                  >
-                    Salvar Saída
-                  </button>
+                            {locAction !== 'VIEW' && (
+                                <form onSubmit={handleLocationSubmit} className="space-y-5 animate-in fade-in slide-in-from-top-2">
+                                    {locAction === 'ADD' ? (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Nome do Novo Local</label>
+                                            <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Ex: Prateleira B-02" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})} />
+                                            <p className="text-[10px] text-slate-400 mt-1.5 ml-1">O local ficará disponível na lista global.</p>
+                                        </div>
+                                    ) : locAction === 'TRANSFER' ? (
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Origem (Onde está)</label>
+                                                <select required className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})}>
+                                                    <option value="">Selecione...</option>
+                                                    {selectedMaterialForLoc.stockLocations?.map((l, i) => <option key={i} value={l.name}>{l.name} ({l.quantity})</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Destino (Para onde vai)</label>
+                                                <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Selecionar ou Digitar..." value={locForm.toLocation} onChange={e => setLocForm({...locForm, toLocation: e.target.value})} />
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Local Alvo</label>
+                                            {locAction === 'OUT' ? (
+                                                <select required className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})}>
+                                                    <option value="">Selecione...</option>
+                                                    {selectedMaterialForLoc.stockLocations?.map((l, i) => <option key={i} value={l.name}>{l.name} ({l.quantity})</option>)}
+                                                </select>
+                                            ) : (
+                                                <>
+                                                    <input required list="all-locations-list" className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" placeholder="Selecionar ou Digitar..." value={locForm.location} onChange={e => setLocForm({...locForm, location: e.target.value})} />
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {locAction === 'OUT' && (
+                                        <div className="space-y-4">
+                                            <div className="flex bg-white p-1 rounded-xl border border-red-200 shadow-sm">
+                                                <button type="button" onClick={() => { setOutType('OS'); setLocForm({...locForm, osNumber: '', projectId: '', reason: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'OS' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-red-50'}`}>Baixa p/ OS</button>
+                                                <button type="button" onClick={() => { setOutType('PROJECT'); setLocForm({...locForm, osNumber: '', projectId: '', reason: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'PROJECT' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-amber-50'}`}>Baixa p/ Projeto</button>
+                                                <button type="button" onClick={() => { setOutType('GENERAL'); setLocForm({...locForm, osNumber: '', projectId: '', reason: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'GENERAL' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Saida Avulsa</button>
+                                            </div>
+
+                                            {outType === 'OS' && (
+                                                <div className="bg-red-50 p-4 rounded-xl border border-red-100 space-y-4">
+                                                    <div>
+                                                        <label className="text-xs font-bold text-red-700 uppercase block mb-2">
+                                                            Ordem de Servico <span className="text-red-600">*</span>
+                                                            {allOS.filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED').length > 0 && (
+                                                                <span className="ml-2 text-[10px] bg-red-100 px-2 py-0.5 rounded border border-red-200">
+                                                                    {allOS.filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED').length} OS disponiveis
+                                                                </span>
+                                                            )}
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            className="w-full h-11 px-4 rounded-xl border border-red-200 bg-white shadow-sm focus:border-red-400 focus:ring-0 transition-all text-slate-800 mb-3"
+                                                            placeholder="Buscar OS por número ou descrição..."
+                                                            value={osSearch}
+                                                            onChange={e => setOsSearch(e.target.value)}
+                                                        />
+                                                        <select
+                                                            required
+                                                            className="w-full h-12 px-4 rounded-xl border border-red-200 bg-white shadow-sm focus:border-red-400 focus:ring-0 transition-all text-slate-800"
+                                                            value={locForm.osNumber}
+                                                            onChange={e => setLocForm({...locForm, osNumber: e.target.value})}
+                                                        >
+                                                            <option value="">Selecione a OS de destino...</option>
+                                                            {allOS
+                                                                .filter(os => os.status !== 'COMPLETED' && os.status !== 'CANCELED')
+                                                                .map(os => {
+                                                                    let context = '';
+                                                                    if (os.projectId) {
+                                                                        const proj = projects.find(p => p.id === os.projectId);
+                                                                        context = proj ? ` | Projeto: ${proj.code}` : ' | Projeto';
+                                                                    } else if (os.buildingId) {
+                                                                        context = ' | Edificio';
+                                                                    } else if (os.equipmentId) {
+                                                                        context = ' | Equipamento';
+                                                                    }
+                                                                    return (
+                                                                        <option key={os.id} value={os.number}>
+                                                                            {os.number} - {os.description}{context} ({os.status})
+                                                                        </option>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </select>
+                                                        <div className="flex gap-2 mt-3">
+                                                            <button
+                                                                type="button"
+                                                                disabled={!osHasMore || osLoading}
+                                                                onClick={() => loadOS(osPage + 1, true)}
+                                                                className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-red-200 hover:bg-red-50 disabled:opacity-50"
+                                                            >
+                                                                {osLoading ? 'Carregando...' : osHasMore ? 'Carregar mais OS' : 'Sem mais OS'}
+                                                            </button>
+                                                            <span className="text-[10px] text-red-600 flex items-center">Exibindo {allOS.length} OS</span>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[10px] text-red-600">A baixa sera vinculada a OS selecionada e o custo alocado ao centro de custo correspondente.</p>
+                                                    {(() => {
+                                                        if (locForm.osNumber) {
+                                                            const selectedOS = allOS.find(os => os.number === locForm.osNumber);
+                                                            if (selectedOS) {
+                                                                let displayCostCenter = '';
+                                                                let osContext = '';
+                                                                if (selectedOS.projectId) {
+                                                                    const project = projects.find(p => p.id === selectedOS.projectId);
+                                                                    displayCostCenter = project?.costCenter || 'N/A';
+                                                                    osContext = `Projeto: ${project?.code || 'N/A'}`;
+                                                                } else if (selectedOS.buildingId) {
+                                                                    displayCostCenter = selectedOS.costCenter || 'N/A';
+                                                                    osContext = 'Vinculada a Edificio';
+                                                                } else if (selectedOS.equipmentId) {
+                                                                    displayCostCenter = selectedOS.costCenter || 'N/A';
+                                                                    osContext = 'Vinculada a Equipamento';
+                                                                }
+                                                                return (
+                                                                    <div className="mt-3 p-3 bg-white rounded-lg border border-red-200 space-y-2">
+                                                                        <div>
+                                                                            <p className="text-[10px] font-bold text-red-800 uppercase mb-1">Contexto da OS</p>
+                                                                            <p className="text-sm font-bold text-red-900">{osContext}</p>
+                                                                        </div>
+                                                                        {displayCostCenter && (
+                                                                            <div>
+                                                                                <p className="text-[10px] font-bold text-red-800 uppercase mb-1">Centro de Custo</p>
+                                                                                <p className="text-sm font-bold text-red-900">{displayCostCenter}</p>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                </div>
+                                            )}
+
+                                            {outType === 'PROJECT' && (
+                                                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 space-y-4">
+                                                    <div>
+                                                        <label className="text-xs font-bold text-amber-700 uppercase block mb-2">
+                                                            Projeto <span className="text-amber-600">*</span>
+                                                        </label>
+                                                        <select
+                                                            required
+                                                            className="w-full h-12 px-4 rounded-xl border border-amber-200 bg-white shadow-sm focus:border-amber-400 focus:ring-0 transition-all text-slate-800"
+                                                            value={locForm.projectId}
+                                                            onChange={e => setLocForm({...locForm, projectId: e.target.value})}
+                                                        >
+                                                            <option value="">Selecione o projeto...</option>
+                                                            {projects
+                                                                .filter(p => p.status !== 'FINISHED' && p.status !== 'CANCELED')
+                                                                .map(p => (
+                                                                    <option key={p.id} value={p.id}>
+                                                                        {p.code} - {p.description} ({p.status === 'IN_PROGRESS' ? 'Em andamento' : p.status === 'PLANNED' ? 'Planejado' : p.status})
+                                                                    </option>
+                                                                ))
+                                                            }
+                                                        </select>
+                                                    </div>
+                                                    {(() => {
+                                                        if (locForm.projectId) {
+                                                            const project = projects.find(p => p.id === locForm.projectId);
+                                                            if (project) {
+                                                                return (
+                                                                    <div className="p-3 bg-white rounded-lg border border-amber-200 space-y-2">
+                                                                        <div className="flex gap-4">
+                                                                            <div>
+                                                                                <p className="text-[10px] font-bold text-amber-800 uppercase mb-1">Local</p>
+                                                                                <p className="text-sm font-bold text-amber-900">{project.location}</p>
+                                                                            </div>
+                                                                            {project.costCenter && (
+                                                                                <div>
+                                                                                    <p className="text-[10px] font-bold text-amber-800 uppercase mb-1">Centro de Custo</p>
+                                                                                    <p className="text-sm font-bold text-amber-900">{project.costCenter}</p>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                    <p className="text-[10px] text-amber-600">Baixa direta no projeto, sem necessidade de OS.</p>
+                                                </div>
+                                            )}
+
+                                            {outType === 'GENERAL' && (
+                                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                                                    <p className="text-xs font-bold text-slate-600 uppercase">Saida avulsa</p>
+                                                    <p className="text-[10px] text-slate-500">Saida sem vinculo com OS ou Projeto. Informe o motivo no campo de justificativa.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Datalist Global para Autocomplete de Criação/Reuso */}
+                                    <datalist id="all-locations-list">
+                                        {globalLocations.map((loc, i) => <option key={i} value={loc} />)}
+                                    </datalist>
+
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">{locAction === 'ADD' ? 'Saldo Inicial (Opcional)' : 'Quantidade'}</label>
+                                            <input type="number" min="0" step="1" required={locAction !== 'ADD'} className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all font-bold text-slate-800" value={locForm.quantity} onChange={e => setLocForm({...locForm, quantity: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Justificativa {locAction === 'OUT' && outType === 'GENERAL' && <span className="text-red-500">*</span>}</label>
+                                            {locAction === 'OUT' && outType === 'OS' && locForm.osNumber ? (
+                                                <input disabled className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-100 shadow-sm text-slate-400 italic cursor-not-allowed" value="Baixa vinculada a OS (Automatico)" />
+                                            ) : (
+                                                <input required={locAction === 'OUT' && outType === 'GENERAL'} className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all" value={locForm.reason} onChange={e => setLocForm({...locForm, reason: e.target.value})} placeholder={locAction === 'OUT' && outType === 'GENERAL' ? 'Informe o motivo da saida...' : 'Motivo da operacao...'} />
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" className="w-full py-4 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 transition-all shadow-lg hover:shadow-xl transform active:scale-[0.98]">Confirmar Operação</button>
+                                </form>
+                            )}
+                            {locAction === 'VIEW' && <p className="text-center text-sm text-slate-400 py-4 font-medium">Selecione uma ação acima para movimentar o estoque.</p>}
+                        </div>
+                    </div>
                 </div>
               </div>
             </div>
-          </div>
-        </ModalPortal>
+          </ModalPortal>
       )}
     </div>
   );
 };
 
-export default InventoryManager;
+export default Inventory;
