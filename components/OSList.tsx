@@ -100,6 +100,8 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const [showQuickMatModal, setShowQuickMatModal] = useState(false);
   const [quickMat, setQuickMat] = useState({ description: '', unit: 'Un', cost: '' });
 
+  const [isSavingItems, setIsSavingItems] = useState(false);
+
   const [newItem, setNewItem] = useState<{ id: string, qty: number | '', cost: number | '' }>({ id: '', qty: '', cost: '' });
   const [itemSearchTerm, setItemSearchTerm] = useState('');
   const [showDetailSuggestions, setShowDetailSuggestions] = useState(false); 
@@ -304,6 +306,21 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
 
       setNewItem({ id: '', qty: '', cost: '' });
       setItemSearchTerm('');
+  };
+
+  const handleSaveOSItems = async () => {
+      if (!selectedOS) return;
+      setIsSavingItems(true);
+      try {
+          const { error } = await supabase.from('oss').upsert(mapToSupabase(selectedOS));
+          if (error) throw error;
+          console.log('Itens da OS salvos com sucesso.');
+      } catch (e) {
+          console.error('Erro ao salvar itens da OS:', e);
+          alert('Erro ao salvar itens da OS no banco de dados.');
+      } finally {
+          setIsSavingItems(false);
+      }
   };
 
   const handleRemoveService = async (index: number) => {
@@ -1177,6 +1194,19 @@ Custo de Materiais e Serviços</label>
                                                 <input type="number" min="0.1" placeholder="Qtd" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium" value={newItem.qty} onChange={e => setNewItem({ ...newItem, qty: Number(e.target.value) })} />
                                             </div>
                                             <button onClick={handleAddItemToOS} className="h-10 px-5 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors">Adicionar</button>
+                                            <button
+                                                type=\"button\"
+                                                onClick={handleSaveOSItems}
+                                                disabled={isSavingItems}
+                                                className={`h-10 px-5 rounded-lg font-bold text-sm transition-colors border ${
+                                                    isSavingItems
+                                                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                                }`}
+                                                title=\"Salvar no banco os itens (materiais/serviços) desta OS\"
+                                            >
+                                                {isSavingItems ? 'Salvando...' : 'Salvar Itens'}
+                                            </button>
                                         </div>
                                     </div>
                                 )}
