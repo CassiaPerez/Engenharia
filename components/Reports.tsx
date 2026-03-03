@@ -2,7 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { Material, Project, StockMovement, OS, ServiceType, User, Building, Equipment, OSStatus } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { calculateProjectCosts, calculateOSCosts, groupCostsByCompany, buildExecutorHoursRows } from '../services/engine';
+import {
+  calculateProjectCosts,
+  calculateOSCosts,
+  groupCostsByCompany,
+  buildExecutorHoursRows,
+} from '../services/engine';
 
 interface Props {
   materials: Material[];
@@ -15,37 +20,6 @@ interface Props {
   equipments?: Equipment[];
 }
 
-type PauseEntry = {
-  timestamp: string;
-  reason?: string;
-  userId: string;
-  executorId?: string;
-  action: 'PAUSE' | 'RESUME';
-  worklogBeforePause?: string;
-};
-
-type ExecutorState = {
-  status?: 'OPEN' | 'IN_PROGRESS' | 'PAUSED' | 'DONE';
-  startedAt?: string;
-  currentPauseReason?: string;
-  pauseHistory?: PauseEntry[];
-};
-
-type ManualMaterialEntry = {
-  description: string;
-  quantity: number;
-  createdAt: string;
-  userId: string;
-  executorId?: string;
-};
-
-type OSAny = OS & {
-  executorIds?: string[];
-  executorId?: string;
-  executorStates?: Record<string, ExecutorState>;
-  manualMaterialsByExecutor?: Record<string, ManualMaterialEntry[]>;
-};
-
 const Reports: React.FC<Props> = ({
   materials,
   projects,
@@ -54,28 +28,26 @@ const Reports: React.FC<Props> = ({
   services,
   users = [],
   buildings = [],
-  equipments = []
+  equipments = [],
 }) => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedEquipment, setSelectedEquipment] = useState('');
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
+  const [selectedExecutor, setSelectedExecutor] = useState<string>('');
 
   const formatCurrency = (val: number) =>
     val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  const formatPeriodLabel = () => {
-    if (!dateFrom && !dateTo) return 'Período: Início até Hoje';
-    return `Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`;
-  };
 
   const applyFilters = (data: any[]) => {
     let filtered = [...data];
 
     if (dateFrom || dateTo) {
       filtered = filtered.filter((item: any) => {
-        const itemDate = new Date(item.openDate || item.date || item.startDate || item.startTime || item.createdAt);
+        const itemDate = new Date(
+          item.openDate || item.date || item.startDate || item.endTime || item.limitDate || item.createdAt
+        );
         if (dateFrom && itemDate < new Date(dateFrom)) return false;
         if (dateTo && itemDate > new Date(dateTo + 'T23:59:59')) return false;
         return true;
@@ -97,42 +69,176 @@ const Reports: React.FC<Props> = ({
     return filtered;
   };
 
-  const filteredOSs = useMemo(() => applyFilters(oss as any[]), [oss, dateFrom, dateTo, selectedEquipment, selectedBuilding, selectedProject]);
-  const filteredMovements = useMemo(() => applyFilters(movements as any[]), [movements, dateFrom, dateTo, selectedEquipment, selectedBuilding, selectedProject]);
-  const filteredProjects = useMemo(() => {
-    if (!selectedProject) return projects;
-    return projects.filter(p => p.id === selectedProject);
-  }, [projects, selectedProject]);
+  // ------------------------------------
+  // Helpers para Executor Report (PDF)
+  // ------------------------------------
+
+  const getExecutorName = (idOrEmail?: string) => {
+    if (!idOrEmail) return 'Executor';
+    const u = users.find(x => x.id === idOrEmail) || users.find(x => x.email === idOrEmail);
+    return u?.name || idOrEmail;
+  };
+
+  const normalizeExecutorKey = (idOrEmail: string) => {
+    const u = users.find(x => x.id === idOrEmail) || users.find(x => x.email === idOrEmail);
+    return { id: u?.id || idOrEmail, email: u?.email || idOrEmail };
+  };
+
+  const isOsForExecutor = (os: OS, executorIdOrEmail: string) => {
+    if (!executorIdOrEmail) return true;
+    const { id, email } = normalizeExecutorKey(executorIdOrEmail);
+
+    const legacy = os.executorId === id || os.executorId === email;
+    const multi = (os.executorIds || []).includes(id) || (os.executorIds || []).includes(email);
+    return legacy || multi;
+  };
+
+  const getExecutorPauseText = (os: OS, executorIdOrEmail: string) => {
+    const anyOs: any = os as any;
+    const { id, email } = normalizeExecutorKey(executorIdOrEmail);
+
+    // novo modelo: executorStates[id/email].pauseHistory
+    const states = anyOs.executorStates || {};
+    const st = states[id] || states[email];
+    const pauseHistory = (st?.pauseHistory || []) as any[];
+
+    // legado: pauseHistory global
+    const legacy = (anyOs.pauseHistory || []) as any[];
+
+    const entries = (pauseHistory.length ? pauseHistory : legacy).slice(-10);
+    if (!entries.length) return '-';
+
+    return entries
+      .map((p: any) => {
+        const d = p.timestamp ? new Date(p.timestamp).toLocaleString('pt-BR') : '';
+        const reason = p.reason || '';
+        const act = p.action || '';
+        const worklog = p.worklogBeforePause ? ` | Feito: ${p.worklogBeforePause}` : '';
+        return `${d} ${act} - ${reason}${worklog}`.trim();
+      })
+      .join('\n');
+  };
+
+  const getExecutorManualMaterials = (os: OS, executorIdOrEmail: string) => {
+    /**
+     * ⚠️ Ajuste se você já tem um campo exato.
+     * Essa função tenta várias estruturas comuns.
+     */
+    const anyOs: any = os as any;
+    const { id, email } = normalizeExecutorKey(executorIdOrEmail);
+
+    // 1) os.executorManualMaterials[executorId] = [{ description, quantity, unit? }]
+    const v1 = anyOs.executorManualMaterials?.[id] || anyOs.executorManualMaterials?.[email];
+    if (Array.isArray(v1)) return v1;
+
+    // 2) os.executorAddedMaterials[executorId] = [...]
+    const v2 = anyOs.executorAddedMaterials?.[id] || anyOs.executorAddedMaterials?.[email];
+    if (Array.isArray(v2)) return v2;
+
+    // 3) os.manualMaterials = [{ description, quantity, unit?, executorId }]
+    const v3 = anyOs.manualMaterials;
+    if (Array.isArray(v3)) {
+      const list = v3.filter((m: any) => m.executorId === id || m.executorId === email);
+      if (list.length) return list;
+    }
+
+    // 4) fallback comum
+    const guess = anyOs.manualItems || anyOs.manualStock || anyOs.manualMaterialsByExecutor;
+    if (Array.isArray(guess)) {
+      const list = guess.filter((m: any) => m.executorId === id || m.executorId === email);
+      if (list.length) return list;
+    }
+
+    return [];
+  };
+
+  const getEvidence = (os: OS): string | null => {
+    const anyOs: any = os as any;
+    return (
+      anyOs.completionImage ||
+      anyOs.completionImageUrl ||
+      anyOs.evidenceImage ||
+      anyOs.evidenceUrl ||
+      anyOs.image ||
+      null
+    );
+  };
+
+  const loadImageAsDataUrl = (src: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      try {
+        if (!src) return resolve(null);
+        if (src.startsWith('data:image/')) return resolve(src);
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return resolve(null);
+            ctx.drawImage(img, 0, 0);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            resolve(dataUrl);
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = src;
+      } catch {
+        resolve(null);
+      }
+    });
+  };
+
+  const addHeader = (doc: jsPDF, title: string, subtitleRight?: string) => {
+    const isLandscape = (doc as any).internal?.pageSize?.getWidth?.() > (doc as any).internal?.pageSize?.getHeight?.();
+    const w = isLandscape ? 297 : 210;
+
+    doc.setFillColor(50, 60, 70);
+    doc.rect(0, 0, w, 24, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, 14, 16);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    if (subtitleRight) doc.text(subtitleRight, w - 14, 16, { align: 'right' });
+
+    if (dateFrom || dateTo) {
+      doc.setFontSize(8);
+      doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, w - 14, 20, { align: 'right' });
+    }
+
+    doc.setTextColor(0, 0, 0);
+  };
+
+  // ------------------------------------
+  // Relatórios: Materiais / Projetos / Fluxo / Custos Operacionais (seus)
+  // ------------------------------------
 
   const generateMaterialReport = () => {
     const doc = new jsPDF();
     const today = new Date().toLocaleDateString('pt-BR');
+    const filteredMovements = applyFilters(movements);
 
-    doc.setFillColor(71, 122, 127);
-    doc.rect(0, 0, 210, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('RELATÓRIO DE GASTOS POR MATERIAL', 14, 16);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Gerado em: ${today}`, 196, 16, { align: 'right' });
-
-    doc.setFontSize(8);
-    doc.text(formatPeriodLabel(), 196, 20, { align: 'right' });
+    addHeader(doc, 'RELATÓRIO DE GASTOS POR MATERIAL', `Gerado em: ${today}`);
 
     const materialStats = materials
       .map(mat => {
-        const outMovements = filteredMovements.filter((m: any) => m.materialId === mat.id && m.type === 'OUT');
-        const totalQtyOut = outMovements.reduce((acc: number, m: any) => acc + (m.quantity || 0), 0);
-        const totalCostOut = totalQtyOut * (mat.unitCost || 0);
+        const outMovements = filteredMovements.filter(m => m.materialId === mat.id && m.type === 'OUT');
+        const totalQtyOut = outMovements.reduce((acc, m) => acc + m.quantity, 0);
+        const totalCostOut = totalQtyOut * mat.unitCost;
         return {
           code: mat.code,
           description: mat.description,
           unit: mat.unit,
           qtyOut: totalQtyOut,
-          unitCost: mat.unitCost || 0,
-          totalCost: totalCostOut
+          unitCost: mat.unitCost,
+          totalCost: totalCostOut,
         };
       })
       .filter(i => i.qtyOut > 0)
@@ -145,7 +251,7 @@ const Reports: React.FC<Props> = ({
       i.description,
       `${i.qtyOut} ${i.unit}`,
       `R$ ${formatCurrency(i.unitCost)}`,
-      `R$ ${formatCurrency(i.totalCost)}`
+      `R$ ${formatCurrency(i.totalCost)}`,
     ]);
 
     rows.push(['', 'TOTAL GERAL GASTO', '', '', `R$ ${formatCurrency(totalGeneral)}`]);
@@ -155,18 +261,14 @@ const Reports: React.FC<Props> = ({
       head: [['Código', 'Descrição', 'Qtd Consumida', 'Custo Médio', 'Custo Total']],
       body: rows,
       styles: { fontSize: 9 },
-      headStyles: { fillColor: [71, 122, 127] },
-      columnStyles: {
-        2: { halign: 'right' },
-        3: { halign: 'right' },
-        4: { halign: 'right', fontStyle: 'bold' }
-      },
+      headStyles: { fillColor: [50, 60, 70] },
+      columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right', fontStyle: 'bold' } },
       didParseCell: (data) => {
         if (data.row.index === rows.length - 1) {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.fillColor = [240, 240, 240];
         }
-      }
+      },
     });
 
     doc.save(`Relatorio_Materiais_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -176,38 +278,33 @@ const Reports: React.FC<Props> = ({
     const doc = new jsPDF({ orientation: 'landscape' });
     const today = new Date().toLocaleDateString('pt-BR');
 
-    doc.setFillColor(71, 122, 127);
-    doc.rect(0, 0, 297, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('RELATÓRIO DE CUSTOS POR PROJETO (OS + BAIXA DIRETA)', 14, 16);
-    doc.setFontSize(10);
-    doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+    const filteredProjects = selectedProject ? projects.filter(p => p.id === selectedProject) : projects;
+    const filteredOSs = applyFilters(oss);
+    const filteredMovements = applyFilters(movements);
 
-    doc.setFontSize(8);
-    doc.text(formatPeriodLabel(), 280, 20, { align: 'right' });
+    addHeader(doc, 'RELATÓRIO DE CUSTOS POR PROJETO (OS + BAIXA DIRETA)', `Gerado em: ${today}`);
 
     const projectStats = filteredProjects.map(proj => {
       const osCosts = calculateProjectCosts(proj, filteredOSs, materials, services);
 
-      const directMovements = filteredMovements.filter((m: any) => m.projectId === proj.id && m.type === 'OUT');
-      const directMaterialCost = directMovements.reduce((acc: number, m: any) => {
+      const directMovements = filteredMovements.filter(m => m.projectId === proj.id && m.type === 'OUT');
+      const directMaterialCost = directMovements.reduce((acc, m) => {
         const mat = materials.find(mt => mt.id === m.materialId);
-        return acc + (m.quantity || 0) * ((mat?.unitCost || 0) as number);
+        return acc + (m.quantity * (mat?.unitCost || 0));
       }, 0);
 
-      const totalReal = (osCosts.totalReal || 0) + directMaterialCost;
+      const totalReal = osCosts.totalReal + directMaterialCost;
+      const totalMaterials = osCosts.totalMaterials + directMaterialCost;
 
       return {
         code: proj.code,
         desc: proj.description,
-        status: (proj as any).status,
-        budget: (proj as any).estimatedValue || 0,
-        osMaterial: osCosts.totalMaterials || 0,
+        status: proj.status,
+        budget: proj.estimatedValue,
+        osMaterial: totalMaterials,
         directMaterial: directMaterialCost,
-        services: osCosts.totalServices || 0,
-        total: totalReal
+        services: osCosts.totalServices,
+        total: totalReal,
       };
     });
 
@@ -219,7 +316,7 @@ const Reports: React.FC<Props> = ({
       `R$ ${formatCurrency(p.osMaterial)}`,
       `R$ ${formatCurrency(p.directMaterial)}`,
       `R$ ${formatCurrency(p.services)}`,
-      `R$ ${formatCurrency(p.total)}`
+      `R$ ${formatCurrency(p.total)}`,
     ]);
 
     const grandTotal = projectStats.reduce((acc, p) => acc + p.total, 0);
@@ -230,20 +327,20 @@ const Reports: React.FC<Props> = ({
       head: [['Código', 'Projeto', 'Status', 'Budget', 'Mat. via OS', 'Mat. Direto', 'Serviços', 'Custo Total']],
       body: rows,
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [71, 122, 127] },
+      headStyles: { fillColor: [50, 60, 70] },
       columnStyles: {
         3: { halign: 'right' },
         4: { halign: 'right' },
         5: { halign: 'right', fontStyle: 'bold', textColor: [100, 100, 100] },
         6: { halign: 'right' },
-        7: { halign: 'right', fontStyle: 'bold' }
+        7: { halign: 'right', fontStyle: 'bold' },
       },
       didParseCell: (data) => {
         if (data.row.index === rows.length - 1) {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.fillColor = [240, 240, 240];
         }
-      }
+      },
     });
 
     doc.save(`Relatorio_Projetos_Consolidado_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -253,28 +350,27 @@ const Reports: React.FC<Props> = ({
     const doc = new jsPDF({ orientation: 'landscape' });
     const today = new Date().toLocaleDateString('pt-BR');
 
-    doc.setFillColor(50, 60, 70);
-    doc.rect(0, 0, 297, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('FLUXO DE ESTOQUE DETALHADO (ENTRADA / SAÍDA)', 14, 16);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+    addHeader(doc, 'FLUXO DE ESTOQUE DETALHADO (ENTRADA / SAÍDA)', `Gerado em: ${today}`);
 
-    doc.setFontSize(8);
-    doc.text(formatPeriodLabel(), 280, 20, { align: 'right' });
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? new Date(dateTo) : null;
 
-    const sortedMovements = [...filteredMovements].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const periodMovements = movements.filter(m => {
+      const d = new Date(m.date);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
 
-    const rows = sortedMovements.map((m: any) => {
+    const sortedMovements = [...periodMovements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const rows = sortedMovements.map(m => {
       const mat = materials.find(mt => mt.id === m.materialId);
       const userName = users.find(u => u.id === m.userId)?.name || 'Sistema / Importação';
 
       let reference = '-';
       if (m.osId) {
-        const osRef = (oss as any[]).find((o: any) => o.id === m.osId);
+        const osRef = oss.find(o => o.id === m.osId);
         reference = `OS: ${osRef?.number || m.osId}`;
       } else if (m.projectId) {
         const p = projects.find(proj => proj.id === m.projectId);
@@ -282,14 +378,14 @@ const Reports: React.FC<Props> = ({
       }
 
       return [
-        new Date(m.date).toLocaleString(),
+        new Date(m.date).toLocaleString('pt-BR'),
         m.type,
         mat?.code || '???',
         mat?.description || 'Item excluído',
         m.quantity,
-        (m.type === 'OUT' || m.type === 'PROJECT_OUT') ? userName : '-',
+        m.type === 'OUT' || m.type === 'PROJECT_OUT' ? userName : '-',
         reference,
-        m.description
+        (m as any).description || '-',
       ];
     });
 
@@ -302,7 +398,7 @@ const Reports: React.FC<Props> = ({
       columnStyles: {
         1: { fontStyle: 'bold' },
         4: { halign: 'right', fontStyle: 'bold' },
-        5: { fontStyle: 'bold', textColor: [20, 100, 200] }
+        5: { fontStyle: 'bold', textColor: [20, 100, 200] },
       },
       didParseCell: (data) => {
         if (data.column.index === 1) {
@@ -310,7 +406,7 @@ const Reports: React.FC<Props> = ({
           if (type === 'IN') data.cell.styles.textColor = [0, 150, 0];
           if (type === 'OUT') data.cell.styles.textColor = [200, 0, 0];
         }
-      }
+      },
     });
 
     doc.save(`Fluxo_Estoque_Detalhado_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -320,18 +416,11 @@ const Reports: React.FC<Props> = ({
     const doc = new jsPDF();
     const today = new Date().toLocaleDateString('pt-BR');
 
-    doc.setFillColor(71, 122, 127);
-    doc.rect(0, 0, 210, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('RELATÓRIO DE CUSTOS OPERACIONAIS (OS & ATIVOS)', 14, 16);
-    doc.setFontSize(10);
-    doc.text(`Gerado em: ${today}`, 196, 16, { align: 'right' });
+    addHeader(doc, 'RELATÓRIO DE CUSTOS OPERACIONAIS (OS & ATIVOS)', `Gerado em: ${today}`);
 
     let yPos = 35;
 
-    doc.setTextColor(0);
+    // 1. CUSTOS POR EDIFÍCIO
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('1. CUSTOS POR EDIFÍCIO (FACILITIES)', 14, yPos);
@@ -339,13 +428,13 @@ const Reports: React.FC<Props> = ({
 
     const buildingCosts = buildings
       .map(b => {
-        const relatedOS = (filteredOSs as any[]).filter((o: any) => o.buildingId === b.id && o.status !== 'CANCELED');
-        const totalCost = relatedOS.reduce((acc: number, os: any) => acc + (calculateOSCosts(os, materials, services).totalCost || 0), 0);
-        return [b.name, (b as any).city, relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
+        const relatedOS = oss.filter(o => o.buildingId === b.id && o.status !== 'CANCELED');
+        const totalCost = relatedOS.reduce((acc, os) => acc + calculateOSCosts(os, materials, services).totalCost, 0);
+        return [b.name, b.city, relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
       })
       .sort((a, b) => {
-        const valA = parseFloat(String(a[3]).replace('R$ ', '').replace('.', '').replace(',', '.'));
-        const valB = parseFloat(String(b[3]).replace('R$ ', '').replace('.', '').replace(',', '.'));
+        const valA = parseFloat(String(a[3]).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+        const valB = parseFloat(String(b[3]).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
         return valB - valA;
       });
 
@@ -355,23 +444,24 @@ const Reports: React.FC<Props> = ({
       body: buildingCosts,
       styles: { fontSize: 9 },
       headStyles: { fillColor: [50, 80, 120] },
-      columnStyles: { 2: { halign: 'center' }, 3: { halign: 'right', fontStyle: 'bold' } }
+      columnStyles: { 2: { halign: 'center' }, 3: { halign: 'right', fontStyle: 'bold' } },
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
+    // 2. CUSTOS POR EQUIPAMENTO
     doc.text('2. CUSTOS POR EQUIPAMENTO (MANUTENÇÃO)', 14, yPos);
     yPos += 5;
 
     const equipmentCosts = equipments
       .map(eq => {
-        const relatedOS = (filteredOSs as any[]).filter((o: any) => o.equipmentId === eq.id && o.status !== 'CANCELED');
-        const totalCost = relatedOS.reduce((acc: number, os: any) => acc + (calculateOSCosts(os, materials, services).totalCost || 0), 0);
-        return [(eq as any).code, eq.name, (eq as any).status, relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
+        const relatedOS = oss.filter(o => o.equipmentId === eq.id && o.status !== 'CANCELED');
+        const totalCost = relatedOS.reduce((acc, os) => acc + calculateOSCosts(os, materials, services).totalCost, 0);
+        return [eq.code, eq.name, (eq as any).status || '-', relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
       })
       .sort((a, b) => {
-        const valA = parseFloat(String(a[4]).replace('R$ ', '').replace('.', '').replace(',', '.'));
-        const valB = parseFloat(String(b[4]).replace('R$ ', '').replace('.', '').replace(',', '.'));
+        const valA = parseFloat(String(a[4]).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
+        const valB = parseFloat(String(b[4]).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
         return valB - valA;
       });
 
@@ -381,7 +471,7 @@ const Reports: React.FC<Props> = ({
       body: equipmentCosts,
       styles: { fontSize: 9 },
       headStyles: { fillColor: [120, 80, 50] },
-      columnStyles: { 3: { halign: 'center' }, 4: { halign: 'right', fontStyle: 'bold' } }
+      columnStyles: { 3: { halign: 'center' }, 4: { halign: 'right', fontStyle: 'bold' } },
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
@@ -394,52 +484,43 @@ const Reports: React.FC<Props> = ({
     doc.text('3. TOP 30 ORDENS DE SERVIÇO MAIS CARAS', 14, yPos);
     yPos += 5;
 
-    const osCosts = (filteredOSs as any[])
-      .filter((o: any) => o.status !== 'CANCELED')
-      .map((o: any) => {
+    const osCosts = oss
+      .filter(o => o.status !== 'CANCELED')
+      .map(o => {
         const costs = calculateOSCosts(o, materials, services);
-        return { ...o, total: costs.totalCost || 0 };
+        return { ...o, total: costs.totalCost };
       })
       .sort((a: any, b: any) => b.total - a.total)
       .slice(0, 30)
-      .map((o: any) => [
+      .map(o => [
         o.number,
         (o.description || '').substring(0, 40) + '...',
         o.type,
-        `R$ ${formatCurrency(o.total)}`
+        `R$ ${formatCurrency((o as any).total)}`,
       ]);
 
     autoTable(doc, {
       startY: yPos,
       head: [['Número OS', 'Descrição', 'Tipo', 'Custo Total']],
-      body: osCosts,
+      body: osCosts as any[],
       styles: { fontSize: 8 },
       headStyles: { fillColor: [80, 80, 80] },
-      columnStyles: { 3: { halign: 'right', fontStyle: 'bold' } }
+      columnStyles: { 3: { halign: 'right', fontStyle: 'bold' } },
     });
 
     doc.save(`Custos_Operacionais_Analitico_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  // ✅ JÁ ARRUMADO: funções que estavam fora do componente e quebravam (dateFrom/dateTo undefined)
+  // ------------------------------------
+  // ✅ Relatório: Horas por Executor (tabela)
+  // ------------------------------------
   const generateExecutorHoursReport = () => {
     const doc = new jsPDF({ orientation: 'landscape' });
     const today = new Date().toLocaleString('pt-BR');
 
-    doc.setFillColor(50, 60, 70);
-    doc.rect(0, 0, 297, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('RELATÓRIO DE HORAS POR EXECUTOR', 14, 16);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+    addHeader(doc, 'RELATÓRIO DE HORAS POR EXECUTOR', `Gerado em: ${today}`);
 
-    doc.setFontSize(8);
-    doc.text(formatPeriodLabel(), 280, 20, { align: 'right' });
-
-    const rowsData = buildExecutorHoursRows(filteredOSs as any, users || [], dateFrom, dateTo).map((r: any) => ([
+    const rowsData = buildExecutorHoursRows(oss, users || [], dateFrom, dateTo).map(r => [
       r.executorName,
       r.osNumber,
       r.startTime ? new Date(r.startTime).toLocaleString('pt-BR') : '-',
@@ -447,12 +528,12 @@ const Reports: React.FC<Props> = ({
       Number(r.grossHours || 0).toFixed(2),
       Number(r.pausedHours || 0).toFixed(2),
       Number(r.netHours || 0).toFixed(2),
-    ]));
+    ]);
 
     autoTable(doc, {
       startY: 30,
       head: [['Executor', 'OS', 'Início', 'Fim', 'Horas Brutas', 'Horas Pausadas', 'Horas Líquidas']],
-      body: rowsData,
+      body: rowsData as any[],
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [30, 41, 59] },
     });
@@ -460,36 +541,38 @@ const Reports: React.FC<Props> = ({
     doc.save(`relatorio_horas_executor_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
+  // ------------------------------------
+  // ✅ Relatório: Custo por Empresa (tabela)
+  // ------------------------------------
   const generateCompanyCostReport = () => {
     const doc = new jsPDF({ orientation: 'portrait' });
     const today = new Date().toLocaleString('pt-BR');
 
-    doc.setFillColor(50, 60, 70);
-    doc.rect(0, 0, 210, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('RELATÓRIO DE CUSTO POR EMPRESA', 14, 16);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Gerado em: ${today}`, 196, 16, { align: 'right' });
+    addHeader(doc, 'RELATÓRIO DE CUSTO POR EMPRESA', `Gerado em: ${today}`);
 
-    doc.setFontSize(8);
-    doc.text(formatPeriodLabel(), 196, 20, { align: 'right' });
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to = dateTo ? new Date(dateTo) : null;
 
-    const grouped = groupCostsByCompany(filteredOSs as any, materials, services, equipments || [], projects);
+    const periodOS = oss.filter(o => {
+      const d = new Date(o.openDate || o.startTime || o.limitDate || o.endTime || new Date().toISOString());
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
 
-    const rows = grouped.map((g: any) => ([
+    const grouped = groupCostsByCompany(periodOS, materials, services, equipments || [], projects);
+
+    const rows = grouped.map(g => [
       g.company,
       `R$ ${formatCurrency(g.material)}`,
       `R$ ${formatCurrency(g.service)}`,
-      `R$ ${formatCurrency(g.total)}`
-    ]));
+      `R$ ${formatCurrency(g.total)}`,
+    ]);
 
     autoTable(doc, {
       startY: 30,
       head: [['Empresa', 'Materiais', 'Serviços', 'Total']],
-      body: rows,
+      body: rows as any[],
       styles: { fontSize: 9, cellPadding: 2 },
       headStyles: { fillColor: [30, 41, 59] },
     });
@@ -497,116 +580,176 @@ const Reports: React.FC<Props> = ({
     doc.save(`relatorio_custo_empresa_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
-  // ✅ NOVO: Relatório que mostra TAREFAS + PAUSAS + MATERIAIS MANUAIS POR EXECUTOR
-  const generateExecutorTasksAndManualMaterialsReport = () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
+  // ------------------------------------
+  // ✅ NOVO: Relatório por Executor (com evidências/imagens)
+  // ------------------------------------
+  const generateExecutorReportWithEvidence = async () => {
+    const doc = new jsPDF({ orientation: 'portrait' });
     const today = new Date().toLocaleString('pt-BR');
 
-    doc.setFillColor(17, 24, 39);
-    doc.rect(0, 0, 297, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('RELATÓRIO DE EXECUÇÃO POR EXECUTOR (TAREFAS + PAUSAS + MATERIAIS)', 14, 16);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Gerado em: ${today}`, 280, 16, { align: 'right' });
+    addHeader(doc, 'RELATÓRIO POR EXECUTOR (COM EVIDÊNCIAS)', `Gerado em: ${today}`);
 
-    doc.setFontSize(8);
-    doc.text(formatPeriodLabel(), 280, 20, { align: 'right' });
+    // filtra OS por período/contexto
+    const filteredOS = applyFilters(oss);
 
-    const getUserName = (key: string) => {
-      const u = users.find(x => (x as any).id === key || (x as any).email === key);
-      return u?.name || key;
-    };
+    // se selecionar executor, restringe a ele, senão agrupa todos
+    const executorKeys = (() => {
+      if (selectedExecutor) {
+        const { id, email } = normalizeExecutorKey(selectedExecutor);
+        return Array.from(new Set([id, email].filter(Boolean)));
+      }
 
-    const getExecutorKeys = (osAny: OSAny) => {
-      const ids =
-        (osAny.executorIds && osAny.executorIds.length > 0)
-          ? osAny.executorIds
-          : (osAny.executorId ? [osAny.executorId] : []);
-      return Array.from(new Set(ids));
-    };
+      // pega executores presentes em oss: executorId + executorIds
+      const set = new Set<string>();
+      filteredOS.forEach(o => {
+        if (o.executorId) set.add(o.executorId);
+        (o.executorIds || []).forEach(x => x && set.add(x));
+      });
+      return Array.from(set);
+    })();
 
-    const rows: any[] = [];
+    let y = 32;
 
-    (filteredOSs as any as OSAny[])
-      .filter(o => o.status !== OSStatus.CANCELED)
-      .forEach((osAny) => {
-        const keys = getExecutorKeys(osAny);
-        const number = (osAny as any).number;
-        const desc = (osAny as any).description || '';
-        const status = (osAny as any).status;
+    const maxOsPerExecutorWithImages = 30;
 
-        keys.forEach((k) => {
-          const st = osAny.executorStates?.[k];
-          const pauses = (st?.pauseHistory || []) as PauseEntry[];
+    for (const execKey of executorKeys) {
+      // pega os que pertencem ao executor e concluídas (para evidência e tarefas feitas)
+      const osForExec = filteredOS
+        .filter(o => isOsForExecutor(o, execKey))
+        .filter(o => o.status === OSStatus.COMPLETED || (o as any).endTime); // garante "realizadas"
 
-          const pauseCount = pauses.filter(p => p.action === 'PAUSE').length;
+      if (!osForExec.length) continue;
 
-          const worklogs = pauses
-            .filter(p => p.action === 'PAUSE' && p.worklogBeforePause)
-            .map(p => `• ${new Date(p.timestamp).toLocaleString('pt-BR')}: ${p.worklogBeforePause}`)
-            .join('\n');
+      // quebra página se necessário
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
 
-          const mats = (osAny.manualMaterialsByExecutor?.[k] || []) as ManualMaterialEntry[];
-          const matsTxt = mats.length
-            ? mats.map(m => `• ${m.description} (${m.quantity})`).join('\n')
-            : '';
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text(`Executor: ${getExecutorName(execKey)}`, 14, y);
+      y += 6;
 
-          rows.push([
-            getUserName(k),
-            number,
-            desc.substring(0, 60),
-            status,
-            st?.startedAt ? new Date(st.startedAt).toLocaleString('pt-BR') : ((osAny as any).startTime ? new Date((osAny as any).startTime).toLocaleString('pt-BR') : '-'),
-            (osAny as any).endTime ? new Date((osAny as any).endTime).toLocaleString('pt-BR') : '-',
-            pauseCount,
-            worklogs || '-',
-            matsTxt || '-'
-          ]);
-        });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`Qtd OS concluídas no filtro: ${osForExec.length}`, 14, y);
+      y += 6;
+
+      // tabela resumo por executor
+      const tableRows = osForExec.slice(0, maxOsPerExecutorWithImages).map(o => {
+        const manualMats = getExecutorManualMaterials(o, execKey);
+        const manualText = manualMats.length
+          ? manualMats
+              .map((m: any) => {
+                const desc = m.description || m.desc || m.name || 'Material';
+                const qty = m.quantity ?? m.qty ?? 0;
+                const unit = m.unit ? ` ${m.unit}` : '';
+                return `${desc} (${qty}${unit})`;
+              })
+              .join('; ')
+          : '-';
+
+        const pauses = getExecutorPauseText(o, execKey);
+
+        return [
+          o.number || '-',
+          (o.description || '').substring(0, 50),
+          o.startTime ? new Date(o.startTime).toLocaleString('pt-BR') : (o.openDate ? new Date(o.openDate).toLocaleString('pt-BR') : '-'),
+          o.endTime ? new Date(o.endTime).toLocaleString('pt-BR') : '-',
+          pauses,
+          manualText,
+        ];
       });
 
-    if (rows.length === 0) {
-      doc.setTextColor(0);
-      doc.setFontSize(12);
-      doc.text('Nenhum dado encontrado para os filtros informados.', 14, 40);
-      doc.save(`relatorio_execucao_executor_${new Date().toISOString().slice(0, 10)}.pdf`);
-      return;
+      autoTable(doc, {
+        startY: y,
+        head: [['OS', 'Descrição', 'Início', 'Fim', 'Pausas (últimas)', 'Materiais manuais (executor)']],
+        body: tableRows as any[],
+        styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
+        headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 18 },
+          1: { cellWidth: 45 },
+          2: { cellWidth: 28 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 38 },
+          5: { cellWidth: 38 },
+        },
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 8;
+
+      // seção de evidências (imagens)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('Evidências (imagens de finalização):', 14, y);
+      y += 6;
+
+      const osWithEvidence = osForExec
+        .map(o => ({ os: o, ev: getEvidence(o) }))
+        .filter(x => !!x.ev)
+        .slice(0, maxOsPerExecutorWithImages);
+
+      if (!osWithEvidence.length) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text('-', 14, y);
+        y += 8;
+      } else {
+        for (const item of osWithEvidence) {
+          const os = item.os;
+          const ev = item.ev as string;
+
+          if (y > 250) {
+            doc.addPage();
+            y = 20;
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.text(`OS ${os.number || '-'} - ${(os.description || '').substring(0, 60)}`, 14, y);
+          y += 4;
+
+          // tenta carregar imagem como dataURL
+          const dataUrl = await loadImageAsDataUrl(ev);
+
+          if (!dataUrl) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.text(`(Não foi possível carregar a imagem. Ref: ${ev})`, 14, y);
+            y += 8;
+            continue;
+          }
+
+          // desenha miniatura
+          const imgW = 80;
+          const imgH = 45;
+          try {
+            doc.addImage(dataUrl, 'JPEG', 14, y, imgW, imgH);
+            y += imgH + 8;
+          } catch {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.text(`(Erro ao inserir imagem no PDF. Ref: ${ev})`, 14, y);
+            y += 8;
+          }
+        }
+      }
+
+      // separador entre executores
+      y += 6;
+      doc.setDrawColor(220);
+      doc.line(14, y, 196, y);
+      y += 10;
     }
 
-    autoTable(doc, {
-      startY: 30,
-      head: [[
-        'Executor',
-        'OS',
-        'Descrição',
-        'Status',
-        'Início (Exec)',
-        'Fim (OS)',
-        'Qtd Pausas',
-        'O que foi feito (antes da pausa)',
-        'Materiais manuais'
-      ]],
-      body: rows,
-      styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
-      headStyles: { fillColor: [30, 41, 59] },
-      columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: 18 },
-        2: { cellWidth: 55 },
-        3: { cellWidth: 18 },
-        4: { cellWidth: 28 },
-        5: { cellWidth: 28 },
-        6: { cellWidth: 18, halign: 'center' },
-        7: { cellWidth: 55 },
-        8: { cellWidth: 40 }
-      }
-    });
-
-    doc.save(`relatorio_execucao_executor_${new Date().toISOString().slice(0, 10)}.pdf`);
+    doc.save(`relatorio_executor_evidencias_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
+
+  // -----------------------------
+  // UI
+  // -----------------------------
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -620,7 +763,8 @@ const Reports: React.FC<Props> = ({
           <i className="fas fa-filter text-blue-600"></i>
           Filtros de Período e Contexto
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data Inicial</label>
             <input
@@ -630,6 +774,7 @@ const Reports: React.FC<Props> = ({
               onChange={e => setDateFrom(e.target.value)}
             />
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data Final</label>
             <input
@@ -639,6 +784,7 @@ const Reports: React.FC<Props> = ({
               onChange={e => setDateTo(e.target.value)}
             />
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Equipamento</label>
             <select
@@ -648,10 +794,13 @@ const Reports: React.FC<Props> = ({
             >
               <option value="">Todos</option>
               {equipments.map(eq => (
-                <option key={eq.id} value={eq.id}>{eq.name} - {(eq as any).code}</option>
+                <option key={eq.id} value={eq.id}>
+                  {eq.name} - {eq.code}
+                </option>
               ))}
             </select>
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Edifício/Setor</label>
             <select
@@ -661,10 +810,13 @@ const Reports: React.FC<Props> = ({
             >
               <option value="">Todos</option>
               {buildings.map(b => (
-                <option key={b.id} value={b.id}>{b.name} - {(b as any).city}</option>
+                <option key={b.id} value={b.id}>
+                  {b.name} - {b.city}
+                </option>
               ))}
             </select>
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Projeto</label>
             <select
@@ -674,8 +826,28 @@ const Reports: React.FC<Props> = ({
             >
               <option value="">Todos</option>
               {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.code} - {p.description}</option>
+                <option key={p.id} value={p.id}>
+                  {p.code} - {p.description}
+                </option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Executor</label>
+            <select
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={selectedExecutor}
+              onChange={e => setSelectedExecutor(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {users
+                .filter(u => (u as any).role === 'EXECUTOR' || (u as any).role === 'PRESTADOR' || (u as any).isExecutor)
+                .map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
             </select>
           </div>
         </div>
@@ -693,8 +865,11 @@ const Reports: React.FC<Props> = ({
             <i className="fas fa-cubes"></i>
           </div>
           <h3 className="font-bold text-lg text-slate-800 mb-2">Relatório de Materiais (Sintético)</h3>
-          <p className="text-slate-500 text-sm mb-6">Detalhamento de consumo total de itens do almoxarifado e custo médio.</p>
-          <button onClick={generateMaterialReport} className="mt-auto px-6 py-3 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 w-full justify-center">
+          <p className="text-slate-500 text-sm mb-6">Consumo total de itens do almoxarifado e custo médio.</p>
+          <button
+            onClick={generateMaterialReport}
+            className="mt-auto px-6 py-3 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 w-full justify-center"
+          >
             <i className="fas fa-file-pdf"></i> Gerar PDF
           </button>
         </div>
@@ -705,71 +880,90 @@ const Reports: React.FC<Props> = ({
             <i className="fas fa-folder-tree"></i>
           </div>
           <h3 className="font-bold text-lg text-slate-800 mb-2">Relatório de Projetos (Consolidado)</h3>
-          <p className="text-slate-500 text-sm mb-6">Custo total por projeto (Capex), incluindo materiais via OS, baixas diretas e serviços.</p>
-          <button onClick={generateProjectReport} className="mt-auto px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 transition-colors flex items-center gap-2 w-full justify-center">
+          <p className="text-slate-500 text-sm mb-6">Custo total por projeto incluindo materiais via OS, baixas diretas e serviços.</p>
+          <button
+            onClick={generateProjectReport}
+            className="mt-auto px-6 py-3 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 transition-colors flex items-center gap-2 w-full justify-center"
+          >
             <i className="fas fa-file-pdf"></i> Gerar PDF
           </button>
         </div>
 
-        {/* STOCK FLOW */}
+        {/* STOCK FLOW REPORT */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group">
           <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
             <i className="fas fa-exchange-alt"></i>
           </div>
           <h3 className="font-bold text-lg text-slate-800 mb-2">Fluxo de Estoque Detalhado</h3>
-          <p className="text-slate-500 text-sm mb-6">Entradas e saídas com identificação do <strong>responsável pela baixa</strong> e contexto (OS/Proj).</p>
-          <button onClick={generateStockFlowReport} className="mt-auto px-6 py-3 bg-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors flex items-center gap-2 w-full justify-center">
+          <p className="text-slate-500 text-sm mb-6">Entradas e saídas com responsável e contexto (OS/Proj).</p>
+          <button
+            onClick={generateStockFlowReport}
+            className="mt-auto px-6 py-3 bg-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors flex items-center gap-2 w-full justify-center"
+          >
             <i className="fas fa-file-pdf"></i> Gerar PDF
           </button>
         </div>
 
-        {/* COST CENTERS */}
+        {/* COST CENTERS REPORT */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group">
           <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
             <i className="fas fa-coins"></i>
           </div>
           <h3 className="font-bold text-lg text-slate-800 mb-2">Custos Operacionais (Analítico)</h3>
-          <p className="text-slate-500 text-sm mb-6">Gastos por <strong>Edifício</strong>, <strong>Equipamento</strong> e ranking de <strong>OS</strong>.</p>
-          <button onClick={generateCostCenterReport} className="mt-auto px-6 py-3 bg-purple-600 text-white rounded-lg font-bold text-sm hover:bg-purple-700 transition-colors flex items-center gap-2 w-full justify-center">
+          <p className="text-slate-500 text-sm mb-6">Gastos por Edifício, Equipamento e ranking de OS.</p>
+          <button
+            onClick={generateCostCenterReport}
+            className="mt-auto px-6 py-3 bg-purple-600 text-white rounded-lg font-bold text-sm hover:bg-purple-700 transition-colors flex items-center gap-2 w-full justify-center"
+          >
             <i className="fas fa-file-pdf"></i> Gerar PDF
           </button>
         </div>
 
-        {/* HOURS BY EXECUTOR */}
+        {/* EXECUTOR HOURS REPORT */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group">
-          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+          <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
             <i className="fas fa-user-clock"></i>
           </div>
           <h3 className="font-bold text-lg text-slate-800 mb-2">Horas por Executor</h3>
-          <p className="text-slate-500 text-sm mb-6">Consolidado de início/fim, horas pausadas e horas líquidas (por executor).</p>
-          <button onClick={generateExecutorHoursReport} className="mt-auto px-6 py-3 bg-amber-600 text-white rounded-lg font-bold text-sm hover:bg-amber-700 transition-colors flex items-center gap-2 w-full justify-center">
+          <p className="text-slate-500 text-sm mb-6">Horas brutas, pausadas e líquidas por OS/executor.</p>
+          <button
+            onClick={generateExecutorHoursReport}
+            className="mt-auto px-6 py-3 bg-orange-600 text-white rounded-lg font-bold text-sm hover:bg-orange-700 transition-colors flex items-center gap-2 w-full justify-center"
+          >
             <i className="fas fa-file-pdf"></i> Gerar PDF
           </button>
         </div>
 
-        {/* COST BY COMPANY */}
+        {/* COMPANY COST REPORT */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group">
           <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
             <i className="fas fa-building"></i>
           </div>
           <h3 className="font-bold text-lg text-slate-800 mb-2">Custo por Empresa</h3>
-          <p className="text-slate-500 text-sm mb-6">Totais segmentados por empresa (materiais, serviços e total).</p>
-          <button onClick={generateCompanyCostReport} className="mt-auto px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors flex items-center gap-2 w-full justify-center">
+          <p className="text-slate-500 text-sm mb-6">Total de materiais e serviços agrupados por empresa.</p>
+          <button
+            onClick={generateCompanyCostReport}
+            className="mt-auto px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors flex items-center gap-2 w-full justify-center"
+          >
             <i className="fas fa-file-pdf"></i> Gerar PDF
           </button>
         </div>
 
-        {/* ✅ NOVO: EXECUTOR TASKS + MANUAL MATERIALS */}
+        {/* ✅ EXECUTOR REPORT WITH EVIDENCE */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group md:col-span-2">
-          <div className="w-12 h-12 bg-slate-900 text-white rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
-            <i className="fas fa-clipboard-check"></i>
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+            <i className="fas fa-images"></i>
           </div>
-          <h3 className="font-bold text-lg text-slate-800 mb-2">Execução por Executor (Tarefas + Pausas + Materiais)</h3>
+          <h3 className="font-bold text-lg text-slate-800 mb-2">Relatório por Executor (com evidências)</h3>
           <p className="text-slate-500 text-sm mb-6">
-            Lista todas as tarefas realizadas por executor e inclui <strong>pausas</strong> (com “o que foi feito”) e <strong>materiais manuais</strong>.
+            Lista tarefas concluídas por executor + pausas + materiais manuais + imagens de evidência no PDF.
+            {selectedExecutor ? ` (Filtrado em: ${getExecutorName(selectedExecutor)})` : ''}
           </p>
-          <button onClick={generateExecutorTasksAndManualMaterialsReport} className="mt-auto px-6 py-3 bg-slate-900 text-white rounded-lg font-bold text-sm hover:bg-black transition-colors flex items-center gap-2 w-full justify-center">
-            <i className="fas fa-file-pdf"></i> Gerar PDF
+          <button
+            onClick={() => { void generateExecutorReportWithEvidence(); }}
+            className="mt-auto px-6 py-3 bg-emerald-700 text-white rounded-lg font-bold text-sm hover:bg-emerald-800 transition-colors flex items-center gap-2 w-full justify-center"
+          >
+            <i className="fas fa-file-pdf"></i> Gerar PDF com evidências
           </button>
         </div>
       </div>
