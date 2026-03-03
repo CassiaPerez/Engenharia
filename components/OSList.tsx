@@ -1112,6 +1112,23 @@ Custo de Materiais e Serviços</label>
     + Adicionar item
   </button>
 </div>
+
+<div className="pt-2">
+  <button
+    type="button"
+    onClick={handleSaveOSItems}
+    disabled={isSavingItems}
+    className={`h-9 px-4 rounded-lg font-bold text-xs transition-colors border ${
+      isSavingItems
+        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+    }`}
+    title="Salvar no banco os valores manuais (itens avulsos) desta OS"
+  >
+    {isSavingItems ? 'Salvando...' : 'Salvar Valores Manuais'}
+  </button>
+</div>
+
 <label className="text-xs font-semibold text-slate-600 mb-1 block">Totais</label>
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-slate-500">R$</span>
