@@ -75,13 +75,15 @@ const [editMaterial, setEditMaterial] = useState<Partial<Material>>({
   const [selectedMaterialForLoc, setSelectedMaterialForLoc] = useState<Material | null>(null);
   const [locAction, setLocAction] = useState<'IN' | 'OUT' | 'TRANSFER' | 'ADD' | 'VIEW'>('VIEW');
   const [outType, setOutType] = useState<'OS' | 'PROJECT' | 'GENERAL'>('OS');
+  // locForm.unitCost é usado somente na operação de ENTRADA (IN)
   const [locForm, setLocForm] = useState({
       location: '',
       toLocation: '',
       quantity: '',
       reason: '',
       osNumber: '',
-      projectId: ''
+      projectId: '',
+      unitCost: ''
   });
 
   useEffect(() => {
@@ -348,7 +350,7 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
           setSelectedMaterialForLoc(m);
       }
       setLocAction('VIEW');
-      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '', osNumber: '' });
+      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', projectId: '', osNumber: '', unitCost: '' });
       setOutType('OS');
   };
 
@@ -436,6 +438,9 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                       newLocations.push({ name: locForm.location, quantity: qty });
                   }
 
+                  const unitCostText = String(locForm.unitCost ?? '').trim();
+                  const unitCostSuffix = unitCostText ? ` | Valor unit.: R$ ${unitCostText}` : '';
+
                   addMovementWithSync({
                       id: Math.random().toString(36).substr(2, 9),
                       type: 'IN',
@@ -443,7 +448,7 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                       quantity: qty,
                       date: new Date().toISOString(),
                       userId: currentUser.id,
-                      description: locForm.reason || 'Entrada Manual',
+                      description: (locForm.reason || 'Entrada Manual') + unitCostSuffix,
                       toLocation: locForm.location
                   });
 
@@ -559,7 +564,23 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
 
               const newTotal = newLocations.reduce((acc, l) => acc + l.quantity, 0);
 
-              const updatedM = { ...m, currentStock: newTotal, stockLocations: newLocations };
+              // ✅ Média automática do custo unitário na ENTRADA (quando informado)
+              let nextUnitCost = m.unitCost;
+              if (locAction === 'IN') {
+                  const unitCostInRaw = String(locForm.unitCost ?? '').trim();
+                  const unitCostIn = unitCostInRaw ? Number(unitCostInRaw.replace(',', '.')) : NaN;
+                  if (!Number.isNaN(unitCostIn) && unitCostIn >= 0) {
+                      const oldQty = Number(m.currentStock || 0);
+                      const oldCost = Number(m.unitCost || 0);
+                      const newQty = oldQty + qty;
+                      if (newQty > 0) {
+                          const avgCost = ((oldQty * oldCost) + (qty * unitCostIn)) / newQty;
+                          nextUnitCost = Math.round(avgCost * 10000) / 10000;
+                      }
+                  }
+              }
+
+              const updatedM = { ...m, currentStock: newTotal, stockLocations: newLocations, unitCost: nextUnitCost };
               setSelectedMaterialForLoc(updatedM);
               updatedMaterial = updatedM;
 
@@ -572,7 +593,7 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
           queueOperation('materials', 'upsert', updatedMaterial, updatedMaterial.id);
       }
 
-      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', osNumber: '', projectId: '' });
+      setLocForm({ location: '', toLocation: '', quantity: '', reason: '', osNumber: '', projectId: '', unitCost: '' });
       setLocAction('VIEW');
       setOutType('OS');
   };
@@ -1350,10 +1371,10 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                         {/* Ações */}
                         <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
                             <div className="flex flex-wrap bg-white p-1 rounded-xl border border-slate-200 mb-6 shadow-sm">
-                                <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
-                                <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
-                                <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
-                                <button onClick={() => { setLocAction('OUT'); setOutType('OS'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: '', projectId: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa / Saida</button>
+                                <button onClick={() => { setLocAction('ADD'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: '', unitCost: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'ADD' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>+ Local</button>
+                                <button onClick={() => { setLocAction('TRANSFER'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: '', unitCost: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'TRANSFER' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Transferir</button>
+                                <button onClick={() => { setLocAction('IN'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: '', unitCost: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'IN' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Entrada</button>
+                                <button onClick={() => { setLocAction('OUT'); setOutType('OS'); setLocForm({...locForm, location: '', toLocation: '', quantity: '', osNumber: '', projectId: '', unitCost: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${locAction === 'OUT' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Baixa / Saida</button>
                             </div>
 
                             {locAction !== 'VIEW' && (
@@ -1397,9 +1418,9 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                                     {locAction === 'OUT' && (
                                         <div className="space-y-4">
                                             <div className="flex bg-white p-1 rounded-xl border border-red-200 shadow-sm">
-                                                <button type="button" onClick={() => { setOutType('OS'); setLocForm({...locForm, osNumber: '', projectId: '', reason: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'OS' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-red-50'}`}>Baixa p/ OS</button>
-                                                <button type="button" onClick={() => { setOutType('PROJECT'); setLocForm({...locForm, osNumber: '', projectId: '', reason: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'PROJECT' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-amber-50'}`}>Baixa p/ Projeto</button>
-                                                <button type="button" onClick={() => { setOutType('GENERAL'); setLocForm({...locForm, osNumber: '', projectId: '', reason: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'GENERAL' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Saida Avulsa</button>
+                                                <button type="button" onClick={() => { setOutType('OS'); setLocForm({...locForm, osNumber: '', projectId: '', reason: '', unitCost: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'OS' ? 'bg-red-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-red-50'}`}>Baixa p/ OS</button>
+                                                <button type="button" onClick={() => { setOutType('PROJECT'); setLocForm({...locForm, osNumber: '', projectId: '', reason: '', unitCost: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'PROJECT' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-amber-50'}`}>Baixa p/ Projeto</button>
+                                                <button type="button" onClick={() => { setOutType('GENERAL'); setLocForm({...locForm, osNumber: '', projectId: '', reason: '', unitCost: ''}); }} className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${outType === 'GENERAL' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>Saida Avulsa</button>
                                             </div>
 
                                             {outType === 'OS' && (
@@ -1563,11 +1584,28 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                                         {globalLocations.map((loc, i) => <option key={i} value={loc} />)}
                                     </datalist>
 
-                                    <div className="grid grid-cols-2 gap-6">
+                                    <div className={locAction === 'IN' ? "grid grid-cols-1 md:grid-cols-3 gap-6" : "grid grid-cols-1 md:grid-cols-2 gap-6"}>
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase block mb-2">{locAction === 'ADD' ? 'Saldo Inicial (Opcional)' : 'Quantidade'}</label>
                                             <input type="number" min="0" step="1" required={locAction !== 'ADD'} className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all font-bold text-slate-800" value={locForm.quantity} onChange={e => setLocForm({...locForm, quantity: e.target.value})} />
                                         </div>
+
+                                        {locAction === 'IN' && (
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Valor unitário (R$)</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:border-slate-400 focus:ring-0 transition-all font-bold text-slate-800"
+                                                    value={locForm.unitCost}
+                                                    onChange={e => setLocForm({ ...locForm, unitCost: e.target.value })}
+                                                    placeholder="Opcional"
+                                                />
+                                                <p className="text-[10px] text-slate-400 mt-1.5 ml-1">Se informado, atualiza o <strong>custo médio</strong> automaticamente.</p>
+                                            </div>
+                                        )}
+
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Justificativa {locAction === 'OUT' && outType === 'GENERAL' && <span className="text-red-500">*</span>}</label>
                                             {locAction === 'OUT' && outType === 'OS' && locForm.osNumber ? (
