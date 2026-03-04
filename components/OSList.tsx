@@ -74,6 +74,11 @@ const removeCostItem = (id: string) => {
 
 const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('services');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Sempre que filtros/pesquisa mudarem, volta para a primeira página
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, priorityFilter, slaFilter, openDateSort]);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
   const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
@@ -100,9 +105,10 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const [showQuickMatModal, setShowQuickMatModal] = useState(false);
   const [quickMat, setQuickMat] = useState({ description: '', unit: 'Un', cost: '' });
 
+  const [isSavingItems, setIsSavingItems] = useState(false);
+
   const [newItem, setNewItem] = useState<{ id: string, qty: number | '', cost: number | '' }>({ id: '', qty: '', cost: '' });
   const [itemSearchTerm, setItemSearchTerm] = useState('');
-  const [isSavingItems, setIsSavingItems] = useState(false);
   const [showDetailSuggestions, setShowDetailSuggestions] = useState(false); 
 
   const [showExecutorModal, setShowExecutorModal] = useState(false);
@@ -258,7 +264,19 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
     return Array.from(new Set(equipments.map(eq => eq.location).filter(Boolean)));
   }, [equipments]);
 
-  const currentOSs = filteredOSs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  // Paginação
+  const totalPages = Math.max(1, Math.ceil(filteredOSs.length / ITEMS_PER_PAGE));
+  const indexOfFirst = (currentPage - 1) * ITEMS_PER_PAGE;
+  const indexOfLast = currentPage * ITEMS_PER_PAGE;
+  const currentOSs = filteredOSs.slice(indexOfFirst, indexOfLast);
+
+  const pageStart = filteredOSs.length === 0 ? 0 : indexOfFirst + 1;
+  const pageEnd = Math.min(indexOfLast, filteredOSs.length);
+
+  const goToPage = (p: number) => {
+    const next = Math.min(Math.max(1, p), totalPages);
+    setCurrentPage(next);
+  };
 
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
   
@@ -307,27 +325,20 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       setItemSearchTerm('');
   };
 
-
   const handleSaveOSItems = async () => {
       if (!selectedOS) return;
       setIsSavingItems(true);
       try {
           const { error } = await supabase.from('oss').upsert(mapToSupabase(selectedOS));
           if (error) throw error;
-
-          const toast = document.createElement('div');
-          toast.className = "fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-[99999] text-sm font-bold";
-          toast.innerText = "Itens da OS salvos com sucesso!";
-          document.body.appendChild(toast);
-          setTimeout(() => toast.remove(), 2500);
-      } catch (e: any) {
+          console.log('Itens da OS salvos com sucesso.');
+      } catch (e) {
           console.error('Erro ao salvar itens da OS:', e);
-          alert(`Erro ao salvar itens da OS: ${e?.message || JSON.stringify(e)}`);
+          alert('Erro ao salvar itens da OS no banco de dados.');
       } finally {
           setIsSavingItems(false);
       }
   };
-
 
   const handleRemoveService = async (index: number) => {
       if (!selectedOS || !isEditable(selectedOS)) return;
@@ -687,177 +698,6 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         y = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // =========================
-    // HISTÓRICO DE PAUSAS / APONTAMENTOS (Executor)
-    // =========================
-    const getUserNameById = (id?: string) => {
-      if (!id) return '-';
-      const u = users.find(x => x.id === id || x.email === id);
-      return u?.name || id;
-    };
-
-    const pauseRows: Array<{ ts: string; executor: string; action: string; reason: string; worklog: string }> = [];
-
-    // Novo modelo: pausa por executor (executorStates[executorId].pauseHistory[])
-    const execStates = (os as any).executorStates || {};
-    Object.keys(execStates || {}).forEach((executorId: string) => {
-      const st = execStates[executorId];
-      const hist = Array.isArray(st?.pauseHistory) ? st.pauseHistory : [];
-      hist.forEach((h: any) => {
-        pauseRows.push({
-          ts: h?.timestamp ? new Date(h.timestamp).toISOString() : '',
-          executor: getUserNameById(h?.executorId || executorId || h?.userId),
-          action: String(h?.action || '').toUpperCase() === 'RESUME' ? 'RETOMADA' : 'PAUSA',
-          reason: String(h?.reason || '').trim() || '-',
-          worklog: String(h?.worklogBeforePause || '').trim() || '-',
-        });
-      });
-    });
-
-    // Legado: pausa global (pauseHistory[])
-    const legacyPauseHistory = Array.isArray((os as any).pauseHistory) ? (os as any).pauseHistory : [];
-    legacyPauseHistory.forEach((h: any) => {
-      pauseRows.push({
-        ts: h?.timestamp ? new Date(h.timestamp).toISOString() : '',
-        executor: getUserNameById(h?.userId),
-        action: String(h?.action || '').toUpperCase() === 'RESUME' ? 'RETOMADA' : 'PAUSA',
-        reason: String(h?.reason || '').trim() || '-',
-        worklog: String(h?.worklogBeforePause || '').trim() || '-',
-      });
-    });
-
-    pauseRows.sort((a, b) => (a.ts || '').localeCompare(b.ts || ''));
-
-    if (pauseRows.length > 0) {
-      if (y > 240) {
-        doc.addPage();
-        y = 40;
-      }
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text("HISTÓRICO DE PAUSAS / APONTAMENTOS", 14, y);
-      y += 4;
-
-      const rows = pauseRows.map(r => ([
-        r.ts ? new Date(r.ts).toLocaleString('pt-BR') : '-',
-        r.executor,
-        r.action,
-        r.reason,
-        r.worklog
-      ]));
-
-      autoTable(doc, {
-        startY: y,
-        head: [['Data/Hora', 'Executor', 'Ação', 'Motivo', 'O que foi feito (antes da pausa)']],
-        body: rows,
-        headStyles: { fillColor: [220, 220, 220], textColor: 50 },
-        styles: { fontSize: 8 },
-        columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 35 }, 2: { cellWidth: 18 }, 3: { cellWidth: 45 }, 4: { cellWidth: 60 } }
-      });
-
-      y = (doc as any).lastAutoTable.finalY + 10;
-    }
-
-    // =========================
-    // MATERIAIS ADICIONADOS MANUALMENTE PELOS EXECUTORES
-    // =========================
-    const execManualMaterials = (os as any).executorManualMaterials || (os as any).manualMaterialsByExecutor || [];
-    const execManualRows = Array.isArray(execManualMaterials) ? execManualMaterials : [];
-
-    if (execManualRows.length > 0) {
-      if (y > 240) {
-        doc.addPage();
-        y = 40;
-      }
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text("MATERIAIS ADICIONADOS PELO EXECUTOR (MANUAL)", 14, y);
-      y += 4;
-
-      const rows = execManualRows
-        .map((m: any) => ({
-          ts: m?.timestamp ? new Date(m.timestamp).toISOString() : '',
-          executor: getUserNameById(m?.executorId || m?.userId),
-          description: String(m?.description || '').trim(),
-          quantity: Number(m?.quantity) || 0,
-        }))
-        .filter((m: any) => m.description.length > 0 || m.quantity > 0)
-        .map((m: any) => ([
-          m.ts ? new Date(m.ts).toLocaleString('pt-BR') : '-',
-          m.executor,
-          m.description || '-',
-          String(m.quantity)
-        ]));
-
-      if (rows.length > 0) {
-        autoTable(doc, {
-          startY: y,
-          head: [['Data/Hora', 'Executor', 'Descrição', 'Qtd']],
-          body: rows,
-          headStyles: { fillColor: [220, 220, 220], textColor: 50 },
-          styles: { fontSize: 9 },
-          columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 45 }, 2: { cellWidth: 80 }, 3: { halign: 'right', cellWidth: 20 } }
-        });
-
-        y = (doc as any).lastAutoTable.finalY + 10;
-      }
-    }
-
-
-    // Valores Manuais (itens avulsos) - visíveis no PDF
-    const manualItems = (os.costItems || [])
-      .map((it: any) => ({
-        type: String(it?.type || '').toUpperCase(),
-        description: String(it?.description || '').trim(),
-        amount: Number(it?.amount) || 0
-      }))
-      .filter((it: any) => it.description.length > 0 || it.amount > 0);
-
-    // Compatibilidade: se ainda existir modelo legado (manualMaterialCost/manualServiceCost) e não houver itens
-    const legacyManualRows: any[] = [];
-    if (manualItems.length === 0) {
-      const legacyMat = Number((os as any).manualMaterialCost) || 0;
-      const legacySrv = Number((os as any).manualServiceCost) || 0;
-      const legacyMatDesc = String((os as any).manualMaterialDescription || '').trim();
-      const legacySrvDesc = String((os as any).manualServiceDescription || '').trim();
-
-      if (legacyMat > 0 || legacyMatDesc) legacyManualRows.push({ type: 'MATERIAL', description: legacyMatDesc || 'Material manual', amount: legacyMat });
-      if (legacySrv > 0 || legacySrvDesc) legacyManualRows.push({ type: 'SERVICE', description: legacySrvDesc || 'Serviço manual', amount: legacySrv });
-    }
-
-    const manualRowsSource = manualItems.length > 0 ? manualItems : legacyManualRows;
-
-    if (manualRowsSource.length > 0) {
-      if (y > 240) {
-        doc.addPage();
-        y = 40;
-      }
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text("VALORES MANUAIS (ITENS AVULSOS)", 14, y);
-      y += 4;
-
-      const manualRows = manualRowsSource.map((it: any) => ([
-        it.type === 'MATERIAL' ? 'Material' : 'Serviço',
-        it.description || '-',
-        `R$ ${formatCurrency(it.amount)}`
-      ]));
-
-      autoTable(doc, {
-        startY: y,
-        head: [['Tipo', 'Descrição', 'Valor']],
-        body: manualRows,
-        headStyles: { fillColor: [220, 220, 220], textColor: 50 },
-        styles: { fontSize: 9 },
-        columnStyles: { 2: { halign: 'right' } }
-      });
-
-      y = (doc as any).lastAutoTable.finalY + 10;
-    }
-
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
@@ -919,6 +759,52 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
             <div className="flex gap-2 w-full md:w-auto"><button onClick={openNewOS} className="flex-1 md:flex-none bg-clean-primary text-white px-6 rounded-xl font-bold text-base uppercase tracking-wide hover:bg-clean-primary/90 transition-all shadow-lg shadow-clean-primary/20 h-12 whitespace-nowrap"><i className="fas fa-plus mr-2"></i> Abrir OS</button></div>
         </div>
       </header>
+
+      {/* Paginação */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="text-sm text-slate-600 font-medium">
+          Mostrando <span className="font-bold text-slate-800">{pageStart}</span>–<span className="font-bold text-slate-800">{pageEnd}</span> de <span className="font-bold text-slate-800">{filteredOSs.length}</span> OS
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage <= 1}
+            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+            title="Página anterior"
+          >
+            <i className="fas fa-chevron-left"></i>
+          </button>
+
+          <div className="h-10 px-3 rounded-lg border border-slate-300 bg-white flex items-center gap-2 text-sm font-bold text-slate-700">
+            <span>{currentPage}</span>
+            <span className="text-slate-400">/</span>
+            <span>{totalPages}</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+            title="Próxima página"
+          >
+            <i className="fas fa-chevron-right"></i>
+          </button>
+
+          <select
+            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 font-bold text-sm"
+            value={currentPage}
+            onChange={(e) => goToPage(Number(e.target.value))}
+            title="Ir para página"
+          >
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <option key={p} value={p}>Página {p}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {currentOSs.map(os => {
@@ -1283,23 +1169,6 @@ Custo de Materiais e Serviços</label>
     + Adicionar item
   </button>
 </div>
-
-<div className="pt-2">
-  <button
-    type="button"
-    onClick={handleSaveOSItems}
-    disabled={isSavingItems}
-    className={`h-9 px-4 rounded-lg font-bold text-xs transition-colors border ${
-      isSavingItems
-        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-    }`}
-    title="Salvar no banco os valores manuais (itens avulsos) desta OS"
-  >
-    {isSavingItems ? 'Salvando...' : 'Salvar Valores Manuais'}
-  </button>
-</div>
-
 <label className="text-xs font-semibold text-slate-600 mb-1 block">Totais</label>
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-slate-500">R$</span>
@@ -1389,17 +1258,17 @@ Custo de Materiais e Serviços</label>
                                             </div>
                                             <button onClick={handleAddItemToOS} className="h-10 px-5 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors">Adicionar</button>
                                             <button
-                                              type="button"
-                                              onClick={handleSaveOSItems}
-                                              disabled={isSavingItems || !selectedOS}
-                                              className={`h-10 px-5 rounded-lg font-bold text-sm transition-colors border ${
-                                                isSavingItems
-                                                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                                                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                                              }`}
-                                              title="Salvar no banco os itens (materiais/serviços) desta OS"
+                                                type="button"
+                                                onClick={handleSaveOSItems}
+                                                disabled={isSavingItems}
+                                                className={`h-10 px-5 rounded-lg font-bold text-sm transition-colors border ${
+                                                    isSavingItems
+                                                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                                }`}
+                                                title="Salvar no banco os itens (materiais/serviços) desta OS"
                                             >
-                                              {isSavingItems ? 'Salvando...' : 'Salvar Itens'}
+                                                {isSavingItems ? 'Salvando...' : 'Salvar Itens'}
                                             </button>
                                         </div>
                                     </div>
