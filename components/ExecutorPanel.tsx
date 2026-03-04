@@ -24,11 +24,6 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
   const [executionDescription, setExecutionDescription] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Materiais adicionados manualmente pelo executor (para baixa no almox)
-  const [manualMaterialDesc, setManualMaterialDesc] = useState<string>('');
-  const [manualMaterialQty, setManualMaterialQty] = useState<string>('');
-  const [isSavingManualMaterial, setIsSavingManualMaterial] = useState<boolean>(false);
-
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
 
@@ -52,6 +47,33 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
   
   const todoList = myOSs.filter(o => o.status !== OSStatus.COMPLETED && o.status !== OSStatus.CANCELED);
   const doneList = myOSs.filter(o => o.status === OSStatus.COMPLETED);
+
+  // -----------------------------
+  // ✅ Estado por executor (multi-executor)
+  // -----------------------------
+  const isMultiExecutorOS = (os: OS) => (os.executorIds?.length || 0) > 1;
+
+  const getMyExecState = (os: OS) => {
+    const anyOs: any = os as any;
+    const states = (anyOs.executorStates || {}) as Record<string, any>;
+    return (states[user.id] || (user.email ? states[user.email] : undefined)) as any | undefined;
+  };
+
+  const getMyExecStatus = (os: OS) => {
+    const st = getMyExecState(os);
+    return (st?.status as 'OPEN' | 'IN_PROGRESS' | 'PAUSED' | undefined) || undefined;
+  };
+
+  const ensureExecutorState = (os: OS, next: Partial<any>) => {
+    const anyOs: any = os as any;
+    const prevStates = (anyOs.executorStates || {}) as Record<string, any>;
+    const prev = prevStates[user.id] || (user.email ? prevStates[user.email] : undefined) || {};
+    const merged = { ...prev, ...next };
+    const nextStates: Record<string, any> = { ...prevStates, [user.id]: merged };
+    // manter compatibilidade com chaves por email (algumas telas/relatórios antigos)
+    if (user.email) nextStates[user.email] = merged;
+    return nextStates;
+  };
 
   const getContext = (os: OS) => {
     if (os.projectId) {
@@ -155,10 +177,44 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       const os = oss.find(o => o.id === osId);
       if (!os) return;
 
+      const nowIso = new Date().toISOString();
+
+      // ✅ Multi-executor: iniciar execução do executor atual (sem depender do status global)
+      if (isMultiExecutorOS(os)) {
+          const nextStates = ensureExecutorState(os, {
+              status: 'IN_PROGRESS',
+              startTime: getMyExecState(os)?.startTime || nowIso,
+              currentPauseReason: undefined,
+              pauseHistory: getMyExecState(os)?.pauseHistory || []
+          });
+
+          const updated: any = {
+              executorStates: nextStates,
+              status: OSStatus.IN_PROGRESS,
+              startTime: os.startTime || nowIso
+          };
+
+          setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
+
+          try {
+              const { error } = await supabase.from('oss').upsert(mapToSupabase({
+                  id: osId,
+                  ...os,
+                  ...updated
+              }));
+              if (error) throw error;
+          } catch (e) {
+              console.error('Erro ao atualizar OS (start executor):', e);
+          }
+          return;
+      }
+
+      // ✅ Legado (1 executor)
       const updated = {
-        status: OSStatus.IN_PROGRESS,
-        startTime: os.startTime || new Date().toISOString()
+          status: OSStatus.IN_PROGRESS,
+          startTime: os.startTime || nowIso
       };
+
       setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
 
       try {
@@ -207,22 +263,15 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
               worklogBeforePause
           };
 
-          const prevStates = os.executorStates || {};
-          const prevState = prevStates[executorId] || { status: 'IN_PROGRESS' as const, pauseHistory: [] as any[] };
-
-          const nextStates = {
-              ...prevStates,
-              [executorId]: {
-                  ...prevState,
-                  status: 'PAUSED' as const,
-                  currentPauseReason: reason,
-                  pauseHistory: [...(prevState.pauseHistory || []), pauseEntry]
-              }
-          };
+          const nextStates = ensureExecutorState(os, {
+              status: 'PAUSED',
+              currentPauseReason: reason,
+              pauseHistory: [...(getMyExecState(os)?.pauseHistory || []), pauseEntry]
+          });
 
           // Status global: só PAUSED se todos executores estiverem pausados
           const allPaused = (os.executorIds || []).length > 0
-            ? (os.executorIds || []).every(id => nextStates[id]?.status === 'PAUSED')
+            ? (os.executorIds || []).every(id => (nextStates as any)[id]?.status === 'PAUSED')
             : false;
 
           const updated = {
@@ -316,22 +365,15 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
               action: 'RESUME' as const
           };
 
-          const prevStates = os.executorStates || {};
-          const prevState = prevStates[executorId] || { status: 'IN_PROGRESS' as const, pauseHistory: [] as any[] };
-
-          const nextStates = {
-              ...prevStates,
-              [executorId]: {
-                  ...prevState,
-                  status: 'IN_PROGRESS' as const,
-                  currentPauseReason: undefined,
-                  pauseHistory: [...(prevState.pauseHistory || []), resumeEntry]
-              }
-          };
+          const nextStates = ensureExecutorState(os, {
+              status: 'IN_PROGRESS',
+              currentPauseReason: undefined,
+              pauseHistory: [...(getMyExecState(os)?.pauseHistory || []), resumeEntry]
+          });
 
           // Status global: se algum executor estiver em andamento, IN_PROGRESS
           const anyInProgress = (os.executorIds || []).length > 0
-            ? (os.executorIds || []).some(id => nextStates[id]?.status === 'IN_PROGRESS')
+            ? (os.executorIds || []).some(id => (nextStates as any)[id]?.status === 'IN_PROGRESS')
             : true;
 
           const updated = {
@@ -401,10 +443,48 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
 
   const confirmFinish = async () => {
       if (!finishingOS || !photoPreview) return;
+      const nowIso = new Date().toISOString();
+
+      // ✅ Multi-executor: grava endTime no executorStates do executor atual
+      if (isMultiExecutorOS(finishingOS)) {
+          const nextStates = ensureExecutorState(finishingOS, {
+              endTime: nowIso,
+              // mantém o status do executor como IN_PROGRESS (histórico) — a OS global vai para COMPLETED
+              status: getMyExecStatus(finishingOS) || 'IN_PROGRESS',
+              pauseHistory: getMyExecState(finishingOS)?.pauseHistory || []
+          });
+
+          const updated: any = {
+              ...finishingOS,
+              status: OSStatus.COMPLETED,
+              endTime: nowIso,
+              completionImage: photoPreview,
+              executionDescription: executionDescription || undefined,
+              executorStates: nextStates
+          };
+
+          setOss(prev => prev.map(o => o.id === finishingOS.id ? updated : o));
+
+          try {
+              const { error } = await supabase.from('oss').upsert(mapToSupabase({
+                  id: finishingOS.id,
+                  ...updated
+              }));
+              if (error) throw error;
+          } catch (e) {
+              console.error('Erro ao finalizar OS (multi-executor):', e);
+          }
+
+          setFinishingOS(null);
+          setPhotoPreview(null);
+          setExecutionDescription('');
+          return;
+      }
+
       const updated = {
           ...finishingOS,
           status: OSStatus.COMPLETED,
-          endTime: new Date().toISOString(),
+          endTime: nowIso,
           completionImage: photoPreview,
           executionDescription: executionDescription || undefined
       };
@@ -443,57 +523,6 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
       }
   };
 
-  const handleAddExecutorManualMaterial = async (osId: string) => {
-      const desc = manualMaterialDesc.trim();
-      const qty = Number(String(manualMaterialQty).replace(',', '.'));
-      if (!desc || !Number.isFinite(qty) || qty <= 0) {
-          alert('Informe a descrição e uma quantidade válida (> 0).');
-          return;
-      }
-
-      const os = oss.find(o => o.id === osId);
-      if (!os) return;
-
-      setIsSavingManualMaterial(true);
-
-      const entry = {
-          timestamp: new Date().toISOString(),
-          executorId: user.id,
-          userId: user.id,
-          description: desc,
-          quantity: qty,
-          source: 'EXECUTOR_MANUAL'
-      };
-
-      const prev = (os as any).executorManualMaterials || (os as any).manualMaterialsByExecutor || [];
-      const nextArr = Array.isArray(prev) ? [...prev, entry] : [entry];
-
-      const updated = { ...(os as any), executorManualMaterials: nextArr };
-      setOss(prevList => prevList.map(o => o.id === osId ? ({ ...o, ...(updated as any) }) : o));
-      if (viewDetailOS && viewDetailOS.id === osId) {
-          setViewDetailOS({ ...(viewDetailOS as any), ...(updated as any) });
-      }
-
-      try {
-          const payload = mapToSupabase({
-              id: osId,
-              ...(os as any),
-              executorManualMaterials: nextArr,
-          });
-
-          const { error } = await supabase.from('oss').upsert(payload);
-          if (error) throw error;
-
-          setManualMaterialDesc('');
-          setManualMaterialQty('');
-      } catch (e) {
-          console.error('Erro ao salvar material manual do executor:', e);
-          alert('Não foi possível salvar o material.');
-      } finally {
-          setIsSavingManualMaterial(false);
-      }
-  };
-
   const getPriorityColor = (p: string) => {
       switch(p) {
           case 'CRITICAL': return 'bg-red-500 text-white border-red-600';
@@ -505,9 +534,13 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
 
   const renderOSCard = (os: OS) => {
       const context = getContext(os);
+      const myExecStatus = getMyExecStatus(os);
+      const effectiveStatus = isMultiExecutorOS(os) && myExecStatus
+        ? (myExecStatus === 'PAUSED' ? OSStatus.PAUSED : myExecStatus === 'IN_PROGRESS' ? OSStatus.IN_PROGRESS : OSStatus.OPEN)
+        : os.status;
       return (
         <div key={os.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 relative overflow-hidden mb-4 group hover:shadow-md transition-shadow">
-            <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${os.status === OSStatus.IN_PROGRESS ? 'bg-blue-500 animate-pulse' : os.status === OSStatus.COMPLETED ? 'bg-clean-primary' : 'bg-slate-300'}`}></div>
+            <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${effectiveStatus === OSStatus.IN_PROGRESS ? 'bg-blue-500 animate-pulse' : effectiveStatus === OSStatus.PAUSED ? 'bg-amber-500' : effectiveStatus === OSStatus.COMPLETED ? 'bg-clean-primary' : 'bg-slate-300'}`}></div>
 
             <div className="pl-3">
                 <div className="flex justify-between items-start mb-2">
@@ -559,11 +592,11 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                 <div className="flex gap-2">
                    {os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED && (
                        <>
-                        {os.status === OSStatus.OPEN ? (
+                        {(effectiveStatus === OSStatus.OPEN) ? (
                             <button onClick={(e) => handleStart(e, os.id)} className="flex-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
                                 <i className="fas fa-play"></i> Iniciar
                             </button>
-                        ) : os.status === OSStatus.PAUSED ? (
+                        ) : (effectiveStatus === OSStatus.PAUSED) ? (
                             <button onClick={(e) => handleResume(e, os.id)} className="flex-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
                                 <i className="fas fa-play"></i> Retomar
                             </button>
@@ -936,68 +969,6 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                                     );
                                 }) : <p className="text-sm text-slate-400 italic">Nenhum material alocado previamente.</p>}
                             </ul>
-
-                            {/* Materiais adicionados manualmente pelo executor (para baixa no almox) */}
-                            <div className="mt-5 bg-amber-50 rounded-xl p-4 border border-amber-100">
-                                <h5 className="text-xs font-black text-amber-900 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <i className="fas fa-warehouse text-amber-700"></i> Baixa Manual (Executor)
-                                </h5>
-
-                                {/* Lista do que já foi adicionado */}
-                                {Array.isArray((viewDetailOS as any).executorManualMaterials) && (viewDetailOS as any).executorManualMaterials.length > 0 && (
-                                  <div className="mb-4 space-y-2">
-                                    {(viewDetailOS as any).executorManualMaterials
-                                      .slice(-6)
-                                      .reverse()
-                                      .map((mm: any, i: number) => (
-                                        <div key={i} className="flex items-start justify-between gap-3 bg-white/70 border border-amber-100 rounded-lg p-3 text-xs">
-                                          <div className="min-w-0">
-                                            <p className="font-bold text-slate-800 truncate">{mm?.description || 'Material'}</p>
-                                            <p className="text-[10px] text-slate-500 mt-0.5">
-                                              {mm?.timestamp ? new Date(mm.timestamp).toLocaleString('pt-BR') : ''}
-                                            </p>
-                                          </div>
-                                          <div className="shrink-0 font-black text-amber-900">{Number(mm?.quantity) || 0}</div>
-                                        </div>
-                                      ))}
-                                  </div>
-                                )}
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <div className="md:col-span-2">
-                                        <label className="text-[10px] font-black text-amber-900 uppercase mb-1 block">Descrição</label>
-                                        <input
-                                            value={manualMaterialDesc}
-                                            onChange={(e) => setManualMaterialDesc(e.target.value)}
-                                            placeholder="Ex: Parafuso 6mm, cabo 2,5mm, fita isolante..."
-                                            className="w-full h-11 px-4 bg-white border border-amber-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-amber-900 uppercase mb-1 block">Qtd</label>
-                                        <input
-                                            value={manualMaterialQty}
-                                            onChange={(e) => setManualMaterialQty(e.target.value)}
-                                            placeholder="0"
-                                            inputMode="decimal"
-                                            className="w-full h-11 px-4 bg-white border border-amber-200 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/15"
-                                        />
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    disabled={isSavingManualMaterial}
-                                    onClick={() => handleAddExecutorManualMaterial(viewDetailOS.id)}
-                                    className="mt-3 w-full h-11 rounded-xl font-black text-sm bg-amber-600 text-white hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <i className="fas fa-plus"></i>
-                                    {isSavingManualMaterial ? 'Salvando...' : 'Adicionar material para baixa'}
-                                </button>
-                                <p className="text-[10px] text-amber-800/80 mt-2 font-semibold">
-                                    Esses itens ficam registrados na OS e aparecem no PDF. A baixa no almoxarifado pode ser processada pela rotina do sistema.
-                                </p>
-                            </div>
                         </div>
                     </div>
 
