@@ -76,7 +76,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
-  const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>(OSStatus.OPEN);
+  const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
   const [slaFilter, setSlaFilter] = useState<'ALL' | 'SLA_OVERDUE'>('ALL');
   const [openDateSort, setOpenDateSort] = useState<'NONE' | 'OPEN_DATE_DESC' | 'OPEN_DATE_ASC'>('NONE');
@@ -100,9 +100,10 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const [showQuickMatModal, setShowQuickMatModal] = useState(false);
   const [quickMat, setQuickMat] = useState({ description: '', unit: 'Un', cost: '' });
 
+  const [isSavingItems, setIsSavingItems] = useState(false);
+
   const [newItem, setNewItem] = useState<{ id: string, qty: number | '', cost: number | '' }>({ id: '', qty: '', cost: '' });
   const [itemSearchTerm, setItemSearchTerm] = useState('');
-  const [isSavingItems, setIsSavingItems] = useState(false);
   const [showDetailSuggestions, setShowDetailSuggestions] = useState(false); 
 
   const [showExecutorModal, setShowExecutorModal] = useState(false);
@@ -259,18 +260,6 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   }, [equipments]);
 
   const currentOSs = filteredOSs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-  const totalPages = Math.max(1, Math.ceil(filteredOSs.length / ITEMS_PER_PAGE));
-
-  // ✅ Paginação: sempre manter página válida e resetar ao mudar filtros
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter, equipmentCompanyFilter]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-    if (currentPage < 1) setCurrentPage(1);
-  }, [totalPages, currentPage]);
-
 
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
   
@@ -319,27 +308,20 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       setItemSearchTerm('');
   };
 
-
   const handleSaveOSItems = async () => {
       if (!selectedOS) return;
       setIsSavingItems(true);
       try {
           const { error } = await supabase.from('oss').upsert(mapToSupabase(selectedOS));
           if (error) throw error;
-
-          const toast = document.createElement('div');
-          toast.className = "fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-[99999] text-sm font-bold";
-          toast.innerText = "Itens da OS salvos com sucesso!";
-          document.body.appendChild(toast);
-          setTimeout(() => toast.remove(), 2500);
-      } catch (e: any) {
+          console.log('Itens da OS salvos com sucesso.');
+      } catch (e) {
           console.error('Erro ao salvar itens da OS:', e);
-          alert(`Erro ao salvar itens da OS: ${e?.message || JSON.stringify(e)}`);
+          alert('Erro ao salvar itens da OS no banco de dados.');
       } finally {
           setIsSavingItems(false);
       }
   };
-
 
   const handleRemoveService = async (index: number) => {
       if (!selectedOS || !isEditable(selectedOS)) return;
@@ -699,177 +681,6 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         y = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // =========================
-    // HISTÓRICO DE PAUSAS / APONTAMENTOS (Executor)
-    // =========================
-    const getUserNameById = (id?: string) => {
-      if (!id) return '-';
-      const u = users.find(x => x.id === id || x.email === id);
-      return u?.name || id;
-    };
-
-    const pauseRows: Array<{ ts: string; executor: string; action: string; reason: string; worklog: string }> = [];
-
-    // Novo modelo: pausa por executor (executorStates[executorId].pauseHistory[])
-    const execStates = (os as any).executorStates || {};
-    Object.keys(execStates || {}).forEach((executorId: string) => {
-      const st = execStates[executorId];
-      const hist = Array.isArray(st?.pauseHistory) ? st.pauseHistory : [];
-      hist.forEach((h: any) => {
-        pauseRows.push({
-          ts: h?.timestamp ? new Date(h.timestamp).toISOString() : '',
-          executor: getUserNameById(h?.executorId || executorId || h?.userId),
-          action: String(h?.action || '').toUpperCase() === 'RESUME' ? 'RETOMADA' : 'PAUSA',
-          reason: String(h?.reason || '').trim() || '-',
-          worklog: String(h?.worklogBeforePause || '').trim() || '-',
-        });
-      });
-    });
-
-    // Legado: pausa global (pauseHistory[])
-    const legacyPauseHistory = Array.isArray((os as any).pauseHistory) ? (os as any).pauseHistory : [];
-    legacyPauseHistory.forEach((h: any) => {
-      pauseRows.push({
-        ts: h?.timestamp ? new Date(h.timestamp).toISOString() : '',
-        executor: getUserNameById(h?.userId),
-        action: String(h?.action || '').toUpperCase() === 'RESUME' ? 'RETOMADA' : 'PAUSA',
-        reason: String(h?.reason || '').trim() || '-',
-        worklog: String(h?.worklogBeforePause || '').trim() || '-',
-      });
-    });
-
-    pauseRows.sort((a, b) => (a.ts || '').localeCompare(b.ts || ''));
-
-    if (pauseRows.length > 0) {
-      if (y > 240) {
-        doc.addPage();
-        y = 40;
-      }
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text("HISTÓRICO DE PAUSAS / APONTAMENTOS", 14, y);
-      y += 4;
-
-      const rows = pauseRows.map(r => ([
-        r.ts ? new Date(r.ts).toLocaleString('pt-BR') : '-',
-        r.executor,
-        r.action,
-        r.reason,
-        r.worklog
-      ]));
-
-      autoTable(doc, {
-        startY: y,
-        head: [['Data/Hora', 'Executor', 'Ação', 'Motivo', 'O que foi feito (antes da pausa)']],
-        body: rows,
-        headStyles: { fillColor: [220, 220, 220], textColor: 50 },
-        styles: { fontSize: 8 },
-        columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 35 }, 2: { cellWidth: 18 }, 3: { cellWidth: 45 }, 4: { cellWidth: 60 } }
-      });
-
-      y = (doc as any).lastAutoTable.finalY + 10;
-    }
-
-    // =========================
-    // MATERIAIS ADICIONADOS MANUALMENTE PELOS EXECUTORES
-    // =========================
-    const execManualMaterials = (os as any).executorManualMaterials || (os as any).manualMaterialsByExecutor || [];
-    const execManualRows = Array.isArray(execManualMaterials) ? execManualMaterials : [];
-
-    if (execManualRows.length > 0) {
-      if (y > 240) {
-        doc.addPage();
-        y = 40;
-      }
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text("MATERIAIS ADICIONADOS PELO EXECUTOR (MANUAL)", 14, y);
-      y += 4;
-
-      const rows = execManualRows
-        .map((m: any) => ({
-          ts: m?.timestamp ? new Date(m.timestamp).toISOString() : '',
-          executor: getUserNameById(m?.executorId || m?.userId),
-          description: String(m?.description || '').trim(),
-          quantity: Number(m?.quantity) || 0,
-        }))
-        .filter((m: any) => m.description.length > 0 || m.quantity > 0)
-        .map((m: any) => ([
-          m.ts ? new Date(m.ts).toLocaleString('pt-BR') : '-',
-          m.executor,
-          m.description || '-',
-          String(m.quantity)
-        ]));
-
-      if (rows.length > 0) {
-        autoTable(doc, {
-          startY: y,
-          head: [['Data/Hora', 'Executor', 'Descrição', 'Qtd']],
-          body: rows,
-          headStyles: { fillColor: [220, 220, 220], textColor: 50 },
-          styles: { fontSize: 9 },
-          columnStyles: { 0: { cellWidth: 35 }, 1: { cellWidth: 45 }, 2: { cellWidth: 80 }, 3: { halign: 'right', cellWidth: 20 } }
-        });
-
-        y = (doc as any).lastAutoTable.finalY + 10;
-      }
-    }
-
-
-    // Valores Manuais (itens avulsos) - visíveis no PDF
-    const manualItems = (os.costItems || [])
-      .map((it: any) => ({
-        type: String(it?.type || '').toUpperCase(),
-        description: String(it?.description || '').trim(),
-        amount: Number(it?.amount) || 0
-      }))
-      .filter((it: any) => it.description.length > 0 || it.amount > 0);
-
-    // Compatibilidade: se ainda existir modelo legado (manualMaterialCost/manualServiceCost) e não houver itens
-    const legacyManualRows: any[] = [];
-    if (manualItems.length === 0) {
-      const legacyMat = Number((os as any).manualMaterialCost) || 0;
-      const legacySrv = Number((os as any).manualServiceCost) || 0;
-      const legacyMatDesc = String((os as any).manualMaterialDescription || '').trim();
-      const legacySrvDesc = String((os as any).manualServiceDescription || '').trim();
-
-      if (legacyMat > 0 || legacyMatDesc) legacyManualRows.push({ type: 'MATERIAL', description: legacyMatDesc || 'Material manual', amount: legacyMat });
-      if (legacySrv > 0 || legacySrvDesc) legacyManualRows.push({ type: 'SERVICE', description: legacySrvDesc || 'Serviço manual', amount: legacySrv });
-    }
-
-    const manualRowsSource = manualItems.length > 0 ? manualItems : legacyManualRows;
-
-    if (manualRowsSource.length > 0) {
-      if (y > 240) {
-        doc.addPage();
-        y = 40;
-      }
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0, 0, 0);
-      doc.text("VALORES MANUAIS (ITENS AVULSOS)", 14, y);
-      y += 4;
-
-      const manualRows = manualRowsSource.map((it: any) => ([
-        it.type === 'MATERIAL' ? 'Material' : 'Serviço',
-        it.description || '-',
-        `R$ ${formatCurrency(it.amount)}`
-      ]));
-
-      autoTable(doc, {
-        startY: y,
-        head: [['Tipo', 'Descrição', 'Valor']],
-        body: manualRows,
-        headStyles: { fillColor: [220, 220, 220], textColor: 50 },
-        styles: { fontSize: 9 },
-        columnStyles: { 2: { halign: 'right' } }
-      });
-
-      y = (doc as any).lastAutoTable.finalY + 10;
-    }
-
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
@@ -989,62 +800,6 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         })}
       </div>
       
-      {/* ✅ Paginação */}
-      {filteredOSs.length > 0 && (
-        <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="text-xs text-slate-500 font-semibold">
-            Mostrando <span className="text-slate-800">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span>
-            &nbsp;–&nbsp;
-            <span className="text-slate-800">{Math.min(currentPage * ITEMS_PER_PAGE, filteredOSs.length)}</span>
-            &nbsp;de <span className="text-slate-800">{filteredOSs.length}</span> OS
-          </div>
-
-          <div className="flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
-              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
-            >
-              <i className="fas fa-chevron-left mr-2"></i>Anterior
-            </button>
-
-            <div className="hidden sm:flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))
-                .map(page => (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => setCurrentPage(page)}
-                    className={
-                      "h-9 w-9 rounded-lg border text-xs font-black " +
-                      (page === currentPage
-                        ? "bg-slate-800 text-white border-slate-800"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50")
-                    }
-                  >
-                    {page}
-                  </button>
-                ))}
-            </div>
-
-            <div className="sm:hidden text-xs font-bold text-slate-600">
-              Página {currentPage} / {totalPages}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
-            >
-              Próxima<i className="fas fa-chevron-right ml-2"></i>
-            </button>
-          </div>
-        </div>
-      )}
-
       {filteredOSs.length === 0 && <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed text-slate-400 text-lg">Nenhuma Ordem de Serviço encontrada.</div>}
       
       {/* DETAILED MODAL */}
@@ -1351,23 +1106,6 @@ Custo de Materiais e Serviços</label>
     + Adicionar item
   </button>
 </div>
-
-<div className="pt-2">
-  <button
-    type="button"
-    onClick={handleSaveOSItems}
-    disabled={isSavingItems}
-    className={`h-9 px-4 rounded-lg font-bold text-xs transition-colors border ${
-      isSavingItems
-        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-    }`}
-    title="Salvar no banco os valores manuais (itens avulsos) desta OS"
-  >
-    {isSavingItems ? 'Salvando...' : 'Salvar Valores Manuais'}
-  </button>
-</div>
-
 <label className="text-xs font-semibold text-slate-600 mb-1 block">Totais</label>
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-slate-500">R$</span>
@@ -1457,17 +1195,17 @@ Custo de Materiais e Serviços</label>
                                             </div>
                                             <button onClick={handleAddItemToOS} className="h-10 px-5 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors">Adicionar</button>
                                             <button
-                                              type="button"
-                                              onClick={handleSaveOSItems}
-                                              disabled={isSavingItems || !selectedOS}
-                                              className={`h-10 px-5 rounded-lg font-bold text-sm transition-colors border ${
-                                                isSavingItems
-                                                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                                                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                                              }`}
-                                              title="Salvar no banco os itens (materiais/serviços) desta OS"
+                                                type=\"button\"
+                                                onClick={handleSaveOSItems}
+                                                disabled={isSavingItems}
+                                                className={`h-10 px-5 rounded-lg font-bold text-sm transition-colors border ${
+                                                    isSavingItems
+                                                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                                }`}
+                                                title=\"Salvar no banco os itens (materiais/serviços) desta OS\"
                                             >
-                                              {isSavingItems ? 'Salvando...' : 'Salvar Itens'}
+                                                {isSavingItems ? 'Salvando...' : 'Salvar Itens'}
                                             </button>
                                         </div>
                                     </div>
@@ -1551,22 +1289,45 @@ Custo de Materiais e Serviços</label>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-50">
-                                                    {movements.filter(mov => mov.osId === selectedOS.number && mov.type === 'OUT').map(mov => {
-                                                        const mat = materials.find(m => m.id === mov.materialId);
+                                                    {(() => {
+                                                        // ✅ Compatibilidade: em alguns ambientes o movimento salva osId como UUID (os.id)
+                                                        // e em outros salva como número (os.number) ou campo auxiliar. Aqui aceitamos ambos.
+                                                        const osKeyId = String((selectedOS as any).id || '');
+                                                        const osKeyNumber = String((selectedOS as any).number || '');
+                                                        const matchesOS = (mov: any) => {
+                                                            const movOsId = mov?.osId != null ? String(mov.osId) : '';
+                                                            const movOsNumber = mov?.osNumber != null ? String(mov.osNumber) : '';
+                                                            return (movOsId && (movOsId === osKeyId || movOsId === osKeyNumber)) || (movOsNumber && movOsNumber === osKeyNumber);
+                                                        };
+                                                        const isOut = (mov: any) => {
+                                                            const t = String(mov?.type || '').toUpperCase();
+                                                            // OUT, PROJECT_OUT, OS_OUT, MANUAL_OUT, etc.
+                                                            return t === 'OUT' || t.endsWith('_OUT') || t.includes('OUT');
+                                                        };
+
+                                                        const rows = movements.filter(mov => matchesOS(mov) && isOut(mov));
                                                         return (
-                                                            <tr key={mov.id} className="hover:bg-slate-50">
-                                                                <td className="p-4 text-slate-600 font-mono text-xs">{new Date(mov.date).toLocaleString('pt-BR')}</td>
-                                                                <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluido'}</td>
-                                                                <td className="p-4 text-right font-mono font-bold text-lg">{mov.quantity} <span className="text-xs text-slate-400">{mat?.unit}</span></td>
-                                                                <td className="p-4 text-slate-600 text-sm">{mov.fromLocation || '-'}</td>
-                                                                <td className="p-4 text-slate-600 text-sm">{mov.userId}</td>
-                                                                <td className="p-4 text-slate-500 text-sm">{mov.description}</td>
-                                                            </tr>
+                                                            <>
+                                                                {rows.map(mov => {
+                                                                    const mat = materials.find(m => m.id === mov.materialId);
+                                                                    const u = users?.find((uu: any) => uu.id === mov.userId) || users?.find((uu: any) => uu.email === mov.userId);
+                                                                    return (
+                                                                        <tr key={mov.id} className="hover:bg-slate-50">
+                                                                            <td className="p-4 text-slate-600 font-mono text-xs">{new Date(mov.date).toLocaleString('pt-BR')}</td>
+                                                                            <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluído'}</td>
+                                                                            <td className="p-4 text-right font-mono font-bold text-lg">{mov.quantity} <span className="text-xs text-slate-400">{mat?.unit}</span></td>
+                                                                            <td className="p-4 text-slate-600 text-sm">{mov.fromLocation || '-'}</td>
+                                                                            <td className="p-4 text-slate-600 text-sm">{u?.name || mov.userId || '-'}</td>
+                                                                            <td className="p-4 text-slate-500 text-sm">{(mov as any).description || '-'}</td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                                {rows.length === 0 && (
+                                                                    <tr><td colSpan={6} className="p-8 text-center text-slate-400 italic">Nenhuma baixa de almoxarifado registrada para esta OS.</td></tr>
+                                                                )}
+                                                            </>
                                                         );
-                                                    })}
-                                                    {movements.filter(mov => mov.osId === selectedOS.number && mov.type === 'OUT').length === 0 && (
-                                                        <tr><td colSpan={6} className="p-8 text-center text-slate-400 italic">Nenhuma baixa de almoxarifado registrada para esta OS.</td></tr>
-                                                    )}
+                                                    })()}
                                                 </tbody>
                                             </table>
                                         </div>
