@@ -101,6 +101,28 @@ const Reports: React.FC<Props> = ({
     return filtered;
   };
 
+  // ✅ Tipos de movimentação: em alguns ambientes existem variações (OUT, PROJECT_OUT, OS_OUT, MANUAL_OUT...)
+  const isOutMovement = (m: any) => {
+    const t = String(m?.type || '').toUpperCase();
+    if (!t) return false;
+    // Evita classificar "IN" como OUT por engano
+    if (t === 'IN' || t.endsWith('_IN') || t.includes('INBOUND')) return false;
+    return t === 'OUT' || t.endsWith('_OUT') || t.includes('OUT');
+  };
+
+  const isInMovement = (m: any) => {
+    const t = String(m?.type || '').toUpperCase();
+    return t === 'IN' || t.endsWith('_IN') || t.includes('INBOUND');
+  };
+
+  const matchesOs = (m: any, os: OS) => {
+    const osId = String((os as any).id || '');
+    const osNum = String((os as any).number || '');
+    const movOsId = m?.osId != null ? String(m.osId) : '';
+    const movOsNumber = m?.osNumber != null ? String(m.osNumber) : '';
+    return (movOsId && (movOsId === osId || movOsId === osNum)) || (movOsNumber && movOsNumber === osNum);
+  };
+
   // -----------------------------
   // Helpers (Executor)
   // -----------------------------
@@ -388,7 +410,7 @@ const Reports: React.FC<Props> = ({
 
     const materialStats = materials
       .map(mat => {
-        const outMovements = filteredMovements.filter(m => m.materialId === mat.id && m.type === 'OUT');
+        const outMovements = filteredMovements.filter(m => m.materialId === mat.id && isOutMovement(m));
         const totalQtyOut = outMovements.reduce((acc, m) => acc + (Number(m.quantity) || 0), 0);
         const totalCostOut = totalQtyOut * (Number(mat.unitCost) || 0);
         return {
@@ -446,7 +468,7 @@ const Reports: React.FC<Props> = ({
     const projectStats = filteredProjects.map(proj => {
       const osCosts = calculateProjectCosts(proj, filteredOSs, materials, services);
 
-      const directMovements = filteredMovements.filter(m => m.projectId === proj.id && m.type === 'OUT');
+      const directMovements = filteredMovements.filter(m => m.projectId === proj.id && isOutMovement(m));
       const directMaterialCost = directMovements.reduce((acc, m) => {
         const mat = materials.find(mt => mt.id === m.materialId);
         return acc + (Number(m.quantity) || 0) * (Number(mat?.unitCost) || 0);
@@ -543,7 +565,7 @@ const Reports: React.FC<Props> = ({
         mat?.code || '???',
         mat?.description || 'Item excluído',
         Number(m.quantity) || 0,
-        m.type === 'OUT' || m.type === 'PROJECT_OUT' ? userName : '-',
+        isOutMovement(m) ? userName : '-',
         reference,
         (m as any).description || '-',
       ];
@@ -562,9 +584,9 @@ const Reports: React.FC<Props> = ({
       },
       didParseCell: (data) => {
         if (data.column.index === 1) {
-          const type = data.cell.raw;
-          if (type === 'IN') data.cell.styles.textColor = [0, 150, 0];
-          if (type === 'OUT') data.cell.styles.textColor = [200, 0, 0];
+          const typeRaw = data.cell.raw;
+          if (isInMovement({ type: typeRaw })) data.cell.styles.textColor = [0, 150, 0];
+          if (isOutMovement({ type: typeRaw })) data.cell.styles.textColor = [200, 0, 0];
         }
       },
     });
