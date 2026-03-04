@@ -6,6 +6,7 @@ import {
   calculateProjectCosts,
   calculateOSCosts,
   groupCostsByCompany,
+  groupCostsByCompanyWithBreakdown,
   buildExecutorHoursRows,
 } from '../services/engine';
 
@@ -99,28 +100,6 @@ const Reports: React.FC<Props> = ({
     if (selectedProject) filtered = filtered.filter((item: any) => item.projectId === selectedProject);
 
     return filtered;
-  };
-
-  // ✅ Tipos de movimentação: em alguns ambientes existem variações (OUT, PROJECT_OUT, OS_OUT, MANUAL_OUT...)
-  const isOutMovement = (m: any) => {
-    const t = String(m?.type || '').toUpperCase();
-    if (!t) return false;
-    // Evita classificar "IN" como OUT por engano
-    if (t === 'IN' || t.endsWith('_IN') || t.includes('INBOUND')) return false;
-    return t === 'OUT' || t.endsWith('_OUT') || t.includes('OUT');
-  };
-
-  const isInMovement = (m: any) => {
-    const t = String(m?.type || '').toUpperCase();
-    return t === 'IN' || t.endsWith('_IN') || t.includes('INBOUND');
-  };
-
-  const matchesOs = (m: any, os: OS) => {
-    const osId = String((os as any).id || '');
-    const osNum = String((os as any).number || '');
-    const movOsId = m?.osId != null ? String(m.osId) : '';
-    const movOsNumber = m?.osNumber != null ? String(m.osNumber) : '';
-    return (movOsId && (movOsId === osId || movOsId === osNum)) || (movOsNumber && movOsNumber === osNum);
   };
 
   // -----------------------------
@@ -410,7 +389,7 @@ const Reports: React.FC<Props> = ({
 
     const materialStats = materials
       .map(mat => {
-        const outMovements = filteredMovements.filter(m => m.materialId === mat.id && isOutMovement(m));
+        const outMovements = filteredMovements.filter(m => m.materialId === mat.id && m.type === 'OUT');
         const totalQtyOut = outMovements.reduce((acc, m) => acc + (Number(m.quantity) || 0), 0);
         const totalCostOut = totalQtyOut * (Number(mat.unitCost) || 0);
         return {
@@ -468,7 +447,7 @@ const Reports: React.FC<Props> = ({
     const projectStats = filteredProjects.map(proj => {
       const osCosts = calculateProjectCosts(proj, filteredOSs, materials, services);
 
-      const directMovements = filteredMovements.filter(m => m.projectId === proj.id && isOutMovement(m));
+      const directMovements = filteredMovements.filter(m => m.projectId === proj.id && m.type === 'OUT');
       const directMaterialCost = directMovements.reduce((acc, m) => {
         const mat = materials.find(mt => mt.id === m.materialId);
         return acc + (Number(m.quantity) || 0) * (Number(mat?.unitCost) || 0);
@@ -565,7 +544,7 @@ const Reports: React.FC<Props> = ({
         mat?.code || '???',
         mat?.description || 'Item excluído',
         Number(m.quantity) || 0,
-        isOutMovement(m) ? userName : '-',
+        m.type === 'OUT' || m.type === 'PROJECT_OUT' ? userName : '-',
         reference,
         (m as any).description || '-',
       ];
@@ -584,9 +563,9 @@ const Reports: React.FC<Props> = ({
       },
       didParseCell: (data) => {
         if (data.column.index === 1) {
-          const typeRaw = data.cell.raw;
-          if (isInMovement({ type: typeRaw })) data.cell.styles.textColor = [0, 150, 0];
-          if (isOutMovement({ type: typeRaw })) data.cell.styles.textColor = [200, 0, 0];
+          const type = data.cell.raw;
+          if (type === 'IN') data.cell.styles.textColor = [0, 150, 0];
+          if (type === 'OUT') data.cell.styles.textColor = [200, 0, 0];
         }
       },
     });
@@ -740,22 +719,23 @@ const Reports: React.FC<Props> = ({
     const from = dateFrom ? new Date(dateFrom) : null;
     const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
 
+    // Filtra OS por período usando openDate/startTime/limitDate/endTime como fallback
     const periodOS = oss.filter(o => {
-      const d = parseAnyDate((o as any).openDate || (o as any).startTime || (o as any).limitDate || (o as any).endTime || new Date().toISOString());
-      if (!d) return true;
+      const d = new Date(o.openDate || o.startTime || o.limitDate || o.endTime || new Date().toISOString());
       if (from && d < from) return false;
       if (to && d > to) return false;
       return true;
     });
 
-    const grouped = groupCostsByCompany(periodOS as any, materials, services, equipments || [], projects);
+    // ✅ Agora traz também o detalhamento do "NÃO INFORMADO"
+    const { grouped, unknown } = groupCostsByCompanyWithBreakdown(periodOS, materials, services, equipments || [], projects);
 
-    const rows = grouped.map((g: any) => [
+    const rows = grouped.map(g => ([
       g.company,
       `R$ ${formatCurrency(g.material)}`,
       `R$ ${formatCurrency(g.service)}`,
-      `R$ ${formatCurrency(g.total)}`,
-    ]);
+      `R$ ${formatCurrency(g.total)}`
+    ]));
 
     autoTable(doc, {
       startY: 30,
@@ -763,9 +743,61 @@ const Reports: React.FC<Props> = ({
       body: rows as any[],
       styles: { fontSize: 9, cellPadding: 2 },
       headStyles: { fillColor: [30, 41, 59] },
+      columnStyles: {
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right', fontStyle: 'bold' }
+      }
     });
 
-    doc.save(`relatorio_custo_empresa_${new Date().toISOString().slice(0, 10)}.pdf`);
+    let y = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : 45;
+
+    // ✅ Se existir gasto em "NÃO INFORMADO", detalha quais OS geraram esse custo
+    if (unknown.length) {
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Detalhamento — Empresa: NÃO INFORMADO', 14, y);
+      y += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`Total de OS sem empresa definida: ${unknown.length}`, 14, y);
+      y += 6;
+
+      const unkRows = unknown.slice(0, 250).map(u => ([
+        u.osNumber,
+        (u.description || '').substring(0, 45),
+        (u.context || '').substring(0, 35),
+        u.reason,
+        `R$ ${formatCurrency(u.material)}`,
+        `R$ ${formatCurrency(u.service)}`,
+        `R$ ${formatCurrency(u.total)}`
+      ]));
+
+      autoTable(doc, {
+        startY: y,
+        head: [['OS', 'Descrição', 'Vínculo', 'Motivo', 'Materiais', 'Serviços', 'Total']],
+        body: unkRows as any[],
+        styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
+        headStyles: { fillColor: [100, 116, 139], textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 18 },
+          1: { cellWidth: 44 },
+          2: { cellWidth: 32 },
+          3: { cellWidth: 35 },
+          4: { halign: 'right', cellWidth: 20 },
+          5: { halign: 'right', cellWidth: 20 },
+          6: { halign: 'right', cellWidth: 18, fontStyle: 'bold' }
+        }
+      });
+    }
+
+    doc.save(`relatorio_custo_empresa_${new Date().toISOString().slice(0,10)}.pdf`);
   };
 
   // -----------------------------
