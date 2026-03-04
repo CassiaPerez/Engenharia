@@ -158,7 +158,14 @@ export const groupCostsByCompany = (
 const safeDate = (d?: string) => (d ? new Date(d) : null);
 
 export const calculateExecutorHoursForOS = (os: OS, executorId: string) => {
-  const state = os.executorStates?.[executorId];
+  const anyOs: any = os as any;
+  let states: any = anyOs.executorStates;
+  if (typeof states === 'string' && states.trim()) {
+    try { states = JSON.parse(states); } catch { states = {}; }
+  }
+  if (!states || typeof states !== 'object') states = {};
+
+  const state = states?.[executorId];
 
   const start = safeDate(state?.startTime || os.startTime);
   const end = safeDate(state?.endTime || os.endTime);
@@ -208,9 +215,44 @@ export const buildExecutorHoursRows = (
   const within = (d?: string) => {
     if (!d) return true;
     const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return true; // não bloqueia por data inválida
     if (from && dt < from) return false;
     if (to && dt > to) return false;
     return true;
+  };
+
+  const getUserName = (idOrEmail: string) => {
+    const u = users.find(u => u.id === idOrEmail) || users.find(u => (u as any).email === idOrEmail);
+    return u?.name || idOrEmail;
+  };
+
+  const normalizeExecutorIds = (os: any): string[] => {
+    const raw = os.executorIds;
+    if (Array.isArray(raw)) return raw.filter(Boolean).map(String);
+    if (typeof raw === 'string' && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+      } catch {
+        // ignore
+      }
+      return raw.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  };
+
+  const normalizeExecutorStates = (os: any): Record<string, any> => {
+    const raw = os.executorStates;
+    if (!raw) return {};
+    if (typeof raw === 'string' && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+    return typeof raw === 'object' ? raw : {};
   };
 
   const rows: Array<{
@@ -225,39 +267,60 @@ export const buildExecutorHoursRows = (
   }> = [];
 
   oss.forEach(os => {
-    if (os.executorStates && Object.keys(os.executorStates).length > 0) {
-      Object.entries(os.executorStates).forEach(([executorId, st]) => {
-        const ref = st.startTime || os.openDate;
+    const anyOs: any = os as any;
+    const states = normalizeExecutorStates(anyOs);
+
+    // 1) Modelo novo: executorStates
+    if (states && Object.keys(states).length > 0) {
+      Object.entries(states).forEach(([executorKey, st]) => {
+        const ref = st?.startTime || st?.endTime || anyOs.startTime || anyOs.endTime || anyOs.openDate;
         if (!within(ref)) return;
 
-        const name = users.find(u => u.id === executorId)?.name || executorId;
-        const hrs = calculateExecutorHoursForOS(os, executorId);
+        const hrs = calculateExecutorHoursForOS(anyOs, executorKey);
         rows.push({
-          executorId,
-          executorName: name,
-          osNumber: os.number,
-          startTime: st.startTime,
-          endTime: st.endTime,
-          ...hrs
+          executorId: executorKey,
+          executorName: getUserName(executorKey),
+          osNumber: anyOs.number,
+          startTime: st?.startTime || anyOs.startTime,
+          endTime: st?.endTime || anyOs.endTime,
+          ...hrs,
         });
       });
       return;
     }
 
-    const executorId = os.executorId;
-    if (!executorId) return;
-    const ref = os.startTime || os.openDate;
-    if (!within(ref)) return;
+    // 2) Modelo multi (executorIds) sem states
+    const multi = normalizeExecutorIds(anyOs);
+    if (multi.length > 0) {
+      multi.forEach((executorKey) => {
+        const ref = anyOs.startTime || anyOs.endTime || anyOs.openDate;
+        if (!within(ref)) return;
+        const hrs = calculateExecutorHoursForOS(anyOs, executorKey);
+        rows.push({
+          executorId: executorKey,
+          executorName: getUserName(executorKey),
+          osNumber: anyOs.number,
+          startTime: anyOs.startTime,
+          endTime: anyOs.endTime,
+          ...hrs,
+        });
+      });
+      return;
+    }
 
-    const name = users.find(u => u.id === executorId)?.name || executorId;
-    const hrs = calculateExecutorHoursForOS(os, executorId);
+    // 3) Legado: executorId
+    const executorId = anyOs.executorId;
+    if (!executorId) return;
+    const ref = anyOs.startTime || anyOs.endTime || anyOs.openDate;
+    if (!within(ref)) return;
+    const hrs = calculateExecutorHoursForOS(anyOs, executorId);
     rows.push({
       executorId,
-      executorName: name,
-      osNumber: os.number,
-      startTime: os.startTime,
-      endTime: os.endTime,
-      ...hrs
+      executorName: getUserName(executorId),
+      osNumber: anyOs.number,
+      startTime: anyOs.startTime,
+      endTime: anyOs.endTime,
+      ...hrs,
     });
   });
 
