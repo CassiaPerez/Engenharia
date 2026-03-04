@@ -1195,7 +1195,7 @@ Custo de Materiais e Serviços</label>
                                             </div>
                                             <button onClick={handleAddItemToOS} className="h-10 px-5 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors">Adicionar</button>
                                             <button
-                                                type=\"button\"
+                                                type="button"
                                                 onClick={handleSaveOSItems}
                                                 disabled={isSavingItems}
                                                 className={`h-10 px-5 rounded-lg font-bold text-sm transition-colors border ${
@@ -1203,7 +1203,7 @@ Custo de Materiais e Serviços</label>
                                                         ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                                                         : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                                                 }`}
-                                                title=\"Salvar no banco os itens (materiais/serviços) desta OS\"
+                                                title="Salvar no banco os itens (materiais/serviços) desta OS"
                                             >
                                                 {isSavingItems ? 'Salvando...' : 'Salvar Itens'}
                                             </button>
@@ -1289,45 +1289,22 @@ Custo de Materiais e Serviços</label>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-50">
-                                                    {(() => {
-                                                        // ✅ Compatibilidade: em alguns ambientes o movimento salva osId como UUID (os.id)
-                                                        // e em outros salva como número (os.number) ou campo auxiliar. Aqui aceitamos ambos.
-                                                        const osKeyId = String((selectedOS as any).id || '');
-                                                        const osKeyNumber = String((selectedOS as any).number || '');
-                                                        const matchesOS = (mov: any) => {
-                                                            const movOsId = mov?.osId != null ? String(mov.osId) : '';
-                                                            const movOsNumber = mov?.osNumber != null ? String(mov.osNumber) : '';
-                                                            return (movOsId && (movOsId === osKeyId || movOsId === osKeyNumber)) || (movOsNumber && movOsNumber === osKeyNumber);
-                                                        };
-                                                        const isOut = (mov: any) => {
-                                                            const t = String(mov?.type || '').toUpperCase();
-                                                            // OUT, PROJECT_OUT, OS_OUT, MANUAL_OUT, etc.
-                                                            return t === 'OUT' || t.endsWith('_OUT') || t.includes('OUT');
-                                                        };
-
-                                                        const rows = movements.filter(mov => matchesOS(mov) && isOut(mov));
+                                                    {movements.filter(mov => mov.osId === selectedOS.number && mov.type === 'OUT').map(mov => {
+                                                        const mat = materials.find(m => m.id === mov.materialId);
                                                         return (
-                                                            <>
-                                                                {rows.map(mov => {
-                                                                    const mat = materials.find(m => m.id === mov.materialId);
-                                                                    const u = users?.find((uu: any) => uu.id === mov.userId) || users?.find((uu: any) => uu.email === mov.userId);
-                                                                    return (
-                                                                        <tr key={mov.id} className="hover:bg-slate-50">
-                                                                            <td className="p-4 text-slate-600 font-mono text-xs">{new Date(mov.date).toLocaleString('pt-BR')}</td>
-                                                                            <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluído'}</td>
-                                                                            <td className="p-4 text-right font-mono font-bold text-lg">{mov.quantity} <span className="text-xs text-slate-400">{mat?.unit}</span></td>
-                                                                            <td className="p-4 text-slate-600 text-sm">{mov.fromLocation || '-'}</td>
-                                                                            <td className="p-4 text-slate-600 text-sm">{u?.name || mov.userId || '-'}</td>
-                                                                            <td className="p-4 text-slate-500 text-sm">{(mov as any).description || '-'}</td>
-                                                                        </tr>
-                                                                    );
-                                                                })}
-                                                                {rows.length === 0 && (
-                                                                    <tr><td colSpan={6} className="p-8 text-center text-slate-400 italic">Nenhuma baixa de almoxarifado registrada para esta OS.</td></tr>
-                                                                )}
-                                                            </>
+                                                            <tr key={mov.id} className="hover:bg-slate-50">
+                                                                <td className="p-4 text-slate-600 font-mono text-xs">{new Date(mov.date).toLocaleString('pt-BR')}</td>
+                                                                <td className="p-4 font-bold text-slate-700">{mat?.description || 'Item Excluido'}</td>
+                                                                <td className="p-4 text-right font-mono font-bold text-lg">{mov.quantity} <span className="text-xs text-slate-400">{mat?.unit}</span></td>
+                                                                <td className="p-4 text-slate-600 text-sm">{mov.fromLocation || '-'}</td>
+                                                                <td className="p-4 text-slate-600 text-sm">{mov.userId}</td>
+                                                                <td className="p-4 text-slate-500 text-sm">{mov.description}</td>
+                                                            </tr>
                                                         );
-                                                    })()}
+                                                    })}
+                                                    {movements.filter(mov => mov.osId === selectedOS.number && mov.type === 'OUT').length === 0 && (
+                                                        <tr><td colSpan={6} className="p-8 text-center text-slate-400 italic">Nenhuma baixa de almoxarifado registrada para esta OS.</td></tr>
+                                                    )}
                                                 </tbody>
                                             </table>
                                         </div>
