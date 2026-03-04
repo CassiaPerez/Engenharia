@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Material, Project, StockMovement, OS, ServiceType, User, Building, Equipment, OSStatus } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -20,6 +20,18 @@ interface Props {
   equipments?: Equipment[];
 }
 
+type ExecutorHoursRow = {
+  executorName: string;
+  executorKey: string; // id/email
+  osId?: string;
+  osNumber: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  grossHours: number;
+  pausedHours: number;
+  netHours: number;
+};
+
 const Reports: React.FC<Props> = ({
   materials,
   projects,
@@ -38,41 +50,60 @@ const Reports: React.FC<Props> = ({
   const [selectedExecutor, setSelectedExecutor] = useState<string>('');
 
   const formatCurrency = (val: number) =>
-    val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    (Number(val) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const parseAnyDate = (v: any): Date | null => {
+    try {
+      if (!v) return null;
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return null;
+      return d;
+    } catch {
+      return null;
+    }
+  };
+
+  const isWithinPeriod = (d: Date | null) => {
+    if (!d) return true;
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      if (!Number.isNaN(from.getTime()) && d < from) return false;
+    }
+    if (dateTo) {
+      const to = new Date(dateTo + 'T23:59:59');
+      if (!Number.isNaN(to.getTime()) && d > to) return false;
+    }
+    return true;
+  };
 
   const applyFilters = (data: any[]) => {
     let filtered = [...data];
 
     if (dateFrom || dateTo) {
       filtered = filtered.filter((item: any) => {
-        const itemDate = new Date(
-          item.openDate || item.date || item.startDate || item.endTime || item.limitDate || item.createdAt
-        );
-        if (dateFrom && itemDate < new Date(dateFrom)) return false;
-        if (dateTo && itemDate > new Date(dateTo + 'T23:59:59')) return false;
-        return true;
+        const itemDate =
+          parseAnyDate(item.openDate) ||
+          parseAnyDate(item.date) ||
+          parseAnyDate(item.startDate) ||
+          parseAnyDate(item.startTime) ||
+          parseAnyDate(item.endTime) ||
+          parseAnyDate(item.limitDate) ||
+          parseAnyDate(item.createdAt);
+
+        return isWithinPeriod(itemDate);
       });
     }
 
-    if (selectedEquipment) {
-      filtered = filtered.filter((item: any) => item.equipmentId === selectedEquipment);
-    }
-
-    if (selectedBuilding) {
-      filtered = filtered.filter((item: any) => item.buildingId === selectedBuilding);
-    }
-
-    if (selectedProject) {
-      filtered = filtered.filter((item: any) => item.projectId === selectedProject);
-    }
+    if (selectedEquipment) filtered = filtered.filter((item: any) => item.equipmentId === selectedEquipment);
+    if (selectedBuilding) filtered = filtered.filter((item: any) => item.buildingId === selectedBuilding);
+    if (selectedProject) filtered = filtered.filter((item: any) => item.projectId === selectedProject);
 
     return filtered;
   };
 
-  // ------------------------------------
-  // Helpers para Executor Report (PDF)
-  // ------------------------------------
-
+  // -----------------------------
+  // Helpers (Executor)
+  // -----------------------------
   const getExecutorName = (idOrEmail?: string) => {
     if (!idOrEmail) return 'Executor';
     const u = users.find(x => x.id === idOrEmail) || users.find(x => x.email === idOrEmail);
@@ -87,9 +118,8 @@ const Reports: React.FC<Props> = ({
   const isOsForExecutor = (os: OS, executorIdOrEmail: string) => {
     if (!executorIdOrEmail) return true;
     const { id, email } = normalizeExecutorKey(executorIdOrEmail);
-
-    const legacy = os.executorId === id || os.executorId === email;
-    const multi = (os.executorIds || []).includes(id) || (os.executorIds || []).includes(email);
+    const legacy = (os as any).executorId === id || (os as any).executorId === email;
+    const multi = ((os as any).executorIds || []).includes(id) || ((os as any).executorIds || []).includes(email);
     return legacy || multi;
   };
 
@@ -97,12 +127,10 @@ const Reports: React.FC<Props> = ({
     const anyOs: any = os as any;
     const { id, email } = normalizeExecutorKey(executorIdOrEmail);
 
-    // novo modelo: executorStates[id/email].pauseHistory
     const states = anyOs.executorStates || {};
     const st = states[id] || states[email];
     const pauseHistory = (st?.pauseHistory || []) as any[];
 
-    // legado: pauseHistory global
     const legacy = (anyOs.pauseHistory || []) as any[];
 
     const entries = (pauseHistory.length ? pauseHistory : legacy).slice(-10);
@@ -120,29 +148,21 @@ const Reports: React.FC<Props> = ({
   };
 
   const getExecutorManualMaterials = (os: OS, executorIdOrEmail: string) => {
-    /**
-     * ⚠️ Ajuste se você já tem um campo exato.
-     * Essa função tenta várias estruturas comuns.
-     */
     const anyOs: any = os as any;
     const { id, email } = normalizeExecutorKey(executorIdOrEmail);
 
-    // 1) os.executorManualMaterials[executorId] = [{ description, quantity, unit? }]
     const v1 = anyOs.executorManualMaterials?.[id] || anyOs.executorManualMaterials?.[email];
     if (Array.isArray(v1)) return v1;
 
-    // 2) os.executorAddedMaterials[executorId] = [...]
     const v2 = anyOs.executorAddedMaterials?.[id] || anyOs.executorAddedMaterials?.[email];
     if (Array.isArray(v2)) return v2;
 
-    // 3) os.manualMaterials = [{ description, quantity, unit?, executorId }]
     const v3 = anyOs.manualMaterials;
     if (Array.isArray(v3)) {
       const list = v3.filter((m: any) => m.executorId === id || m.executorId === email);
       if (list.length) return list;
     }
 
-    // 4) fallback comum
     const guess = anyOs.manualItems || anyOs.manualStock || anyOs.manualMaterialsByExecutor;
     if (Array.isArray(guess)) {
       const list = guess.filter((m: any) => m.executorId === id || m.executorId === email);
@@ -180,8 +200,7 @@ const Reports: React.FC<Props> = ({
             const ctx = canvas.getContext('2d');
             if (!ctx) return resolve(null);
             ctx.drawImage(img, 0, 0);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            resolve(dataUrl);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
           } catch {
             resolve(null);
           }
@@ -195,31 +214,171 @@ const Reports: React.FC<Props> = ({
   };
 
   const addHeader = (doc: jsPDF, title: string, subtitleRight?: string) => {
-    const isLandscape = (doc as any).internal?.pageSize?.getWidth?.() > (doc as any).internal?.pageSize?.getHeight?.();
-    const w = isLandscape ? 297 : 210;
+    const pageW = (doc as any).internal?.pageSize?.getWidth?.() || 210;
 
     doc.setFillColor(50, 60, 70);
-    doc.rect(0, 0, w, 24, 'F');
+    doc.rect(0, 0, pageW, 24, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text(title, 14, 16);
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    if (subtitleRight) doc.text(subtitleRight, w - 14, 16, { align: 'right' });
+    if (subtitleRight) doc.text(subtitleRight, pageW - 14, 16, { align: 'right' });
 
     if (dateFrom || dateTo) {
       doc.setFontSize(8);
-      doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, w - 14, 20, { align: 'right' });
+      doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, pageW - 14, 20, { align: 'right' });
     }
 
     doc.setTextColor(0, 0, 0);
   };
 
-  // ------------------------------------
-  // Relatórios: Materiais / Projetos / Fluxo / Custos Operacionais (seus)
-  // ------------------------------------
+  // -----------------------------
+  // ✅ Fallback: cálculo de horas por executor (se engine não retornar)
+  // -----------------------------
+  const hoursBetween = (a?: string | null, b?: string | null) => {
+    const da = parseAnyDate(a);
+    const db = parseAnyDate(b);
+    if (!da || !db) return 0;
+    const ms = db.getTime() - da.getTime();
+    return ms > 0 ? ms / 36e5 : 0;
+  };
 
+  const sumPausedHoursFromHistory = (history: any[]) => {
+    // soma PAUSE -> RESUME, se faltar RESUME usa "agora"
+    let paused = 0;
+    let lastPause: Date | null = null;
+
+    for (const ev of history || []) {
+      const ts = parseAnyDate(ev?.timestamp);
+      if (!ts) continue;
+
+      const action = String(ev?.action || '').toUpperCase();
+      if (action === 'PAUSE') lastPause = ts;
+      if (action === 'RESUME' && lastPause) {
+        paused += (ts.getTime() - lastPause.getTime()) / 36e5;
+        lastPause = null;
+      }
+    }
+
+    if (lastPause) {
+      paused += (new Date().getTime() - lastPause.getTime()) / 36e5;
+    }
+
+    return paused > 0 ? paused : 0;
+  };
+
+  const buildExecutorHoursRowsFallback = (inputOS: OS[]): ExecutorHoursRow[] => {
+    const filteredOS = applyFilters(inputOS);
+
+    const execKeys = (() => {
+      if (selectedExecutor) {
+        const { id, email } = normalizeExecutorKey(selectedExecutor);
+        return Array.from(new Set([id, email].filter(Boolean)));
+      }
+      const s = new Set<string>();
+      filteredOS.forEach(o => {
+        const anyOs: any = o as any;
+        if (anyOs.executorId) s.add(anyOs.executorId);
+        (anyOs.executorIds || []).forEach((x: any) => x && s.add(x));
+      });
+      return Array.from(s);
+    })();
+
+    const rows: ExecutorHoursRow[] = [];
+
+    for (const execKey of execKeys) {
+      const osForExec = filteredOS.filter(o => isOsForExecutor(o, execKey));
+
+      for (const os of osForExec) {
+        const anyOs: any = os as any;
+
+        // start/end: usa startTime/endTime; fallback openDate/now
+        const start = anyOs.startTime || anyOs.openDate || null;
+        const end = anyOs.endTime || (anyOs.status === OSStatus.COMPLETED ? anyOs.endTime : null);
+
+        // se não tem endTime mas está concluída, ainda assim tenta endTime; se não tiver, usa "agora" para relatório de andamento
+        const safeEnd = end || (anyOs.status === OSStatus.IN_PROGRESS || anyOs.status === OSStatus.PAUSED ? new Date().toISOString() : null);
+
+        // pausa por executor (novo) ou global (legado)
+        const { id, email } = normalizeExecutorKey(execKey);
+        const states = anyOs.executorStates || {};
+        const st = states[id] || states[email];
+        const pauseHistory = (st?.pauseHistory || []) as any[];
+        const legacyHistory = (anyOs.pauseHistory || []) as any[];
+
+        const gross = hoursBetween(start, safeEnd);
+        const paused = sumPausedHoursFromHistory(pauseHistory.length ? pauseHistory : legacyHistory);
+        const net = Math.max(gross - paused, 0);
+
+        // aplica filtro por período com base no endTime (se tiver) senão start/open
+        const dRef = parseAnyDate(anyOs.endTime) || parseAnyDate(anyOs.startTime) || parseAnyDate(anyOs.openDate) || null;
+        if (!isWithinPeriod(dRef)) continue;
+
+        rows.push({
+          executorName: getExecutorName(execKey),
+          executorKey: execKey,
+          osId: anyOs.id,
+          osNumber: anyOs.number || anyOs.osNumber || anyOs.id || '-',
+          startTime: start,
+          endTime: anyOs.endTime || null,
+          grossHours: Number.isFinite(gross) ? gross : 0,
+          pausedHours: Number.isFinite(paused) ? paused : 0,
+          netHours: Number.isFinite(net) ? net : 0,
+        });
+      }
+    }
+
+    // ordena por executor e data
+    rows.sort((a, b) => {
+      const n = (a.executorName || '').localeCompare(b.executorName || '');
+      if (n !== 0) return n;
+      const ta = parseAnyDate(a.startTime)?.getTime() || 0;
+      const tb = parseAnyDate(b.startTime)?.getTime() || 0;
+      return tb - ta;
+    });
+
+    return rows;
+  };
+
+  const getExecutorHoursRowsSmart = (): ExecutorHoursRow[] => {
+    // 1) tenta engine
+    try {
+      const engineRows = (buildExecutorHoursRows as any)?.(oss, users || [], dateFrom, dateTo) || [];
+      const normalized: ExecutorHoursRow[] = (engineRows || []).map((r: any) => ({
+        executorName: r.executorName || r.name || 'Executor',
+        executorKey: r.executorId || r.executorKey || r.executorEmail || r.executorName || 'executor',
+        osId: r.osId,
+        osNumber: r.osNumber || r.number || '-',
+        startTime: r.startTime || null,
+        endTime: r.endTime || null,
+        grossHours: Number(r.grossHours || 0),
+        pausedHours: Number(r.pausedHours || 0),
+        netHours: Number(r.netHours || 0),
+      }));
+
+      // filtra por executor selecionado (se engine não filtra)
+      const filteredByExec = selectedExecutor
+        ? normalized.filter(row => {
+            const { id, email } = normalizeExecutorKey(selectedExecutor);
+            return row.executorKey === id || row.executorKey === email || row.executorKey === selectedExecutor;
+          })
+        : normalized;
+
+      if (filteredByExec.length) return filteredByExec;
+    } catch {
+      // ignora e usa fallback
+    }
+
+    // 2) fallback compatível com seu modelo atual
+    return buildExecutorHoursRowsFallback(oss);
+  };
+
+  // -----------------------------
+  // Relatórios existentes
+  // -----------------------------
   const generateMaterialReport = () => {
     const doc = new jsPDF();
     const today = new Date().toLocaleDateString('pt-BR');
@@ -230,14 +389,14 @@ const Reports: React.FC<Props> = ({
     const materialStats = materials
       .map(mat => {
         const outMovements = filteredMovements.filter(m => m.materialId === mat.id && m.type === 'OUT');
-        const totalQtyOut = outMovements.reduce((acc, m) => acc + m.quantity, 0);
-        const totalCostOut = totalQtyOut * mat.unitCost;
+        const totalQtyOut = outMovements.reduce((acc, m) => acc + (Number(m.quantity) || 0), 0);
+        const totalCostOut = totalQtyOut * (Number(mat.unitCost) || 0);
         return {
           code: mat.code,
           description: mat.description,
           unit: mat.unit,
           qtyOut: totalQtyOut,
-          unitCost: mat.unitCost,
+          unitCost: Number(mat.unitCost) || 0,
           totalCost: totalCostOut,
         };
       })
@@ -290,20 +449,20 @@ const Reports: React.FC<Props> = ({
       const directMovements = filteredMovements.filter(m => m.projectId === proj.id && m.type === 'OUT');
       const directMaterialCost = directMovements.reduce((acc, m) => {
         const mat = materials.find(mt => mt.id === m.materialId);
-        return acc + (m.quantity * (mat?.unitCost || 0));
+        return acc + (Number(m.quantity) || 0) * (Number(mat?.unitCost) || 0);
       }, 0);
 
-      const totalReal = osCosts.totalReal + directMaterialCost;
-      const totalMaterials = osCosts.totalMaterials + directMaterialCost;
+      const totalReal = (Number(osCosts.totalReal) || 0) + directMaterialCost;
+      const totalMaterials = (Number(osCosts.totalMaterials) || 0) + directMaterialCost;
 
       return {
         code: proj.code,
         desc: proj.description,
         status: proj.status,
-        budget: proj.estimatedValue,
+        budget: Number(proj.estimatedValue) || 0,
         osMaterial: totalMaterials,
         directMaterial: directMaterialCost,
-        services: osCosts.totalServices,
+        services: Number(osCosts.totalServices) || 0,
         total: totalReal,
       };
     });
@@ -353,10 +512,11 @@ const Reports: React.FC<Props> = ({
     addHeader(doc, 'FLUXO DE ESTOQUE DETALHADO (ENTRADA / SAÍDA)', `Gerado em: ${today}`);
 
     const from = dateFrom ? new Date(dateFrom) : null;
-    const to = dateTo ? new Date(dateTo) : null;
+    const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
 
     const periodMovements = movements.filter(m => {
-      const d = new Date(m.date);
+      const d = parseAnyDate(m.date);
+      if (!d) return true;
       if (from && d < from) return false;
       if (to && d > to) return false;
       return true;
@@ -371,7 +531,7 @@ const Reports: React.FC<Props> = ({
       let reference = '-';
       if (m.osId) {
         const osRef = oss.find(o => o.id === m.osId);
-        reference = `OS: ${osRef?.number || m.osId}`;
+        reference = `OS: ${(osRef as any)?.number || m.osId}`;
       } else if (m.projectId) {
         const p = projects.find(proj => proj.id === m.projectId);
         reference = `Proj: ${p?.code || 'N/A'}`;
@@ -382,7 +542,7 @@ const Reports: React.FC<Props> = ({
         m.type,
         mat?.code || '???',
         mat?.description || 'Item excluído',
-        m.quantity,
+        Number(m.quantity) || 0,
         m.type === 'OUT' || m.type === 'PROJECT_OUT' ? userName : '-',
         reference,
         (m as any).description || '-',
@@ -420,7 +580,6 @@ const Reports: React.FC<Props> = ({
 
     let yPos = 35;
 
-    // 1. CUSTOS POR EDIFÍCIO
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('1. CUSTOS POR EDIFÍCIO (FACILITIES)', 14, yPos);
@@ -428,8 +587,8 @@ const Reports: React.FC<Props> = ({
 
     const buildingCosts = buildings
       .map(b => {
-        const relatedOS = oss.filter(o => o.buildingId === b.id && o.status !== 'CANCELED');
-        const totalCost = relatedOS.reduce((acc, os) => acc + calculateOSCosts(os, materials, services).totalCost, 0);
+        const relatedOS = oss.filter(o => (o as any).buildingId === b.id && (o as any).status !== 'CANCELED');
+        const totalCost = relatedOS.reduce((acc, os) => acc + (calculateOSCosts as any)(os, materials, services).totalCost, 0);
         return [b.name, b.city, relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
       })
       .sort((a, b) => {
@@ -441,7 +600,7 @@ const Reports: React.FC<Props> = ({
     autoTable(doc, {
       startY: yPos,
       head: [['Edifício', 'Local', 'Qtd OS', 'Custo Total']],
-      body: buildingCosts,
+      body: buildingCosts as any[],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [50, 80, 120] },
       columnStyles: { 2: { halign: 'center' }, 3: { halign: 'right', fontStyle: 'bold' } },
@@ -449,14 +608,13 @@ const Reports: React.FC<Props> = ({
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
 
-    // 2. CUSTOS POR EQUIPAMENTO
     doc.text('2. CUSTOS POR EQUIPAMENTO (MANUTENÇÃO)', 14, yPos);
     yPos += 5;
 
     const equipmentCosts = equipments
       .map(eq => {
-        const relatedOS = oss.filter(o => o.equipmentId === eq.id && o.status !== 'CANCELED');
-        const totalCost = relatedOS.reduce((acc, os) => acc + calculateOSCosts(os, materials, services).totalCost, 0);
+        const relatedOS = oss.filter(o => (o as any).equipmentId === eq.id && (o as any).status !== 'CANCELED');
+        const totalCost = relatedOS.reduce((acc, os) => acc + (calculateOSCosts as any)(os, materials, services).totalCost, 0);
         return [eq.code, eq.name, (eq as any).status || '-', relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
       })
       .sort((a, b) => {
@@ -468,7 +626,7 @@ const Reports: React.FC<Props> = ({
     autoTable(doc, {
       startY: yPos,
       head: [['TAG', 'Equipamento', 'Status', 'Qtd OS', 'Custo Total']],
-      body: equipmentCosts,
+      body: equipmentCosts as any[],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [120, 80, 50] },
       columnStyles: { 3: { halign: 'center' }, 4: { halign: 'right', fontStyle: 'bold' } },
@@ -485,18 +643,18 @@ const Reports: React.FC<Props> = ({
     yPos += 5;
 
     const osCosts = oss
-      .filter(o => o.status !== 'CANCELED')
+      .filter(o => (o as any).status !== 'CANCELED')
       .map(o => {
-        const costs = calculateOSCosts(o, materials, services);
+        const costs = (calculateOSCosts as any)(o, materials, services);
         return { ...o, total: costs.totalCost };
       })
       .sort((a: any, b: any) => b.total - a.total)
       .slice(0, 30)
-      .map(o => [
+      .map((o: any) => [
         o.number,
         (o.description || '').substring(0, 40) + '...',
         o.type,
-        `R$ ${formatCurrency((o as any).total)}`,
+        `R$ ${formatCurrency(o.total)}`,
       ]);
 
     autoTable(doc, {
@@ -511,16 +669,18 @@ const Reports: React.FC<Props> = ({
     doc.save(`Custos_Operacionais_Analitico_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  // ------------------------------------
-  // ✅ Relatório: Horas por Executor (tabela)
-  // ------------------------------------
+  // -----------------------------
+  // ✅ Horas por Executor (agora não fica vazio)
+  // -----------------------------
   const generateExecutorHoursReport = () => {
     const doc = new jsPDF({ orientation: 'landscape' });
     const today = new Date().toLocaleString('pt-BR');
 
     addHeader(doc, 'RELATÓRIO DE HORAS POR EXECUTOR', `Gerado em: ${today}`);
 
-    const rowsData = buildExecutorHoursRows(oss, users || [], dateFrom, dateTo).map(r => [
+    const rows = getExecutorHoursRowsSmart();
+
+    const rowsData = rows.map(r => [
       r.executorName,
       r.osNumber,
       r.startTime ? new Date(r.startTime).toLocaleString('pt-BR') : '-',
@@ -529,6 +689,11 @@ const Reports: React.FC<Props> = ({
       Number(r.pausedHours || 0).toFixed(2),
       Number(r.netHours || 0).toFixed(2),
     ]);
+
+    // se ainda estiver vazio, coloca uma linha explicativa (melhor que PDF em branco)
+    if (!rowsData.length) {
+      rowsData.push(['-', '-', '-', '-', '0.00', '0.00', '0.00']);
+    }
 
     autoTable(doc, {
       startY: 30,
@@ -541,9 +706,9 @@ const Reports: React.FC<Props> = ({
     doc.save(`relatorio_horas_executor_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
-  // ------------------------------------
-  // ✅ Relatório: Custo por Empresa (tabela)
-  // ------------------------------------
+  // -----------------------------
+  // ✅ Custo por Empresa
+  // -----------------------------
   const generateCompanyCostReport = () => {
     const doc = new jsPDF({ orientation: 'portrait' });
     const today = new Date().toLocaleString('pt-BR');
@@ -551,18 +716,19 @@ const Reports: React.FC<Props> = ({
     addHeader(doc, 'RELATÓRIO DE CUSTO POR EMPRESA', `Gerado em: ${today}`);
 
     const from = dateFrom ? new Date(dateFrom) : null;
-    const to = dateTo ? new Date(dateTo) : null;
+    const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
 
     const periodOS = oss.filter(o => {
-      const d = new Date(o.openDate || o.startTime || o.limitDate || o.endTime || new Date().toISOString());
+      const d = parseAnyDate((o as any).openDate || (o as any).startTime || (o as any).limitDate || (o as any).endTime || new Date().toISOString());
+      if (!d) return true;
       if (from && d < from) return false;
       if (to && d > to) return false;
       return true;
     });
 
-    const grouped = groupCostsByCompany(periodOS, materials, services, equipments || [], projects);
+    const grouped = groupCostsByCompany(periodOS as any, materials, services, equipments || [], projects);
 
-    const rows = grouped.map(g => [
+    const rows = grouped.map((g: any) => [
       g.company,
       `R$ ${formatCurrency(g.material)}`,
       `R$ ${formatCurrency(g.service)}`,
@@ -580,47 +746,41 @@ const Reports: React.FC<Props> = ({
     doc.save(`relatorio_custo_empresa_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
-  // ------------------------------------
-  // ✅ NOVO: Relatório por Executor (com evidências/imagens)
-  // ------------------------------------
+  // -----------------------------
+  // ✅ Relatório por Executor com evidências (pausas + materiais manuais + imagens)
+  // -----------------------------
   const generateExecutorReportWithEvidence = async () => {
     const doc = new jsPDF({ orientation: 'portrait' });
     const today = new Date().toLocaleString('pt-BR');
 
     addHeader(doc, 'RELATÓRIO POR EXECUTOR (COM EVIDÊNCIAS)', `Gerado em: ${today}`);
 
-    // filtra OS por período/contexto
     const filteredOS = applyFilters(oss);
 
-    // se selecionar executor, restringe a ele, senão agrupa todos
     const executorKeys = (() => {
       if (selectedExecutor) {
         const { id, email } = normalizeExecutorKey(selectedExecutor);
         return Array.from(new Set([id, email].filter(Boolean)));
       }
 
-      // pega executores presentes em oss: executorId + executorIds
       const set = new Set<string>();
-      filteredOS.forEach(o => {
+      filteredOS.forEach((o: any) => {
         if (o.executorId) set.add(o.executorId);
-        (o.executorIds || []).forEach(x => x && set.add(x));
+        (o.executorIds || []).forEach((x: any) => x && set.add(x));
       });
       return Array.from(set);
     })();
 
     let y = 32;
-
     const maxOsPerExecutorWithImages = 30;
 
     for (const execKey of executorKeys) {
-      // pega os que pertencem ao executor e concluídas (para evidência e tarefas feitas)
       const osForExec = filteredOS
         .filter(o => isOsForExecutor(o, execKey))
-        .filter(o => o.status === OSStatus.COMPLETED || (o as any).endTime); // garante "realizadas"
+        .filter(o => (o as any).status === OSStatus.COMPLETED || !!(o as any).endTime);
 
       if (!osForExec.length) continue;
 
-      // quebra página se necessário
       if (y > 260) {
         doc.addPage();
         y = 20;
@@ -636,7 +796,6 @@ const Reports: React.FC<Props> = ({
       doc.text(`Qtd OS concluídas no filtro: ${osForExec.length}`, 14, y);
       y += 6;
 
-      // tabela resumo por executor
       const tableRows = osForExec.slice(0, maxOsPerExecutorWithImages).map(o => {
         const manualMats = getExecutorManualMaterials(o, execKey);
         const manualText = manualMats.length
@@ -653,10 +812,12 @@ const Reports: React.FC<Props> = ({
         const pauses = getExecutorPauseText(o, execKey);
 
         return [
-          o.number || '-',
-          (o.description || '').substring(0, 50),
-          o.startTime ? new Date(o.startTime).toLocaleString('pt-BR') : (o.openDate ? new Date(o.openDate).toLocaleString('pt-BR') : '-'),
-          o.endTime ? new Date(o.endTime).toLocaleString('pt-BR') : '-',
+          (o as any).number || '-',
+          String((o as any).description || '').substring(0, 50),
+          (o as any).startTime
+            ? new Date((o as any).startTime).toLocaleString('pt-BR')
+            : ((o as any).openDate ? new Date((o as any).openDate).toLocaleString('pt-BR') : '-'),
+          (o as any).endTime ? new Date((o as any).endTime).toLocaleString('pt-BR') : '-',
           pauses,
           manualText,
         ];
@@ -680,7 +841,6 @@ const Reports: React.FC<Props> = ({
 
       y = (doc as any).lastAutoTable.finalY + 8;
 
-      // seção de evidências (imagens)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.text('Evidências (imagens de finalização):', 14, y);
@@ -698,7 +858,7 @@ const Reports: React.FC<Props> = ({
         y += 8;
       } else {
         for (const item of osWithEvidence) {
-          const os = item.os;
+          const os: any = item.os as any;
           const ev = item.ev as string;
 
           if (y > 250) {
@@ -708,10 +868,9 @@ const Reports: React.FC<Props> = ({
 
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(9);
-          doc.text(`OS ${os.number || '-'} - ${(os.description || '').substring(0, 60)}`, 14, y);
+          doc.text(`OS ${os.number || '-'} - ${String(os.description || '').substring(0, 60)}`, 14, y);
           y += 4;
 
-          // tenta carregar imagem como dataURL
           const dataUrl = await loadImageAsDataUrl(ev);
 
           if (!dataUrl) {
@@ -722,7 +881,6 @@ const Reports: React.FC<Props> = ({
             continue;
           }
 
-          // desenha miniatura
           const imgW = 80;
           const imgH = 45;
           try {
@@ -737,7 +895,6 @@ const Reports: React.FC<Props> = ({
         }
       }
 
-      // separador entre executores
       y += 6;
       doc.setDrawColor(220);
       doc.line(14, y, 196, y);
@@ -750,7 +907,6 @@ const Reports: React.FC<Props> = ({
   // -----------------------------
   // UI
   // -----------------------------
-
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="border-b border-slate-200 pb-6">
@@ -949,7 +1105,7 @@ const Reports: React.FC<Props> = ({
           </button>
         </div>
 
-        {/* ✅ EXECUTOR REPORT WITH EVIDENCE */}
+        {/* EXECUTOR REPORT WITH EVIDENCE */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group md:col-span-2">
           <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
             <i className="fas fa-images"></i>
