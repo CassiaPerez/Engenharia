@@ -76,7 +76,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const [currentPage, setCurrentPage] = useState(1);
   const [searchInput, setSearchInput] = useState(''); 
   const [searchTerm, setSearchTerm] = useState(''); 
-  const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<OSStatus | 'ALL'>(OSStatus.OPEN);
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('ALL');
   const [slaFilter, setSlaFilter] = useState<'ALL' | 'SLA_OVERDUE'>('ALL');
   const [openDateSort, setOpenDateSort] = useState<'NONE' | 'OPEN_DATE_DESC' | 'OPEN_DATE_ASC'>('NONE');
@@ -259,6 +259,18 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   }, [equipments]);
 
   const currentOSs = filteredOSs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filteredOSs.length / ITEMS_PER_PAGE));
+
+  // ✅ Paginação: sempre manter página válida e resetar ao mudar filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, equipmentCompanyFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (currentPage < 1) setCurrentPage(1);
+  }, [totalPages, currentPage]);
+
 
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
   
@@ -977,6 +989,62 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         })}
       </div>
       
+      {/* ✅ Paginação */}
+      {filteredOSs.length > 0 && (
+        <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="text-xs text-slate-500 font-semibold">
+            Mostrando <span className="text-slate-800">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span>
+            &nbsp;–&nbsp;
+            <span className="text-slate-800">{Math.min(currentPage * ITEMS_PER_PAGE, filteredOSs.length)}</span>
+            &nbsp;de <span className="text-slate-800">{filteredOSs.length}</span> OS
+          </div>
+
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+            >
+              <i className="fas fa-chevron-left mr-2"></i>Anterior
+            </button>
+
+            <div className="hidden sm:flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))
+                .map(page => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={
+                      "h-9 w-9 rounded-lg border text-xs font-black " +
+                      (page === currentPage
+                        ? "bg-slate-800 text-white border-slate-800"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50")
+                    }
+                  >
+                    {page}
+                  </button>
+                ))}
+            </div>
+
+            <div className="sm:hidden text-xs font-bold text-slate-600">
+              Página {currentPage} / {totalPages}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+            >
+              Próxima<i className="fas fa-chevron-right ml-2"></i>
+            </button>
+          </div>
+        </div>
+      )}
+
       {filteredOSs.length === 0 && <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed text-slate-400 text-lg">Nenhuma Ordem de Serviço encontrada.</div>}
       
       {/* DETAILED MODAL */}
