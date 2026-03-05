@@ -155,17 +155,55 @@ export const groupCostsByCompany = (
     .sort((a, b) => b.total - a.total);
 };
 
+
+
+// ------------------------------------------------------
+// ✅ Novo: custos por empresa + detalhamento do "Não informado"
+// - Mantém compatibilidade com groupCostsByCompany()
+// - Retorna { grouped, unknown } onde unknown lista as OS que caíram em "Não informado"
+// ------------------------------------------------------
+export const groupCostsByCompanyWithBreakdown = (
+  oss: any[],
+  materials: any[],
+  services: any[],
+  equipments: any[] = [],
+  projects: any[] = []
+) => {
+  const grouped = groupCostsByCompany(oss, materials, services, equipments, projects);
+
+  const unknown = (oss || [])
+    .filter((os: any) => resolveCompanyForOS(os, equipments, projects) === 'Não informado')
+    .map((os: any) => {
+      const costs = calculateOSCosts(os, materials, services);
+
+      const proj = os.projectId ? projects.find((p: any) => p.id === os.projectId) : null;
+      const eq = os.equipmentId ? equipments.find((e: any) => e.id === os.equipmentId) : null;
+
+      const context =
+        proj ? `PROJ: ${proj.code || proj.id}` :
+        eq ? `EQP: ${eq.code || eq.id}` :
+        os.buildingId ? `BLD: ${os.buildingId}` :
+        '-';
+
+      return {
+        osId: os.id,
+        osNumber: os.number || '-',
+        description: os.description || '',
+        context,
+        openDate: os.openDate || os.startTime || os.limitDate || null,
+        material: costs.totalMaterials || 0,
+        service: costs.totalServices || 0,
+        total: costs.totalCost || 0
+      };
+    });
+
+  return { grouped, unknown };
+};
+
 const safeDate = (d?: string) => (d ? new Date(d) : null);
 
 export const calculateExecutorHoursForOS = (os: OS, executorId: string) => {
-  const anyOs: any = os as any;
-  let states: any = anyOs.executorStates;
-  if (typeof states === 'string' && states.trim()) {
-    try { states = JSON.parse(states); } catch { states = {}; }
-  }
-  if (!states || typeof states !== 'object') states = {};
-
-  const state = states?.[executorId];
+  const state = os.executorStates?.[executorId];
 
   const start = safeDate(state?.startTime || os.startTime);
   const end = safeDate(state?.endTime || os.endTime);
@@ -215,44 +253,9 @@ export const buildExecutorHoursRows = (
   const within = (d?: string) => {
     if (!d) return true;
     const dt = new Date(d);
-    if (Number.isNaN(dt.getTime())) return true; // não bloqueia por data inválida
     if (from && dt < from) return false;
     if (to && dt > to) return false;
     return true;
-  };
-
-  const getUserName = (idOrEmail: string) => {
-    const u = users.find(u => u.id === idOrEmail) || users.find(u => (u as any).email === idOrEmail);
-    return u?.name || idOrEmail;
-  };
-
-  const normalizeExecutorIds = (os: any): string[] => {
-    const raw = os.executorIds;
-    if (Array.isArray(raw)) return raw.filter(Boolean).map(String);
-    if (typeof raw === 'string' && raw.trim()) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
-      } catch {
-        // ignore
-      }
-      return raw.split(',').map(s => s.trim()).filter(Boolean);
-    }
-    return [];
-  };
-
-  const normalizeExecutorStates = (os: any): Record<string, any> => {
-    const raw = os.executorStates;
-    if (!raw) return {};
-    if (typeof raw === 'string' && raw.trim()) {
-      try {
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : {};
-      } catch {
-        return {};
-      }
-    }
-    return typeof raw === 'object' ? raw : {};
   };
 
   const rows: Array<{
@@ -267,60 +270,39 @@ export const buildExecutorHoursRows = (
   }> = [];
 
   oss.forEach(os => {
-    const anyOs: any = os as any;
-    const states = normalizeExecutorStates(anyOs);
-
-    // 1) Modelo novo: executorStates
-    if (states && Object.keys(states).length > 0) {
-      Object.entries(states).forEach(([executorKey, st]) => {
-        const ref = st?.startTime || st?.endTime || anyOs.startTime || anyOs.endTime || anyOs.openDate;
+    if (os.executorStates && Object.keys(os.executorStates).length > 0) {
+      Object.entries(os.executorStates).forEach(([executorId, st]) => {
+        const ref = st.startTime || os.openDate;
         if (!within(ref)) return;
 
-        const hrs = calculateExecutorHoursForOS(anyOs, executorKey);
+        const name = users.find(u => u.id === executorId)?.name || executorId;
+        const hrs = calculateExecutorHoursForOS(os, executorId);
         rows.push({
-          executorId: executorKey,
-          executorName: getUserName(executorKey),
-          osNumber: anyOs.number,
-          startTime: st?.startTime || anyOs.startTime,
-          endTime: st?.endTime || anyOs.endTime,
-          ...hrs,
+          executorId,
+          executorName: name,
+          osNumber: os.number,
+          startTime: st.startTime,
+          endTime: st.endTime,
+          ...hrs
         });
       });
       return;
     }
 
-    // 2) Modelo multi (executorIds) sem states
-    const multi = normalizeExecutorIds(anyOs);
-    if (multi.length > 0) {
-      multi.forEach((executorKey) => {
-        const ref = anyOs.startTime || anyOs.endTime || anyOs.openDate;
-        if (!within(ref)) return;
-        const hrs = calculateExecutorHoursForOS(anyOs, executorKey);
-        rows.push({
-          executorId: executorKey,
-          executorName: getUserName(executorKey),
-          osNumber: anyOs.number,
-          startTime: anyOs.startTime,
-          endTime: anyOs.endTime,
-          ...hrs,
-        });
-      });
-      return;
-    }
-
-    // 3) Legado: executorId
-    const executorId = anyOs.executorId;
+    const executorId = os.executorId;
     if (!executorId) return;
-    const ref = anyOs.startTime || anyOs.endTime || anyOs.openDate;
+    const ref = os.startTime || os.openDate;
     if (!within(ref)) return;
-    const hrs = calculateExecutorHoursForOS(anyOs, executorId);
+
+    const name = users.find(u => u.id === executorId)?.name || executorId;
+    const hrs = calculateExecutorHoursForOS(os, executorId);
     rows.push({
       executorId,
-      executorName: getUserName(executorId),
-      osNumber: anyOs.number,
-      startTime: anyOs.startTime,
-      endTime: anyOs.endTime,
-      ...hrs,
+      executorName: name,
+      osNumber: os.number,
+      startTime: os.startTime,
+      endTime: os.endTime,
+      ...hrs
     });
   });
 
