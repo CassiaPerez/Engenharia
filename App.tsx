@@ -19,6 +19,7 @@ import EquipmentManager from './components/EquipmentManager';
 import Reports from './components/Reports';
 import { supabase, mapFromSupabase, mapToSupabase, mapToSupabaseJson } from './services/supabase';
 import { canAccessModule, ModuleId, loadCustomPermissions, loadUserPermissions } from './services/permissions';
+import { lazyLoader } from './services/lazyLoader';
 
 // Definição da estrutura do Menu
 const MENU_GROUPS = [
@@ -120,69 +121,62 @@ const App: React.FC = () => {
     return all;
   };
 
-  // Carregamento Inicial do Supabase (Única Fonte de Dados)
+  // Carregamento Otimizado (Dados Críticos Primeiro, Resto Sob Demanda)
   useEffect(() => {
     const loadData = async () => {
       setSyncStatus('syncing');
       try {
-        console.log('🚀 Starting data load from Supabase...');
+        console.log('🚀 Starting optimized data load...');
+
         await loadCustomPermissions();
         await loadUserPermissions();
 
-        // ⚠️ Mantém tudo como estava, só tiramos "materials" do Promise.all
-        // para não sofrer corte por limite de linhas.
-        const [p, s, o, mov, sup, usr, pur, bld, eqp] = await Promise.all([
-          supabase.from('projects').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
-          supabase.from('services').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
-          supabase.from('oss').select('*', { count: 'exact' }).order('open_date', { ascending: false, nullsFirst: false }).range(0, 9999),
-          supabase.from('stock_movements').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
-          supabase.from('suppliers').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
-          supabase.from('users').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
-          supabase.from('purchases').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
-          supabase.from('buildings').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999),
-          supabase.from('equipments').select('*', { count: 'exact' }).order('updated_at', { ascending: false, nullsFirst: false }).range(0, 9999)
-        ]);
+        // FASE 1: Carregar apenas dados críticos para login e navegação básica
+        const { users, buildings, services } = await lazyLoader.loadCriticalData();
 
-        // ✅ FIX 2: materials paginado para garantir que puxe TODOS
-        let allMaterialsRows: any[] = [];
-        try {
-          allMaterialsRows = await fetchAllRows<any>('materials', {
-            select: '*',
-            orderBy: 'code',
-            ascending: true,
-            pageSize: 1000
-          });
-        } catch (mErr) {
-          console.error("❌ Error loading materials:", mErr);
-          throw mErr;
-        }
-
-        if (p.error) console.error("❌ Error loading projects:", p.error);
-        if (s.error) console.error("❌ Error loading services:", s.error);
-        if (o.error) console.error("❌ Error loading OSs:", o.error);
-        if (mov.error) console.error("❌ Error loading stock_movements:", mov.error);
-        if (eqp.error) console.error("❌ Error loading equipments:", eqp.error);
-        if (usr.error) console.error("❌ Error loading users:", usr.error);
-
-        if (p.error || s.error || usr.error) {
-          console.error("Critical errors found. Check logs above.");
-          throw new Error("Erro de conexão com Supabase");
-        }
-
-        const mappedMaterials = mapFromSupabase<Material>(allMaterialsRows || []);
-
-        setProjects(mapFromSupabase<Project>(p.data || []));
-        setMaterials(mappedMaterials);
-        setServices(mapFromSupabase<ServiceType>(s.data || []));
-        setOss(mapFromSupabase<OS>(o.data || []));
-        setMovements(mapFromSupabase<StockMovement>(mov.data || []));
-        setSuppliers(mapFromSupabase<any>(sup.data || []));
-        setUsers(mapFromSupabase<User>(usr.data || []));
-        setPurchases(mapFromSupabase<PurchaseRecord>(pur.data || []));
-        setBuildings(mapFromSupabase<Building>(bld.data || []));
-        setEquipments(mapFromSupabase<Equipment>(eqp.data || []));
+        setUsers(users);
+        setBuildings(buildings);
+        setServices(services);
 
         setSyncStatus('online');
+        console.log('✅ Critical data loaded, app ready!');
+
+        // FASE 2: Carregar o resto em background (não bloqueia a UI)
+        setTimeout(async () => {
+          try {
+            console.log('📦 Loading secondary data in background...');
+
+            const [projects, oss, equipments, materials] = await Promise.all([
+              lazyLoader.loadOnDemand<Project>('projects'),
+              lazyLoader.loadOnDemand<OS>('oss'),
+              lazyLoader.loadOnDemand<Equipment>('equipments'),
+              lazyLoader.loadOnDemand<Material>('materials')
+            ]);
+
+            setProjects(projects);
+            setOss(oss);
+            setEquipments(equipments);
+            setMaterials(materials);
+
+            console.log('✅ Secondary data loaded');
+
+            // FASE 3: Dados menos críticos por último
+            const [movements, suppliers, purchases] = await Promise.all([
+              lazyLoader.loadOnDemand<StockMovement>('stock_movements'),
+              lazyLoader.loadOnDemand('suppliers'),
+              lazyLoader.loadOnDemand<PurchaseRecord>('purchases')
+            ]);
+
+            setMovements(movements);
+            setSuppliers(suppliers);
+            setPurchases(purchases);
+
+            console.log('✅ All data loaded!');
+          } catch (bgErr) {
+            console.error('⚠️ Error loading background data:', bgErr);
+          }
+        }, 100);
+
       } catch (err) {
         console.error("❌ Failed to connect to Supabase:", err);
         setSyncStatus('error');
