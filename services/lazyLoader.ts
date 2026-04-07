@@ -127,13 +127,22 @@ class LazyDataLoader {
   invalidateCache(tableName?: string): void {
     if (tableName) {
       cacheService.invalidatePattern(`^lazy:${tableName}:`);
+      console.log(`🗑️ Cache invalidated for: ${tableName}`);
     } else {
       cacheService.invalidatePattern('^lazy:');
+      console.log('🗑️ All lazy cache invalidated');
     }
+  }
+
+  async reloadTable<T>(tableName: string): Promise<T[]> {
+    console.log(`🔄 Reloading ${tableName}...`);
+    this.invalidateCache(tableName);
+    return this.loadTable<T>(tableName);
   }
 
   clearAllCache(): void {
     cacheService.clear();
+    console.log('🗑️ All cache cleared');
   }
 }
 

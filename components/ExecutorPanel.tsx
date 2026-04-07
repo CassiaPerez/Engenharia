@@ -14,15 +14,17 @@ interface Props {
   materials?: Material[];
   services?: ServiceType[];
   onLogout: () => void;
+  onRefreshData?: (tableName: string) => Promise<void>;
 }
 
-const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings, equipments = [], materials = [], services = [], onLogout }) => {
+const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings, equipments = [], materials = [], services = [], onLogout, onRefreshData }) => {
   const [activeTab, setActiveTab] = useState<'TODO' | 'DONE' | 'CALENDAR'>('TODO');
   const [finishingOS, setFinishingOS] = useState<OS | null>(null);
   const [viewDetailOS, setViewDetailOS] = useState<OS | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [executionDescription, setExecutionDescription] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
@@ -36,6 +38,23 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
           default: return p;
       }
   };
+
+  const handleRefresh = async () => {
+    if (!onRefreshData) return;
+    setIsRefreshing(true);
+    try {
+      await onRefreshData('oss');
+      console.log('✅ OSs atualizadas para executor');
+    } catch (error) {
+      console.error('❌ Erro ao atualizar OSs:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  React.useEffect(() => {
+    handleRefresh();
+  }, []);
 
   const myOSs = useMemo(() => {
     return oss.filter(o => {
@@ -682,6 +701,14 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                       <p className="text-xs text-white/70 truncate">Prestador</p>
                   </div>
               </div>
+              <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors uppercase tracking-wider disabled:opacity-50 mb-2"
+              >
+                  <i className={`fas fa-sync-alt ${isRefreshing ? 'animate-spin' : ''}`}></i>
+                  {isRefreshing ? 'Atualizando...' : 'Atualizar Tarefas'}
+              </button>
               <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors uppercase tracking-wider">
                   <i className="fas fa-sign-out-alt"></i> Sair do Sistema
               </button>
@@ -702,9 +729,19 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                       <h1 className="text-lg font-bold leading-none">{user.name.split(' ')[0]}</h1>
                   </div>
               </div>
-              <button onClick={onLogout} className="w-10 h-10 bg-blue-800 rounded-full flex items-center justify-center text-blue-300 hover:text-white transition-colors">
-                  <i className="fas fa-sign-out-alt"></i>
-              </button>
+              <div className="flex items-center gap-2">
+                  <button
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                      className="w-10 h-10 bg-blue-800 rounded-full flex items-center justify-center text-blue-300 hover:text-white transition-colors disabled:opacity-50"
+                      title="Atualizar tarefas"
+                  >
+                      <i className={`fas fa-sync-alt ${isRefreshing ? 'animate-spin' : ''}`}></i>
+                  </button>
+                  <button onClick={onLogout} className="w-10 h-10 bg-blue-800 rounded-full flex items-center justify-center text-blue-300 hover:text-white transition-colors">
+                      <i className="fas fa-sign-out-alt"></i>
+                  </button>
+              </div>
           </header>
 
           {/* Scrollable Content */}

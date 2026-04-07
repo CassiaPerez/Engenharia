@@ -288,6 +288,53 @@ const App: React.FC = () => {
     }
   };
 
+  const refreshData = async (tableName: string) => {
+    try {
+      console.log(`🔄 Refreshing ${tableName}...`);
+
+      switch (tableName) {
+        case 'oss':
+          const oss = await lazyLoader.reloadTable<OS>('oss');
+          setOss(oss);
+          break;
+        case 'projects':
+          const projects = await lazyLoader.reloadTable<Project>('projects');
+          setProjects(projects);
+          break;
+        case 'materials':
+          const materials = await lazyLoader.reloadTable<Material>('materials');
+          setMaterials(materials);
+          break;
+        case 'equipments':
+          const equipments = await lazyLoader.reloadTable<Equipment>('equipments');
+          setEquipments(equipments);
+          break;
+        case 'users':
+          const users = await lazyLoader.reloadTable<User>('users');
+          setUsers(users);
+          break;
+        case 'buildings':
+          const buildings = await lazyLoader.reloadTable<Building>('buildings');
+          setBuildings(buildings);
+          break;
+        case 'services':
+          const services = await lazyLoader.reloadTable<ServiceType>('services');
+          setServices(services);
+          break;
+        case 'suppliers':
+          const suppliers = await lazyLoader.reloadTable('suppliers');
+          setSuppliers(suppliers);
+          break;
+        default:
+          console.warn(`Unknown table: ${tableName}`);
+      }
+
+      console.log(`✅ ${tableName} refreshed`);
+    } catch (error) {
+      console.error(`❌ Failed to refresh ${tableName}:`, error);
+    }
+  };
+
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('crop_user_session', JSON.stringify(user));
@@ -318,6 +365,7 @@ const App: React.FC = () => {
         onLogout={handleLogout}
         services={services}
         materials={materials}
+        onRefreshData={refreshData}
       />
     );
   }
@@ -337,6 +385,7 @@ const App: React.FC = () => {
             services={services}
             movements={movements}
             currentUser={currentUser}
+            onRefreshData={refreshData}
           />
         );
       case 'os':
@@ -355,6 +404,7 @@ const App: React.FC = () => {
             movements={movements}
             onStockChange={handleStockChange}
             currentUser={currentUser}
+            onRefreshData={refreshData}
           />
         );
       case 'calendar':
@@ -371,9 +421,9 @@ const App: React.FC = () => {
           />
         );
       case 'buildings':
-        return <BuildingManager buildings={buildings} setBuildings={setBuildings} currentUser={currentUser} />;
+        return <BuildingManager buildings={buildings} setBuildings={setBuildings} currentUser={currentUser} onRefreshData={refreshData} />;
       case 'equipments':
-        return <EquipmentManager equipments={equipments} setEquipments={setEquipments} currentUser={currentUser} />;
+        return <EquipmentManager equipments={equipments} setEquipments={setEquipments} currentUser={currentUser} onRefreshData={refreshData} />;
       case 'inventory':
         return (
           <Inventory
@@ -385,14 +435,15 @@ const App: React.FC = () => {
             projects={projects}
             oss={oss}
             setOss={setOss}
+            onRefreshData={refreshData}
           />
         );
       case 'services':
-        return <ServiceManager services={services} setServices={setServices} currentUser={currentUser} />;
+        return <ServiceManager services={services} setServices={setServices} currentUser={currentUser} onRefreshData={refreshData} />;
       case 'suppliers':
-        return <SupplierManager suppliers={suppliers} setSuppliers={setSuppliers} purchases={purchases} materials={materials} currentUser={currentUser} />;
+        return <SupplierManager suppliers={suppliers} setSuppliers={setSuppliers} purchases={purchases} materials={materials} currentUser={currentUser} onRefreshData={refreshData} />;
       case 'users':
-        return <UserManagement users={users} setUsers={setUsers} currentUser={currentUser} />;
+        return <UserManagement users={users} setUsers={setUsers} currentUser={currentUser} onRefreshData={refreshData} />;
       case 'reports':
         // Agora passamos os users, buildings e equipments para gerar os nomes corretos nos relatórios
         return (

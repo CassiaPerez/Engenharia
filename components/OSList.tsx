@@ -7,6 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { supabase, mapToSupabase } from '../services/supabase';
 import { canEditField } from '../services/permissions';
 import ModalPortal from './ModalPortal';
+import { lazyLoader } from '../services/lazyLoader';
 
 interface Props {
   oss: OS[];
@@ -22,11 +23,12 @@ interface Props {
   movements: StockMovement[];
   onStockChange: (mId: string, qty: number, osNumber: string) => void;
   currentUser: User;
+  onRefreshData?: (tableName: string) => Promise<void>;
 }
 
 const ITEMS_PER_PAGE = 9;
 
-const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments = [], materials, setMaterials, services, users, setUsers, movements, onStockChange, currentUser }) => {
+const OSList: React.FC<Props> = ({ oss, setOss, projects, buildings, equipments = [], materials, setMaterials, services, users, setUsers, movements, onStockChange, currentUser, onRefreshData }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedOS, setSelectedOS] = useState<OS | null>(null);
   
@@ -143,6 +145,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
           try {
               const { error } = await supabase.from('oss').delete().eq('id', id);
               if (error) throw error;
+              lazyLoader.invalidateCache('oss');
           } catch (e: any) {
               console.error('Erro ao excluir OS:', e);
               setOss(previousOss);
@@ -166,6 +169,8 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       try {
           const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
           if (error) throw error;
+
+          lazyLoader.invalidateCache('oss');
 
           const toast = document.createElement('div');
           toast.className = "fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg z-[10000] font-bold animate-in slide-in-from-bottom-5";
@@ -314,6 +319,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       try {
           const { error } = await supabase.from('oss').upsert(mapToSupabase(selectedOS));
           if (error) throw error;
+          lazyLoader.invalidateCache('oss');
           console.log('Itens da OS salvos com sucesso.');
       } catch (e) {
           console.error('Erro ao salvar itens da OS:', e);
@@ -427,6 +433,10 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       try {
           const { error } = await supabase.from('oss').insert(mapToSupabase(newOS));
           if (error) throw error;
+
+          if (onRefreshData) {
+              setTimeout(() => onRefreshData('oss'), 500);
+          }
       } catch (e) {
           console.error('Erro ao salvar OS:', e);
           alert('Erro ao salvar no banco de dados.');
