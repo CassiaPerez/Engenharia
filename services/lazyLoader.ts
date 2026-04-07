@@ -133,32 +133,32 @@ class LazyDataLoader {
     if (tableName === 'oss') {
       return data.map((item: any) => ({
         ...item,
-        services: item.services || [],
-        materials: item.materials || [],
-        executorWorkLogs: item.executorWorkLogs || [],
-        executorStates: item.executorStates || {},
-        pauseHistory: item.pauseHistory || [],
-        manualMaterialItems: item.manualMaterialItems || [],
-        manualServiceItems: item.manualServiceItems || []
+        services: Array.isArray(item.services) ? item.services : [],
+        materials: Array.isArray(item.materials) ? item.materials : [],
+        executorWorkLogs: Array.isArray(item.executorWorkLogs) ? item.executorWorkLogs : [],
+        executorStates: item.executorStates && typeof item.executorStates === 'object' ? item.executorStates : {},
+        pauseHistory: Array.isArray(item.pauseHistory) ? item.pauseHistory : [],
+        manualMaterialItems: Array.isArray(item.manualMaterialItems) ? item.manualMaterialItems : [],
+        manualServiceItems: Array.isArray(item.manualServiceItems) ? item.manualServiceItems : []
       }));
     }
 
     if (tableName === 'projects') {
       return data.map((item: any) => ({
         ...item,
-        plannedServices: item.plannedServices || [],
-        plannedMaterials: item.plannedMaterials || [],
-        auditLogs: item.auditLogs || [],
-        postponementHistory: item.postponementHistory || [],
-        manualMaterialItems: item.manualMaterialItems || [],
-        manualServiceItems: item.manualServiceItems || []
+        plannedServices: Array.isArray(item.plannedServices) ? item.plannedServices : [],
+        plannedMaterials: Array.isArray(item.plannedMaterials) ? item.plannedMaterials : [],
+        auditLogs: Array.isArray(item.auditLogs) ? item.auditLogs : [],
+        postponementHistory: Array.isArray(item.postponementHistory) ? item.postponementHistory : [],
+        manualMaterialItems: Array.isArray(item.manualMaterialItems) ? item.manualMaterialItems : [],
+        manualServiceItems: Array.isArray(item.manualServiceItems) ? item.manualServiceItems : []
       }));
     }
 
     if (tableName === 'materials') {
       return data.map((item: any) => ({
         ...item,
-        stockLocations: item.stockLocations || []
+        stockLocations: Array.isArray(item.stockLocations) ? item.stockLocations : []
       }));
     }
 
