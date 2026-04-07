@@ -43,20 +43,30 @@ export const mapFromSupabase = <T extends { id: string }>(data: any[] | null): T
         }));
       }
 
-      return {
+      const result: any = {
         ...camelCased,
         id,
-        createdAt: created_at,
         updatedAt: updated_at
-      } as T;
+      };
+
+      if (created_at !== undefined) {
+        result.createdAt = created_at;
+      }
+
+      return result as T;
     }
 
-    return {
+    const result: any = {
       ...(json_content as T),
       id,
-      createdAt: created_at,
       updatedAt: updated_at
     };
+
+    if (created_at !== undefined) {
+      result.createdAt = created_at;
+    }
+
+    return result;
   });
 };
 

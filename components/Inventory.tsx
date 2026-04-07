@@ -116,7 +116,7 @@ const [editMaterial, setEditMaterial] = useState<Partial<Material>>({
 
       let query = supabase
         .from('oss')
-        .select('id, number, type, status, priority, description, equipment_id, cost_center, open_date, limit_date, close_date, sla_hours, executor_ids, requester_id, services, materials')
+        .select('id, number, type, status, priority, description, equipment_id, cost_center, open_date, limit_date, close_date, sla_hours, executor_ids, requester_id, services, materials, project_id, building_id, executor_id, requester_name, start_time, end_time, pause_reason, manual_material_cost, manual_service_cost, updated_at')
         .order('open_date', { ascending: false })
         .range(from, to);
 
