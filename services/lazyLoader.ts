@@ -9,8 +9,8 @@ interface LazyLoadOptions {
 
 class LazyDataLoader {
   private loadingState: Map<string, boolean> = new Map();
-  private readonly DEFAULT_PAGE_SIZE = 500;
-  private readonly CACHE_TTL = 10 * 60 * 1000;
+  private readonly DEFAULT_PAGE_SIZE = 1000;
+  private readonly CACHE_TTL = 5 * 60 * 1000;
 
   async loadTable<T>(
     tableName: string,
@@ -49,10 +49,20 @@ class LazyDataLoader {
       while (hasMore) {
         const to = from + pageSize - 1;
 
-        const { data, error, count } = await supabase
+        let query = supabase
           .from(tableName)
-          .select('*', { count: 'exact' })
+          .select('*')
           .range(from, to);
+
+        if (tableName === 'oss') {
+          query = query.order('open_date', { ascending: false, nullsFirst: false });
+        } else if (tableName === 'materials') {
+          query = query.order('code', { ascending: true });
+        } else if (tableName === 'projects') {
+          query = query.order('code', { ascending: true });
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.error(`❌ Error loading ${tableName}:`, error);
@@ -61,7 +71,7 @@ class LazyDataLoader {
 
         if (data && data.length > 0) {
           allData.push(...data);
-          console.log(`📦 ${tableName}: loaded ${allData.length}${count ? `/${count}` : ''} rows`);
+          console.log(`📦 ${tableName}: loaded ${allData.length} rows`);
         }
 
         hasMore = data && data.length === pageSize;

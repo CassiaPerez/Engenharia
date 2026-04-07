@@ -128,6 +128,8 @@ const App: React.FC = () => {
       try {
         console.log('🚀 Starting optimized data load...');
 
+        lazyLoader.clearAllCache();
+
         await loadCustomPermissions();
         await loadUserPermissions();
 
@@ -172,6 +174,29 @@ const App: React.FC = () => {
             setPurchases(purchases);
 
             console.log('✅ All data loaded!');
+
+            // Setup real-time subscriptions for OSs
+            const ossChannel = supabase
+              .channel('oss-changes')
+              .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'oss' }, (payload) => {
+                console.log('🆕 New OS created:', payload.new);
+                refreshData('oss', true);
+              })
+              .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'oss' }, (payload) => {
+                console.log('📝 OS updated:', payload.new);
+                setOss(prev => prev.map(os => os.id === payload.new.id ? mapFromSupabase([payload.new])[0] : os));
+              })
+              .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'oss' }, (payload) => {
+                console.log('🗑️ OS deleted:', payload.old);
+                setOss(prev => prev.filter(os => os.id !== payload.old.id));
+              })
+              .subscribe();
+
+            console.log('🔔 Real-time subscriptions active');
+
+            return () => {
+              ossChannel.unsubscribe();
+            };
           } catch (bgErr) {
             console.error('⚠️ Error loading background data:', bgErr);
           }
@@ -288,41 +313,45 @@ const App: React.FC = () => {
     }
   };
 
-  const refreshData = async (tableName: string) => {
+  const refreshData = async (tableName: string, forceReload = true) => {
     try {
       console.log(`🔄 Refreshing ${tableName}...`);
 
+      if (forceReload) {
+        lazyLoader.invalidateCache(tableName);
+      }
+
       switch (tableName) {
         case 'oss':
-          const oss = await lazyLoader.reloadTable<OS>('oss');
+          const oss = await lazyLoader.loadTable<OS>('oss', { useCache: !forceReload });
           setOss(oss);
           break;
         case 'projects':
-          const projects = await lazyLoader.reloadTable<Project>('projects');
+          const projects = await lazyLoader.loadTable<Project>('projects', { useCache: !forceReload });
           setProjects(projects);
           break;
         case 'materials':
-          const materials = await lazyLoader.reloadTable<Material>('materials');
+          const materials = await lazyLoader.loadTable<Material>('materials', { useCache: !forceReload });
           setMaterials(materials);
           break;
         case 'equipments':
-          const equipments = await lazyLoader.reloadTable<Equipment>('equipments');
+          const equipments = await lazyLoader.loadTable<Equipment>('equipments', { useCache: !forceReload });
           setEquipments(equipments);
           break;
         case 'users':
-          const users = await lazyLoader.reloadTable<User>('users');
+          const users = await lazyLoader.loadTable<User>('users', { useCache: !forceReload });
           setUsers(users);
           break;
         case 'buildings':
-          const buildings = await lazyLoader.reloadTable<Building>('buildings');
+          const buildings = await lazyLoader.loadTable<Building>('buildings', { useCache: !forceReload });
           setBuildings(buildings);
           break;
         case 'services':
-          const services = await lazyLoader.reloadTable<ServiceType>('services');
+          const services = await lazyLoader.loadTable<ServiceType>('services', { useCache: !forceReload });
           setServices(services);
           break;
         case 'suppliers':
-          const suppliers = await lazyLoader.reloadTable('suppliers');
+          const suppliers = await lazyLoader.loadTable('suppliers', { useCache: !forceReload });
           setSuppliers(suppliers);
           break;
         default:
