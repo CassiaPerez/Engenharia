@@ -1,5 +1,6 @@
 import { supabase, mapFromSupabase } from './supabase';
 import { cacheService } from './cache';
+import { getTableColumns } from './tableColumns';
 
 interface LazyLoadOptions {
   pageSize?: number;
@@ -49,9 +50,11 @@ class LazyDataLoader {
       while (hasMore) {
         const to = from + pageSize - 1;
 
+        const columns = getTableColumns(tableName);
+
         let query = supabase
           .from(tableName)
-          .select('*')
+          .select(columns)
           .range(from, to);
 
         if (tableName === 'oss') {
@@ -82,12 +85,15 @@ class LazyDataLoader {
 
       const mapped = mapFromSupabase<T>(allData);
 
+      // Add default values for missing fields based on table type
+      const normalized = this.normalizeTableData(tableName, mapped);
+
       if (useCache) {
-        cacheService.set(cacheKey, mapped, cacheTTL);
+        cacheService.set(cacheKey, normalized, cacheTTL);
       }
 
-      console.log(`✅ ${tableName}: completed (${mapped.length} rows)`);
-      return mapped;
+      console.log(`✅ ${tableName}: completed (${normalized.length} rows)`);
+      return normalized;
     } catch (error) {
       console.error(`❌ Failed to load ${tableName}:`, error);
       throw error;
@@ -123,6 +129,42 @@ class LazyDataLoader {
     return this.loadTable<T>(tableName, { pageSize: 500 });
   }
 
+  private normalizeTableData<T>(tableName: string, data: T[]): T[] {
+    if (tableName === 'oss') {
+      return data.map((item: any) => ({
+        ...item,
+        services: item.services || [],
+        materials: item.materials || [],
+        executorWorkLogs: item.executorWorkLogs || [],
+        executorStates: item.executorStates || {},
+        pauseHistory: item.pauseHistory || [],
+        manualMaterialItems: item.manualMaterialItems || [],
+        manualServiceItems: item.manualServiceItems || []
+      }));
+    }
+
+    if (tableName === 'projects') {
+      return data.map((item: any) => ({
+        ...item,
+        plannedServices: item.plannedServices || [],
+        plannedMaterials: item.plannedMaterials || [],
+        auditLogs: item.auditLogs || [],
+        postponementHistory: item.postponementHistory || [],
+        manualMaterialItems: item.manualMaterialItems || [],
+        manualServiceItems: item.manualServiceItems || []
+      }));
+    }
+
+    if (tableName === 'materials') {
+      return data.map((item: any) => ({
+        ...item,
+        stockLocations: item.stockLocations || []
+      }));
+    }
+
+    return data;
+  }
+
   private async waitForLoad(tableName: string, maxWait = 30000): Promise<void> {
     const start = Date.now();
     while (this.loadingState.get(tableName)) {
@@ -153,6 +195,28 @@ class LazyDataLoader {
   clearAllCache(): void {
     cacheService.clear();
     console.log('🗑️ All cache cleared');
+  }
+
+  async loadSingleRecord<T>(tableName: string, id: string): Promise<T | null> {
+    console.log(`📄 Loading single ${tableName} record: ${id}`);
+
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`❌ Error loading ${tableName} ${id}:`, error);
+      throw error;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    const mapped = mapFromSupabase<T>([data]);
+    return mapped[0] || null;
   }
 }
 
