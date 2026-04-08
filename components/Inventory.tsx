@@ -453,9 +453,34 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                   });
 
               } else if (locAction === 'OUT') {
-                  const targetLocIndex = newLocations.findIndex(l => l.name === locForm.location);
-                  if (targetLocIndex >= 0 && newLocations[targetLocIndex].quantity >= qty) {
-                      newLocations[targetLocIndex].quantity -= qty;
+                  const normalizeLocation = (value: string) => String(value || '').trim().toLowerCase();
+
+                  let workingLocations =
+                      newLocations && newLocations.length > 0
+                          ? [...newLocations]
+                          : [{ name: m.location || 'CD - Central', quantity: Number(m.currentStock || 0) }];
+
+                  const selectedLocationNormalized = normalizeLocation(locForm.location);
+
+                  let targetLocIndex = workingLocations.findIndex(
+                      l => normalizeLocation(l.name) === selectedLocationNormalized
+                  );
+
+                  if (
+                      targetLocIndex < 0 &&
+                      normalizeLocation(m.location || '') === selectedLocationNormalized &&
+                      Number(m.currentStock || 0) > 0
+                  ) {
+                      workingLocations.push({
+                          name: locForm.location,
+                          quantity: Number(m.currentStock || 0)
+                      });
+                      targetLocIndex = workingLocations.length - 1;
+                  }
+
+                  if (targetLocIndex >= 0 && Number(workingLocations[targetLocIndex].quantity) >= qty) {
+                      workingLocations[targetLocIndex].quantity -= qty;
+                      newLocations = workingLocations.filter(l => Number(l.quantity) > 0);
                   } else {
                       alert('Saldo insuficiente no local selecionado.');
                       return m;
