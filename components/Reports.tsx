@@ -961,6 +961,259 @@ const Reports: React.FC<Props> = ({
   // -----------------------------
   // UI
   // -----------------------------
+
+  const generateAllOSReport = async () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const today = new Date().toLocaleString('pt-BR');
+    const filteredOS = applyFilters(oss).sort((a, b) => {
+      const da = parseAnyDate((a as any).openDate || (a as any).startTime || (a as any).createdAt)?.getTime() || 0;
+      const db = parseAnyDate((b as any).openDate || (b as any).startTime || (b as any).createdAt)?.getTime() || 0;
+      return db - da;
+    });
+
+    addHeader(doc, 'RELATÓRIO GERAL DE ORDENS DE SERVIÇO', `Gerado em: ${today}`);
+
+    const statusLabelMap: Record<string, string> = {
+      [OSStatus.OPEN]: 'Aberta',
+      [OSStatus.IN_PROGRESS]: 'Em andamento',
+      [OSStatus.PAUSED]: 'Pausada',
+      [OSStatus.COMPLETED]: 'Concluída',
+      [OSStatus.CANCELED]: 'Cancelada',
+    };
+
+    const priorityLabelMap: Record<string, string> = {
+      LOW: 'Baixa',
+      MEDIUM: 'Média',
+      HIGH: 'Alta',
+      CRITICAL: 'Crítica',
+    };
+
+    const getProjectLabel = (projectId?: string) => {
+      if (!projectId) return '-';
+      const project = projects.find(p => p.id === projectId);
+      return project ? `${project.code} - ${project.description}` : projectId;
+    };
+
+    const getBuildingLabel = (buildingId?: string) => {
+      if (!buildingId) return '-';
+      const building = buildings.find(b => b.id === buildingId);
+      return building ? building.name : buildingId;
+    };
+
+    const getEquipmentLabel = (equipmentId?: string) => {
+      if (!equipmentId) return '-';
+      const equipment = equipments.find(e => e.id === equipmentId);
+      return equipment ? `${equipment.code} - ${equipment.name}` : equipmentId;
+    };
+
+    const getExecutorNames = (os: OS) => {
+      const anyOs: any = os as any;
+      const keys = Array.from(new Set([anyOs.executorId, ...(anyOs.executorIds || [])].filter(Boolean)));
+      if (!keys.length) return '-';
+      return keys.map((key: string) => getExecutorName(key)).join(', ');
+    };
+
+    const getRequesterLabel = (os: OS) => {
+      const anyOs: any = os as any;
+      if (anyOs.requesterName) return anyOs.requesterName;
+      if (anyOs.requesterId) {
+        const requester = users.find(u => u.id === anyOs.requesterId || u.email === anyOs.requesterId);
+        return requester?.name || anyOs.requesterId;
+      }
+      return '-';
+    };
+
+    const getSlaLabel = (os: OS) => {
+      const limit = parseAnyDate((os as any).limitDate);
+      if (!limit) return '-';
+      const status = (os as any).status;
+      const end = parseAnyDate((os as any).endTime);
+      const delayed = status !== OSStatus.COMPLETED && status !== OSStatus.CANCELED && limit.getTime() < Date.now();
+      const completedLate = status === OSStatus.COMPLETED && end && end.getTime() > limit.getTime();
+      return `${limit.toLocaleDateString('pt-BR')} ${delayed || completedLate ? '(Atrasada)' : '(No prazo)'}`;
+    };
+
+    const materialLines = filteredOS.reduce((acc, os) => acc + ((os as any).materials || []).length, 0);
+    const serviceLines = filteredOS.reduce((acc, os) => acc + ((os as any).services || []).length, 0);
+    const totalMaterialsCost = filteredOS.reduce((acc, os) => acc + calculateOSCosts(os, materials, services).materialCost, 0);
+    const totalServicesCost = filteredOS.reduce((acc, os) => acc + calculateOSCosts(os, materials, services).serviceCost, 0);
+    const statusCount = filteredOS.reduce((acc: Record<string, number>, os) => {
+      const key = String((os as any).status || 'SEM_STATUS');
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    autoTable(doc, {
+      startY: 30,
+      head: [['Indicador', 'Valor']],
+      body: [
+        ['Total de OS', String(filteredOS.length)],
+        ['Abertas', String(statusCount[OSStatus.OPEN] || 0)],
+        ['Em andamento', String(statusCount[OSStatus.IN_PROGRESS] || 0)],
+        ['Pausadas', String(statusCount[OSStatus.PAUSED] || 0)],
+        ['Concluídas', String(statusCount[OSStatus.COMPLETED] || 0)],
+        ['Canceladas', String(statusCount[OSStatus.CANCELED] || 0)],
+        ['Lançamentos de materiais', String(materialLines)],
+        ['Lançamentos de serviços', String(serviceLines)],
+        ['Custo total de materiais', `R$ ${formatCurrency(totalMaterialsCost)}`],
+        ['Custo total de serviços', `R$ ${formatCurrency(totalServicesCost)}`],
+        ['Custo geral', `R$ ${formatCurrency(totalMaterialsCost + totalServicesCost)}`],
+      ],
+      theme: 'grid',
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [30, 41, 59] },
+      columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+    });
+
+    const summaryY = (doc as any).lastAutoTable.finalY + 8;
+
+    const osRows = filteredOS.map((os: OS) => {
+      const anyOs: any = os as any;
+      const costs = calculateOSCosts(os, materials, services);
+      const vinculo = anyOs.projectId
+        ? `Projeto: ${getProjectLabel(anyOs.projectId)}`
+        : anyOs.equipmentId
+          ? `Equip.: ${getEquipmentLabel(anyOs.equipmentId)}`
+          : anyOs.buildingId
+            ? `Prédio: ${getBuildingLabel(anyOs.buildingId)}`
+            : '-';
+
+      return [
+        anyOs.number || '-',
+        String(anyOs.description || '-').slice(0, 60),
+        statusLabelMap[String(anyOs.status)] || anyOs.status || '-',
+        priorityLabelMap[String(anyOs.priority)] || anyOs.priority || '-',
+        getRequesterLabel(os),
+        getExecutorNames(os),
+        vinculo,
+        anyOs.openDate ? new Date(anyOs.openDate).toLocaleDateString('pt-BR') : '-',
+        getSlaLabel(os),
+        `R$ ${formatCurrency(costs.materialCost)}`,
+        `R$ ${formatCurrency(costs.serviceCost)}`,
+        `R$ ${formatCurrency(costs.totalCost)}`,
+      ];
+    });
+
+    autoTable(doc, {
+      startY: summaryY,
+      head: [['OS', 'Descrição', 'Status', 'Prioridade', 'Solicitante', 'Executor(es)', 'Vínculo', 'Abertura', 'SLA', 'Materiais', 'Serviços', 'Total']],
+      body: osRows.length ? osRows : [['-', 'Nenhuma OS encontrada para os filtros aplicados.', '-', '-', '-', '-', '-', '-', '-', 'R$ 0,00', 'R$ 0,00', 'R$ 0,00']],
+      styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
+      headStyles: { fillColor: [50, 60, 70], textColor: 255 },
+      columnStyles: {
+        9: { halign: 'right' },
+        10: { halign: 'right' },
+        11: { halign: 'right', fontStyle: 'bold' },
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 2) {
+          const raw = String(data.cell.raw || '');
+          if (raw.includes('Concluída')) data.cell.styles.textColor = [5, 150, 105];
+          if (raw.includes('Em andamento')) data.cell.styles.textColor = [37, 99, 235];
+          if (raw.includes('Pausada')) data.cell.styles.textColor = [217, 119, 6];
+          if (raw.includes('Cancelada')) data.cell.styles.textColor = [100, 116, 139];
+        }
+        if (data.section === 'body' && data.column.index === 8) {
+          const raw = String(data.cell.raw || '');
+          if (raw.includes('Atrasada')) {
+            data.cell.styles.textColor = [220, 38, 38];
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      },
+    });
+
+    let detailStartY = (doc as any).lastAutoTable.finalY + 10;
+
+    for (const os of filteredOS) {
+      const anyOs: any = os as any;
+      const costs = calculateOSCosts(os, materials, services);
+      const materialsRows = ((anyOs.materials || []) as any[]).map((item: any) => {
+        const material = materials.find(m => m.id === item.materialId);
+        return [
+          material?.code || '-',
+          material?.description || item.materialId || '-',
+          Number(item.quantity || 0).toLocaleString('pt-BR'),
+          item.fromLocation || '-',
+          `R$ ${formatCurrency(Number(item.unitCost || 0))}`,
+          `R$ ${formatCurrency(Number(item.quantity || 0) * Number(item.unitCost || 0))}`,
+          item.timestamp ? new Date(item.timestamp).toLocaleString('pt-BR') : '-',
+        ];
+      });
+      const serviceRows = ((anyOs.services || []) as any[]).map((item: any) => {
+        const service = services.find(s => s.id === item.serviceTypeId);
+        return [
+          service?.name || item.serviceTypeId || '-',
+          Number(item.quantity || 0).toLocaleString('pt-BR'),
+          `R$ ${formatCurrency(Number(item.unitCost || 0))}`,
+          `R$ ${formatCurrency(Number(item.quantity || 0) * Number(item.unitCost || 0))}`,
+          item.timestamp ? new Date(item.timestamp).toLocaleString('pt-BR') : '-',
+        ];
+      });
+
+      if (detailStartY > 150) {
+        doc.addPage();
+        detailStartY = 20;
+      }
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`OS ${anyOs.number || '-'} - ${String(anyOs.description || '').slice(0, 80)}`, 14, detailStartY);
+      detailStartY += 6;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Status: ${statusLabelMap[String(anyOs.status)] || anyOs.status || '-'} | Prioridade: ${priorityLabelMap[String(anyOs.priority)] || anyOs.priority || '-'}`, 14, detailStartY);
+      detailStartY += 5;
+      doc.text(`Solicitante: ${getRequesterLabel(os)} | Executor(es): ${getExecutorNames(os)}`, 14, detailStartY);
+      detailStartY += 5;
+      doc.text(`Projeto: ${getProjectLabel(anyOs.projectId)} | Prédio: ${getBuildingLabel(anyOs.buildingId)} | Equipamento: ${getEquipmentLabel(anyOs.equipmentId)}`, 14, detailStartY);
+      detailStartY += 5;
+      doc.text(`Abertura: ${anyOs.openDate ? new Date(anyOs.openDate).toLocaleString('pt-BR') : '-'} | Início: ${anyOs.startTime ? new Date(anyOs.startTime).toLocaleString('pt-BR') : '-'} | Fim: ${anyOs.endTime ? new Date(anyOs.endTime).toLocaleString('pt-BR') : '-'}`, 14, detailStartY);
+      detailStartY += 5;
+      doc.text(`SLA: ${getSlaLabel(os)} | Tipo: ${anyOs.type || '-'} | Centro de custo: ${anyOs.costCenter || '-'}`, 14, detailStartY);
+      detailStartY += 6;
+
+      const execDescription = String(anyOs.executionDescription || '').trim();
+      if (execDescription) {
+        const descLines = doc.splitTextToSize(`Execução: ${execDescription}`, 265);
+        doc.text(descLines, 14, detailStartY);
+        detailStartY += descLines.length * 4 + 2;
+      }
+
+      autoTable(doc, {
+        startY: detailStartY,
+        head: [['Código', 'Material', 'Qtd', 'Origem', 'Unitário', 'Total', 'Data']],
+        body: materialsRows.length ? materialsRows : [['-', 'Nenhum material lançado', '-', '-', 'R$ 0,00', 'R$ 0,00', '-']],
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [59, 130, 246] },
+        columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } },
+      });
+
+      detailStartY = (doc as any).lastAutoTable.finalY + 4;
+
+      autoTable(doc, {
+        startY: detailStartY,
+        head: [['Serviço', 'Qtd/Horas', 'Unitário', 'Total', 'Data']],
+        body: serviceRows.length ? serviceRows : [['Nenhum serviço lançado', '-', 'R$ 0,00', 'R$ 0,00', '-']],
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [16, 185, 129] },
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right', fontStyle: 'bold' } },
+      });
+
+      detailStartY = (doc as any).lastAutoTable.finalY + 6;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(
+        `Resumo da OS: Materiais R$ ${formatCurrency(costs.materialCost)} | Serviços R$ ${formatCurrency(costs.serviceCost)} | Total R$ ${formatCurrency(costs.totalCost)}`,
+        14,
+        detailStartY,
+      );
+      detailStartY += 10;
+    }
+
+    doc.save(`Relatorio_Geral_OS_${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="border-b border-slate-200 pb-6">
@@ -1156,6 +1409,21 @@ const Reports: React.FC<Props> = ({
             className="mt-auto px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors flex items-center gap-2 w-full justify-center"
           >
             <i className="fas fa-file-pdf"></i> Gerar PDF
+          </button>
+        </div>
+
+        {/* ALL OS REPORT */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group md:col-span-2">
+          <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+            <i className="fas fa-clipboard-list"></i>
+          </div>
+          <h3 className="font-bold text-lg text-slate-800 mb-2">Relatório Geral de OS</h3>
+          <p className="text-slate-500 text-sm mb-6">Gera um PDF com todas as OS do filtro, resumo consolidado, custos e detalhamento de materiais e serviços por ordem.</p>
+          <button
+            onClick={() => { void generateAllOSReport(); }}
+            className="mt-auto px-6 py-3 bg-rose-600 text-white rounded-lg font-bold text-sm hover:bg-rose-700 transition-colors flex items-center gap-2 w-full justify-center"
+          >
+            <i className="fas fa-file-pdf"></i> Gerar PDF de todas as OS
           </button>
         </div>
 
