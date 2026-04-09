@@ -531,6 +531,69 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       else if (os.equipmentId) { const eq = equipments.find(e => e.id === os.equipmentId); return { label: eq?.name || 'N/A', sub: eq?.code || '', type: 'EQUIPMENT' }; }
       return { label: '---', sub: '', type: 'UNKNOWN' }; 
   };
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return 'Não informado';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Não informado';
+    return date.toLocaleString('pt-BR');
+  };
+
+  const formatDurationHours = (hours?: number) => {
+    const safeHours = Number(hours || 0);
+    if (!safeHours) return '0h 00min';
+    const totalMinutes = Math.round(safeHours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${h}h ${String(m).padStart(2, '0')}min`;
+  };
+
+  const calculateExecutorWorkedHours = (os: OS) => {
+    const totalServiceHours = (os.services || []).reduce((acc, service) => acc + Number(service.quantity || 0), 0);
+    if (totalServiceHours > 0) return totalServiceHours;
+
+    if (os.startTime && os.endTime) {
+      const start = new Date(os.startTime).getTime();
+      const end = new Date(os.endTime).getTime();
+      if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+        return (end - start) / (1000 * 60 * 60);
+      }
+    }
+
+    return 0;
+  };
+
+  const getPauseEntries = (os: OS) => {
+    const globalPauses = (os.pauseHistory || []).map((entry, index) => ({
+      key: `global-${index}`,
+      executorId: '',
+      executorName: 'OS geral',
+      reason: entry.reason || 'Sem motivo informado',
+      action: entry.action,
+      timestamp: entry.timestamp,
+      userId: entry.userId,
+      worklogBeforePause: ''
+    }));
+
+    const executorPauses = Object.entries(os.executorStates || {}).flatMap(([executorId, state]) =>
+      (state.pauseHistory || []).map((entry, index) => ({
+        key: `executor-${executorId}-${index}`,
+        executorId,
+        executorName: users.find(u => u.id === executorId)?.name || 'Executor não identificado',
+        reason: entry.reason || 'Sem motivo informado',
+        action: entry.action,
+        timestamp: entry.timestamp,
+        userId: entry.userId,
+        worklogBeforePause: entry.worklogBeforePause || ''
+      }))
+    );
+
+    return [...globalPauses, ...executorPauses].sort((a, b) => {
+      const aTime = new Date(a.timestamp || '').getTime();
+      const bTime = new Date(b.timestamp || '').getTime();
+      return (Number.isNaN(aTime) ? 0 : aTime) - (Number.isNaN(bTime) ? 0 : bTime);
+    });
+  };
   
   const generateOSDetailPDF = (os: OS) => {
     const doc = new jsPDF();
@@ -538,170 +601,206 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
     const osExecutors = os.executorIds ? users.filter(u => os.executorIds?.includes(u.id)) : (os.executorId ? [users.find(u => u.id === os.executorId)].filter(Boolean) : []);
     const executorNames = osExecutors.length > 0 ? osExecutors.map(e => e?.name).join(', ') : 'Não Atribuído';
     const costs = calculateOSCosts(os, materials, services);
+    const pauseEntries = getPauseEntries(os);
+    const isOverdue = os.status !== OSStatus.COMPLETED && new Date(os.limitDate).getTime() < new Date().getTime();
+    const workedHours = calculateExecutorWorkedHours(os);
+    const materialTotal = (os.materials || []).reduce((acc, item) => acc + (Number(item.quantity || 0) * Number(item.unitCost || 0)), 0);
+    const serviceTotal = (os.services || []).reduce((acc, item) => acc + (Number(item.quantity || 0) * Number(item.unitCost || 0)), 0);
+    const linkedProject = os.projectId ? projects.find(p => p.id === os.projectId) : null;
+    const linkedBuilding = os.buildingId ? buildings.find(b => b.id === os.buildingId) : null;
+    const linkedEquipment = os.equipmentId ? equipments.find(e => e.id === os.equipmentId) : null;
+
+    const ensureSpace = (requiredHeight = 18) => {
+      if (y + requiredHeight > 275) {
+        doc.addPage();
+        y = 20;
+      }
+    };
+
+    const addSectionTitle = (title: string) => {
+      ensureSpace(12);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text(title, 14, y);
+      doc.setDrawColor(180);
+      doc.setLineWidth(0.4);
+      doc.line(14, y + 2, 196, y + 2);
+      y += 8;
+    };
 
     doc.setFillColor(71, 122, 127);
     doc.rect(0, 0, 210, 24, 'F');
     
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text(`ORDEM DE SERVIÇO: ${os.number}`, 14, 16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`RELATÓRIO DA OS ${os.number}`, 14, 16);
     
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Emissão: ${new Date().toLocaleString()}`, 196, 16, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Emitido em: ${new Date().toLocaleString('pt-BR')}`, 196, 16, { align: 'right' });
 
     let y = 35;
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("DADOS GERAIS", 14, y);
-    doc.setLineWidth(0.5);
-    doc.line(14, y + 2, 196, y + 2);
-    y += 8;
-
     const costCenter = (() => {
-      if (os.projectId) {
-        const project = projects.find(p => p.id === os.projectId);
-        return project?.costCenter ? `${project.costCenter} (Projeto)` : 'Não definido';
+      if (linkedProject?.costCenter) {
+        return `${linkedProject.costCenter} (Projeto)`;
       }
       return os.costCenter || 'Não definido';
     })();
 
+    addSectionTitle('DADOS GERAIS');
+
     const infoData = [
-        [`Vínculo: ${context.type}`, `${context.label} - ${context.sub}`],
-        ["Centro de Custo", costCenter],
-        ["Status", os.status],
-        ["Prioridade", translatePriority(os.priority)],
-        ["Tipo", os.type],
-        ["Solicitante", getRequesterName(os)],
-        ["Executor(es)", executorNames],
-        ["Abertura", new Date(os.openDate).toLocaleString()],
-        ["Prazo Limite", new Date(os.limitDate).toLocaleString()]
+      ['Número da OS', os.number || '-'],
+      ['Status', os.status],
+      ['Prioridade', translatePriority(os.priority)],
+      ['SLA (horas)', String(os.slaHours || 0)],
+      ['Situação do SLA', isOverdue ? 'Atrasado' : 'Dentro do prazo'],
+      ['Tipo', os.type],
+      ['Solicitante', getRequesterName(os)],
+      ['Executor(es)', executorNames],
+      ['Abertura', formatDateTime(os.openDate)],
+      ['Prazo limite', formatDateTime(os.limitDate)],
+      ['Início da execução', formatDateTime(os.startTime)],
+      ['Fim da execução', formatDateTime(os.endTime)],
+      ['Horas apontadas', formatDurationHours(workedHours)],
+      ['Centro de custo', costCenter],
+      ['Vínculo', `${context.type} - ${context.label}${context.sub ? ` / ${context.sub}` : ''}`],
+      ['Projeto', linkedProject ? `${linkedProject.code} - ${linkedProject.description}` : 'Não vinculado'],
+      ['Prédio/Unidade', linkedBuilding ? `${linkedBuilding.name} - ${linkedBuilding.city}` : 'Não vinculado'],
+      ['Equipamento', linkedEquipment ? `${linkedEquipment.code} - ${linkedEquipment.name}` : 'Não vinculado']
     ];
 
     autoTable(doc, {
-        startY: y,
-        body: infoData,
-        theme: 'plain',
-        styles: { fontSize: 10, cellPadding: 1.5 },
-        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 }, 1: { cellWidth: 100 } }
+      startY: y,
+      body: infoData,
+      theme: 'plain',
+      styles: { fontSize: 9.5, cellPadding: 1.8 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 48 }, 1: { cellWidth: 130 } }
     });
 
-    y = (doc as any).lastAutoTable.finalY + 10;
+    y = (doc as any).lastAutoTable.finalY + 8;
 
-    doc.setFont("helvetica", "bold");
-    doc.text("DESCRIÇÃO DO PROBLEMA SOLICITADO", 14, y);
-    doc.line(14, y + 2, 196, y + 2);
-    y += 8;
-
-    doc.setFont("helvetica", "normal");
-    const descLines = doc.splitTextToSize(os.description, 180);
+    addSectionTitle('DESCRIÇÃO DO PROBLEMA');
+    doc.setFont('helvetica', 'normal');
+    const descLines = doc.splitTextToSize(os.description || 'Não informado.', 180);
     doc.text(descLines, 14, y);
-    y += descLines.length * 5 + 10;
+    y += descLines.length * 5 + 8;
 
-    if (os.executionDescription) {
-        doc.setFont("helvetica", "bold");
-        doc.text("DESCRIÇÃO DO SERVIÇO REALIZADO", 14, y);
-        doc.line(14, y + 2, 196, y + 2);
-        y += 8;
-
-        doc.setFont("helvetica", "normal");
-        const execLines = doc.splitTextToSize(os.executionDescription, 180);
-        doc.text(execLines, 14, y);
-        y += execLines.length * 5 + 10;
-    }
-
-    if (os.completionImage) {
-        if (y > 200) {
-            doc.addPage();
-            y = 40;
-        }
-
-        doc.setFont("helvetica", "bold");
-        doc.text("FOTO DO SERVIÇO REALIZADO", 14, y);
-        doc.line(14, y + 2, 196, y + 2);
-        y += 8;
-
-        try {
-            doc.addImage(os.completionImage, 'JPEG', 14, y, 90, 90);
-            y += 100;
-        } catch (e) {
-            doc.setFont("helvetica", "italic");
-            doc.setFontSize(9);
-            doc.text("(Foto não disponível ou formato inválido)", 14, y);
-            y += 10;
-        }
-    }
+    addSectionTitle('DESCRIÇÃO DO SERVIÇO REALIZADO');
+    doc.setFont('helvetica', 'normal');
+    const executionText = os.executionDescription || 'Sem descrição de execução registrada.';
+    const execLines = doc.splitTextToSize(executionText, 180);
+    doc.text(execLines, 14, y);
+    y += execLines.length * 5 + 8;
 
     if (os.materials.length > 0) {
-        doc.setFont("helvetica", "bold");
-        doc.text("MATERIAIS APLICADOS", 14, y);
-        y += 4;
-        
-        const matRows = os.materials.map(m => {
-            const mat = materials.find(x => x.id === m.materialId);
-            return [
-                mat?.code || '-',
-                mat?.description || 'Item excluído',
-                m.fromLocation || 'N/E',
-                `${m.quantity} ${mat?.unit || ''}`,
-                `R$ ${formatCurrency(m.unitCost)}`,
-                `R$ ${formatCurrency(m.quantity * m.unitCost)}`
-            ];
-        });
+      addSectionTitle('MATERIAIS UTILIZADOS');
 
-        autoTable(doc, {
-            startY: y,
-            head: [['Cód', 'Descrição', 'Local', 'Qtd', 'Unit.', 'Total']],
-            body: matRows,
-            headStyles: { fillColor: [220, 220, 220], textColor: 50 },
-            styles: { fontSize: 8 },
-            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
-        });
-        
-        y = (doc as any).lastAutoTable.finalY + 10;
+      const matRows = os.materials.map((m, index) => {
+        const mat = materials.find(x => x.id === m.materialId);
+        return [
+          String(index + 1),
+          mat?.code || '-',
+          mat?.description || 'Item excluído',
+          m.fromLocation || 'N/E',
+          `${m.quantity} ${mat?.unit || ''}`,
+          `R$ ${formatCurrency(m.unitCost)}`,
+          `R$ ${formatCurrency(m.quantity * m.unitCost)}`,
+          formatDateTime(m.timestamp)
+        ];
+      });
+
+      autoTable(doc, {
+        startY: y,
+        head: [['#', 'Cód.', 'Descrição', 'Local', 'Qtd', 'Unit.', 'Total', 'Data']],
+        body: matRows,
+        headStyles: { fillColor: [220, 220, 220], textColor: 50 },
+        styles: { fontSize: 8 },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          4: { halign: 'right' },
+          5: { halign: 'right' },
+          6: { halign: 'right' }
+        }
+      });
+      
+      y = (doc as any).lastAutoTable.finalY + 8;
     }
 
     if (os.services.length > 0) {
-        doc.setFont("helvetica", "bold");
-        doc.text("SERVIÇOS / MÃO DE OBRA", 14, y);
-        y += 4;
+      addSectionTitle('SERVIÇOS / MÃO DE OBRA');
 
-        const srvRows = os.services.map(s => {
-            const srv = services.find(x => x.id === s.serviceTypeId);
-            return [
-                srv?.name || 'Serviço excluído',
-                `${s.quantity} h`,
-                `R$ ${formatCurrency(s.unitCost)}`,
-                `R$ ${formatCurrency(s.quantity * s.unitCost)}`
-            ];
-        });
+      const srvRows = os.services.map((s, index) => {
+        const srv = services.find(x => x.id === s.serviceTypeId);
+        return [
+          String(index + 1),
+          srv?.name || 'Serviço excluído',
+          `${s.quantity} h`,
+          `R$ ${formatCurrency(s.unitCost)}`,
+          `R$ ${formatCurrency(s.quantity * s.unitCost)}`,
+          formatDateTime(s.timestamp)
+        ];
+      });
 
-        autoTable(doc, {
-            startY: y,
-            head: [['Serviço', 'Qtd (h)', 'Valor/h', 'Total']],
-            body: srvRows,
-            headStyles: { fillColor: [220, 220, 220], textColor: 50 },
-            styles: { fontSize: 9 },
-            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
-        });
+      autoTable(doc, {
+        startY: y,
+        head: [['#', 'Serviço', 'Horas', 'Valor/h', 'Total', 'Data']],
+        body: srvRows,
+        headStyles: { fillColor: [220, 220, 220], textColor: 50 },
+        styles: { fontSize: 8.5 },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'right' }
+        }
+      });
 
-        y = (doc as any).lastAutoTable.finalY + 10;
+      y = (doc as any).lastAutoTable.finalY + 8;
     }
 
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
-    doc.text("RESUMO DE CUSTOS", 14, y);
-    doc.line(14, y + 2, 196, y + 2);
-    y += 8;
+    if (pauseEntries.length > 0) {
+      addSectionTitle('PAUSAS E HISTÓRICO OPERACIONAL');
+
+      const pauseRows = pauseEntries.map((entry, index) => {
+        const actionLabel = entry.action === 'PAUSE' ? 'Pausado' : 'Retomado';
+        const responsibleUser = users.find(u => u.id === entry.userId)?.name || entry.userId || '-';
+        return [
+          String(index + 1),
+          entry.executorName,
+          actionLabel,
+          entry.reason || '-',
+          responsibleUser,
+          formatDateTime(entry.timestamp),
+          entry.worklogBeforePause || '-'
+        ];
+      });
+
+      autoTable(doc, {
+        startY: y,
+        head: [['#', 'Executor', 'Ação', 'Motivo', 'Registrado por', 'Data/Hora', 'Apontamento']],
+        body: pauseRows,
+        headStyles: { fillColor: [220, 220, 220], textColor: 50 },
+        styles: { fontSize: 7.5 },
+        columnStyles: { 0: { halign: 'center', cellWidth: 10 } }
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    addSectionTitle('RESUMO DE CUSTOS');
 
     const costSummary = [
-      ["Materiais", `R$ ${formatCurrency(costs.materialCost)}${costs.isManualMaterial ? ' (Manual)' : ''}`],
-      ["Serviços", `R$ ${formatCurrency(costs.serviceCost)}${costs.isManualService ? ' (Manual)' : ''}`],
-      ["TOTAL", `R$ ${formatCurrency(costs.totalCost)}`]
+      ['Materiais aplicados', `R$ ${formatCurrency(materialTotal)}`],
+      ['Serviços apontados', `R$ ${formatCurrency(serviceTotal)}`],
+      ['Custo manual de materiais', `R$ ${formatCurrency(os.manualMaterialCost || 0)}`],
+      ['Custo manual de serviços', `R$ ${formatCurrency(os.manualServiceCost || 0)}`],
+      ['Materiais (total cálculo)', `R$ ${formatCurrency(costs.materialCost)}${costs.isManualMaterial ? ' (Manual)' : ''}`],
+      ['Serviços (total cálculo)', `R$ ${formatCurrency(costs.serviceCost)}${costs.isManualService ? ' (Manual)' : ''}`],
+      ['TOTAL GERAL', `R$ ${formatCurrency(costs.totalCost)}`]
     ];
 
     autoTable(doc, {
@@ -710,11 +809,11 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       theme: 'plain',
       styles: { fontSize: 10, cellPadding: 2 },
       columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 40 },
-        1: { cellWidth: 100, halign: 'right' }
+        0: { fontStyle: 'bold', cellWidth: 70 },
+        1: { cellWidth: 80, halign: 'right' }
       },
       didParseCell: (data: any) => {
-        if (data.row.index === 2) {
+        if (data.row.index === costSummary.length - 1) {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.fontSize = 12;
           data.cell.styles.textColor = [71, 122, 127];
@@ -722,23 +821,34 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       }
     });
 
-    y = (doc as any).lastAutoTable.finalY + 15;
+    y = (doc as any).lastAutoTable.finalY + 10;
 
-    if (y > 250) {
-        doc.addPage();
-        y = 40;
+    if (os.completionImage) {
+      ensureSpace(110);
+      addSectionTitle('FOTO DO SERVIÇO REALIZADO');
+
+      try {
+        doc.addImage(os.completionImage, 'JPEG', 14, y, 90, 90);
+        y += 96;
+      } catch (e) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(9);
+        doc.text('(Foto não disponível ou formato inválido)', 14, y);
+        y += 10;
+      }
     }
 
+    ensureSpace(35);
     doc.setDrawColor(150);
     doc.setLineWidth(0.5);
     doc.setTextColor(100);
     doc.setFontSize(8);
 
     doc.line(20, y + 20, 90, y + 20);
-    doc.text("EXECUTOR RESPONSÁVEL", 55, y + 25, { align: 'center' });
+    doc.text('EXECUTOR RESPONSÁVEL', 55, y + 25, { align: 'center' });
 
     doc.line(120, y + 20, 190, y + 20);
-    doc.text("GESTOR / APROVADOR", 155, y + 25, { align: 'center' });
+    doc.text('GESTOR / APROVADOR', 155, y + 25, { align: 'center' });
 
     doc.save(`OS_${os.number}_Detalhado.pdf`);
   };
