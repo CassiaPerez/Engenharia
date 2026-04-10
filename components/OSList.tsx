@@ -233,6 +233,17 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       return services.filter(s => s.name.toLowerCase().includes(allocSrvSearch.toLowerCase()));
   }, [services, allocSrvSearch]);
 
+  const normalizedOss = useMemo(() => {
+    return (oss || []).map((os: any) => ({
+      ...os,
+      number: os?.number || '',
+      description: os?.description || '',
+      services: Array.isArray(os?.services) ? os.services : [],
+      materials: Array.isArray(os?.materials) ? os.materials : [],
+      executorIds: Array.isArray(os?.executorIds) ? os.executorIds : []
+    }));
+  }, [oss]);
+
   const filteredOSs = useMemo(() => {
     const now = new Date();
     const filtered = normalizedOss.filter(os => {
@@ -280,17 +291,6 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
 
 
-  const normalizedOss = useMemo(() => {
-    return (oss || []).map((os: any) => ({
-      ...os,
-      number: os?.number || '',
-      description: os?.description || '',
-      services: Array.isArray(os?.services) ? os.services : [],
-      materials: Array.isArray(os?.materials) ? os.materials : [],
-      executorIds: Array.isArray(os?.executorIds) ? os.executorIds : []
-    }));
-  }, [oss]);
-
 
   const handleOpenOSDetails = async (os: OS) => {
       try {
@@ -302,6 +302,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
           };
 
           setSelectedOS(baseOS);
+          setShowModal(true);
 
           const fullOS = await lazyLoader.loadSingleRecord<OS>('oss', os.id);
 
