@@ -160,6 +160,14 @@ export const PERMISSIONS_MATRIX: Record<UserRole, Record<ModuleId, ModulePermiss
   }
 };
 
+const FULL_ACCESS_PERMISSIONS: ModulePermissions = {
+  view: true,
+  create: true,
+  edit: true,
+  delete: true,
+  export: true
+};
+
 export async function loadCustomPermissions(): Promise<void> {
   try {
     const { data, error } = await supabase
@@ -317,6 +325,11 @@ export async function resetUserPermissions(userId: string): Promise<boolean> {
 }
 
 function getEffectivePermissions(role: UserRole, module: ModuleId, userId?: string): ModulePermissions {
+  // ADMIN sempre com acesso total, ignorando overrides por usuário
+  if (role === 'ADMIN') {
+    return FULL_ACCESS_PERMISSIONS;
+  }
+
   if (userId && userPermissionsCache[userId]?.[module]) {
     return userPermissionsCache[userId][module];
   }
@@ -370,6 +383,10 @@ export function canEditField(
   fieldName: string,
   role: UserRole
 ): boolean {
+  if (role === 'ADMIN') {
+    return true;
+  }
+
   if (userFieldPermissionsCache[userId]?.[module]?.[fieldName]) {
     return userFieldPermissionsCache[userId][module][fieldName].edit;
   }
@@ -386,6 +403,10 @@ export function getUserFieldPermissions(
 }
 
 export function getUserWarehouses(userId: string, role: UserRole): string[] {
+  if (role === 'ADMIN') {
+    return ['Central', 'Cropbio', 'Cropfert'];
+  }
+
   if (userWarehousesCache[userId] && userWarehousesCache[userId].length > 0) {
     return userWarehousesCache[userId];
   }
@@ -396,7 +417,11 @@ export function getUserWarehouses(userId: string, role: UserRole): string[] {
     return ['Cropbio'];
   } else if (role === 'WAREHOUSE_FERT') {
     return ['Cropfert'];
-  } else if (role === 'ADMIN' || role === 'MANAGER' || role === 'OPERATOR' || role === 'ENGINEER') {
+  } else if (
+    role === 'MANAGER' ||
+    role === 'OPERATOR' ||
+    role === 'ENGINEER'
+  ) {
     return ['Central', 'Cropbio', 'Cropfert'];
   }
 
@@ -446,8 +471,12 @@ export async function saveUserWarehouses(userId: string, warehouses: string[]): 
 }
 
 export function getAllowedModules(role: UserRole): ModuleId[] {
+  if (role === 'ADMIN') {
+    return Object.keys(MODULE_LABELS) as ModuleId[];
+  }
+
   const modules = Object.keys(PERMISSIONS_MATRIX[role]) as ModuleId[];
-  return modules.filter(module => PERMISSIONS_MATRIX[role][module].view);
+  return modules.filter(module => getEffectivePermissions(role, module).view);
 }
 
 export const ROLE_DESCRIPTIONS: Record<UserRole, { label: string; description: string; color: string }> = {
