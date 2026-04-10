@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react';
-import { supabase, mapToSupabase } from '../services/supabase';
+import { supabase, mapToSupabase, mapToSupabaseJson } from '../services/supabase';
 
 interface BatchOperation {
   table: string;
@@ -7,6 +7,10 @@ interface BatchOperation {
   data: any;
   id?: string;
 }
+
+const JSON_CONTENT_TABLES = new Set(['stock_movements', 'purchases']);
+
+const shouldUseJsonContent = (table: string) => JSON_CONTENT_TABLES.has(table);
 
 export const useBatchSave = (debounceMs: number = 1000) => {
   const batchQueue = useRef<Map<string, BatchOperation>>(new Map());
@@ -29,9 +33,18 @@ export const useBatchSave = (debounceMs: number = 1000) => {
     try {
       await Promise.all(
         Object.entries(groupedByTable).map(async ([table, ops]) => {
-          const upserts = ops.filter(o => o.operation === 'upsert').map(o => mapToSupabase(o.data));
-          const inserts = ops.filter(o => o.operation === 'insert').map(o => mapToSupabase(o.data));
-          const deletes = ops.filter(o => o.operation === 'delete').map(o => o.id);
+          const upserts = ops
+            .filter(o => o.operation === 'upsert')
+            .map(o => shouldUseJsonContent(table) ? mapToSupabaseJson(o.data) : mapToSupabase(o.data));
+
+          const inserts = ops
+            .filter(o => o.operation === 'insert')
+            .map(o => shouldUseJsonContent(table) ? mapToSupabaseJson(o.data) : mapToSupabase(o.data));
+
+          const deletes = ops
+            .filter(o => o.operation === 'delete')
+            .map(o => o.id)
+            .filter(Boolean);
 
           if (upserts.length > 0) {
             const { error } = await supabase.from(table).upsert(upserts);
