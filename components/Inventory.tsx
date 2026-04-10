@@ -618,6 +618,8 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
           queueOperation('materials', 'upsert', updatedMaterial, updatedMaterial.id);
       }
 
+      await flush();
+
       setLocForm({ location: '', toLocation: '', quantity: '', reason: '', osNumber: '', projectId: '', unitCost: '' });
       setLocAction('VIEW');
       setOutType('OS');
