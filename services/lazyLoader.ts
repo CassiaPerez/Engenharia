@@ -132,10 +132,14 @@ class LazyDataLoader {
     if (tableName === 'oss') {
       return data.map((item: any) => ({
         ...item,
+
+        // IMPORTANTE: mesmo na listagem leve, manter arrays vazios
+        // para a UI não quebrar ao calcular custo/horas.
+        services: Array.isArray(item.services) ? item.services : [],
+        materials: Array.isArray(item.materials) ? item.materials : [],
+
         ...(isFull
           ? {
-              services: Array.isArray(item.services) ? item.services : [],
-              materials: Array.isArray(item.materials) ? item.materials : [],
               executorWorkLogs: Array.isArray(item.executorWorkLogs) ? item.executorWorkLogs : [],
               executorStates:
                 item.executorStates && typeof item.executorStates === 'object'
@@ -149,7 +153,13 @@ class LazyDataLoader {
                 ? item.manualServiceItems
                 : []
             }
-          : {})
+          : {
+              executorWorkLogs: [],
+              executorStates: {},
+              pauseHistory: [],
+              manualMaterialItems: [],
+              manualServiceItems: []
+            })
       }));
     }
 
