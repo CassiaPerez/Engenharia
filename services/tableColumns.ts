@@ -1,6 +1,6 @@
 export const TABLE_COLUMNS = {
   users: 'id, name, email, password, role, department, avatar, active, company, updated_at',
-  oss: 'id, number, type, status, priority, description, equipment_id, cost_center, open_date, limit_date, close_date, sla_hours, executor_ids, requester_id, project_id, building_id, executor_id, requester_name, start_time, end_time, pause_reason, manual_material_cost, manual_service_cost, updated_at',
+  oss: 'id, number, type, status, priority, description, equipment_id, cost_center, open_date, limit_date, close_date, sla_hours, executor_ids, requester_id, services, materials, manual_material_cost, manual_service_cost, manual_material_description, manual_service_description, manual_material_items, manual_service_items, executor_work_logs, project_id, building_id, executor_id, executor_states, start_time, end_time, pause_reason, pause_history, completion_image, execution_description, requester_name, updated_at',
   equipments: 'id, code, name, description, manufacturer, model, serial_number, location, status, notes, updated_at',
   materials: 'id, code, description, unit, "group", location, status, current_stock, min_stock, unit_cost, updated_at',
   buildings: 'id, name, type, address, city, manager, notes, updated_at',
