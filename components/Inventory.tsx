@@ -402,7 +402,6 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
       }
 
       let updatedMaterial: Material | null = null;
-      let pendingOSUpdate: OS | null = null;
 
       setMaterials(prev => prev.map(m => {
           if (m.id === selectedMaterialForLoc.id) {
@@ -535,39 +534,27 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                       costCenter: costCenter
                   });
 
-                  if (osId) {
-                      const osSource = (oss && oss.length > 0 ? oss : allOS).find(os => os.number === locForm.osNumber || os.id === osId);
-
-                      if (osSource) {
-                          const existingMaterials = Array.isArray(osSource.materials) ? [...osSource.materials] : [];
-                          const existingIndex = existingMaterials.findIndex(
-                              item => item.materialId === m.id && (item.fromLocation || '') === (locForm.location || '')
-                          );
-
-                          if (existingIndex >= 0) {
-                              existingMaterials[existingIndex] = {
-                                  ...existingMaterials[existingIndex],
-                                  quantity: Number(existingMaterials[existingIndex].quantity || 0) + qty,
-                                  unitCost: Number(m.unitCost || 0),
-                                  timestamp: new Date().toISOString(),
-                                  fromLocation: locForm.location || undefined
-                              };
-                          } else {
+                  if (osId && setOss) {
+                      setOss(prevOss => prevOss.map(os => {
+                          if (os.number === locForm.osNumber) {
                               const newMaterial: OSItem = {
                                   materialId: m.id,
                                   quantity: qty,
-                                  unitCost: Number(m.unitCost || 0),
-                                  timestamp: new Date().toISOString(),
-                                  fromLocation: locForm.location || undefined
+                                  unitCost: m.unitCost,
+                                  timestamp: new Date().toISOString()
                               };
-                              existingMaterials.push(newMaterial);
-                          }
 
-                          pendingOSUpdate = {
-                              ...osSource,
-                              materials: existingMaterials
-                          };
-                      }
+                              const updatedOS = {
+                                  ...os,
+                                  materials: [...(os.materials || []), newMaterial]
+                              };
+
+                              queueOperation('oss', 'upsert', updatedOS, updatedOS.id);
+
+                              return updatedOS;
+                          }
+                          return os;
+                      }));
                   }
 
               } else if (locAction === 'TRANSFER') {
@@ -631,127 +618,183 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
           queueOperation('materials', 'upsert', updatedMaterial, updatedMaterial.id);
       }
 
-      if (pendingOSUpdate) {
-          queueOperation('oss', 'upsert', pendingOSUpdate, pendingOSUpdate.id);
-
-          setAllOS(prev => prev.map(os => os.id === pendingOSUpdate!.id ? pendingOSUpdate! : os));
-
-          if (setOss) {
-              setOss(prev => prev.map(os => os.id === pendingOSUpdate!.id ? pendingOSUpdate! : os));
-          }
-      }
-
-      await flush();
-
       setLocForm({ location: '', toLocation: '', quantity: '', reason: '', osNumber: '', projectId: '', unitCost: '' });
       setLocAction('VIEW');
       setOutType('OS');
   };
 
+
   const handleCreateMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log('=== INICIANDO CADASTRO DE MATERIAL ===');
-    console.log('Dados do formulário:', newMaterial);
-    console.log('ENV Check - VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
-    console.log('ENV Check - VITE_SUPABASE_ANON_KEY exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-    console.log('ENV Check - VITE_SUPABASE_ANON_KEY (primeiros 30 chars):', import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 30) + '...');
-
     if (!newMaterial.code || !newMaterial.description) {
-        console.error('Validação falhou: campos obrigatórios vazios');
-        alert('Erro: Código e Descrição são obrigatórios.');
-        return;
+      alert('Erro: Código e Descrição são obrigatórios.');
+      return;
     }
 
-    const code = (newMaterial.code || '').trim().toUpperCase();
+    const code = String(newMaterial.code || '').trim().toUpperCase();
+    const initialQty = Number(newMaterial.currentStock) || 0;
+    const initialLoc = String(newMaterial.location || 'CD - Central').trim();
+    const incomingUnitCost = Number(newMaterial.unitCost) || 0;
 
-    if (materials.some(m => m.code === code)) {
-        console.warn('Código duplicado detectado:', code);
-        alert('Erro: Este código SKU já existe. Edite o código e tente novamente.');
+    const existingMaterial = materials.find(
+      m => String(m.code || '').trim().toUpperCase() === code
+    );
+
+    if (existingMaterial) {
+      try {
+        const existingLocations = Array.isArray(existingMaterial.stockLocations) && existingMaterial.stockLocations.length > 0
+          ? [...existingMaterial.stockLocations]
+          : [{ name: existingMaterial.location || 'CD - Central', quantity: Number(existingMaterial.currentStock || 0) }];
+
+        const locIndex = existingLocations.findIndex(
+          l => String(l.name || '').trim().toLowerCase() === initialLoc.toLowerCase()
+        );
+
+        if (locIndex >= 0) {
+          existingLocations[locIndex] = {
+            ...existingLocations[locIndex],
+            quantity: Number(existingLocations[locIndex].quantity || 0) + initialQty
+          };
+        } else {
+          existingLocations.push({
+            name: initialLoc,
+            quantity: initialQty
+          });
+        }
+
+        const oldQty = Number(existingMaterial.currentStock || 0);
+        const oldCost = Number(existingMaterial.unitCost || 0);
+        const newQty = oldQty + initialQty;
+
+        let nextUnitCost = oldCost;
+        if (initialQty > 0 && newQty > 0) {
+          nextUnitCost = Math.round((((oldQty * oldCost) + (initialQty * incomingUnitCost)) / newQty) * 10000) / 10000;
+        }
+
+        const updatedMaterial: Material = {
+          ...existingMaterial,
+          description: String(newMaterial.description || existingMaterial.description),
+          group: newMaterial.group || existingMaterial.group || 'Geral',
+          unit: newMaterial.unit || existingMaterial.unit || 'Un',
+          minStock: Number(newMaterial.minStock) || Number(existingMaterial.minStock) || 0,
+          currentStock: newQty,
+          location: initialLoc,
+          unitCost: nextUnitCost,
+          stockLocations: existingLocations,
+          status: 'ACTIVE'
+        };
+
+        queueOperation('materials', 'upsert', updatedMaterial, updatedMaterial.id);
+
+        if (initialQty > 0) {
+          await addMovementWithSync({
+            id: Math.random().toString(36).substr(2, 9),
+            type: 'IN',
+            materialId: updatedMaterial.id,
+            quantity: initialQty,
+            date: new Date().toISOString(),
+            userId: currentUser.id,
+            description: 'Entrada por cadastro em item existente',
+            toLocation: initialLoc
+          });
+        }
+
+        await flush();
+
+        setMaterials(prev => prev.map(m => m.id === updatedMaterial.id ? updatedMaterial : m));
+        setShowModal(false);
+        setNewMaterial({
+          status: 'ACTIVE',
+          minStock: 10,
+          currentStock: 0,
+          unitCost: 0,
+          group: 'Geral',
+          unit: 'Un',
+          code: ''
+        });
+
+        alert('Estoque somado ao material existente com sucesso.');
         return;
+      } catch (e: any) {
+        console.error('Erro ao somar estoque no material existente:', e);
+        alert(`Erro ao atualizar estoque do material existente: ${e.message || 'Erro desconhecido'}`);
+        return;
+      }
     }
 
     const id = Math.random().toString(36).substr(2, 9);
-    const initialQty = Number(newMaterial.currentStock) || 0;
-    const initialLoc = newMaterial.location || 'CD - Central';
 
     const material: Material = {
-        id,
-        code: code,
-        description: newMaterial.description,
-        group: newMaterial.group || 'Geral',
-        unit: newMaterial.unit || 'Un',
-        unitCost: Number(newMaterial.unitCost) || 0,
-        minStock: Number(newMaterial.minStock) || 0,
-        currentStock: initialQty,
-        location: initialLoc,
-        stockLocations: [{ name: initialLoc, quantity: initialQty }],
-        status: 'ACTIVE'
+      id,
+      code,
+      description: String(newMaterial.description),
+      group: newMaterial.group || 'Geral',
+      unit: newMaterial.unit || 'Un',
+      unitCost: incomingUnitCost,
+      minStock: Number(newMaterial.minStock) || 0,
+      currentStock: initialQty,
+      location: initialLoc,
+      stockLocations: [{ name: initialLoc, quantity: initialQty }],
+      status: 'ACTIVE'
     };
 
-    console.log('Material preparado para inserção:', material);
-
     try {
-        console.log('Tentando inserir no Supabase...');
-        const { data, error } = await supabase.from('materials').insert({
-            id: material.id,
-            code: material.code,
-            description: material.description,
-            unit: material.unit,
-            group: material.group,
-            location: material.location,
-            status: material.status,
-            current_stock: material.currentStock || 0,
-            min_stock: material.minStock || 0,
-            unit_cost: material.unitCost || 0,
-            stock_locations: material.stockLocations || {}
-        }).select();
+      const { data, error } = await supabase.from('materials').insert({
+        id: material.id,
+        code: material.code,
+        description: material.description,
+        unit: material.unit,
+        group: material.group,
+        location: material.location,
+        status: material.status,
+        current_stock: material.currentStock || 0,
+        min_stock: material.minStock || 0,
+        unit_cost: material.unitCost || 0,
+        stock_locations: material.stockLocations || []
+      }).select();
 
-        console.log('Resposta do Supabase:', { data, error });
+      if (error) {
+        alert(`Erro ao salvar no banco de dados: ${error.message}`);
+        return;
+      }
 
-        if (error) {
-            console.error('Erro do Supabase:', error);
-            alert(`Erro ao salvar no banco de dados: ${error.message}\n\nDetalhes: ${error.hint || 'Verifique sua conexão com o banco de dados.'}`);
-            return;
-        }
+      if (!data || data.length === 0) {
+        alert('Erro: o material não foi salvo corretamente.');
+        return;
+      }
 
-        if (!data || data.length === 0) {
-            console.error('Nenhum dado retornado do Supabase após inserção');
-            alert('Erro: O material não foi salvo corretamente no banco de dados. Tente novamente.');
-            return;
-        }
+      setMaterials(prev => [...prev, material]);
 
-        console.log('Material salvo com sucesso no banco!');
-        setMaterials(prev => {
-            const updated = [...prev, material];
-            console.log('Estado materials atualizado. Total de itens:', updated.length);
-            return updated;
+      if (material.currentStock > 0) {
+        await addMovementWithSync({
+          id: Math.random().toString(36).substr(2, 9),
+          type: 'IN',
+          materialId: id,
+          quantity: material.currentStock,
+          date: new Date().toISOString(),
+          userId: currentUser.id,
+          description: 'Saldo Inicial (Cadastro Manual)',
+          toLocation: initialLoc
         });
+      }
 
-        if (material.currentStock > 0) {
-            console.log('Registrando movimento de estoque inicial...');
-            await addMovementWithSync({
-                id: Math.random().toString(36).substr(2, 9),
-                type: 'IN',
-                materialId: id,
-                quantity: material.currentStock,
-                date: new Date().toISOString(),
-                userId: currentUser.id,
-                description: 'Saldo Inicial (Cadastro Manual)',
-                toLocation: initialLoc
-            });
-            console.log('Movimento registrado!');
-        }
+      await flush();
+      setShowModal(false);
+      setNewMaterial({
+        status: 'ACTIVE',
+        minStock: 10,
+        currentStock: 0,
+        unitCost: 0,
+        group: 'Geral',
+        unit: 'Un',
+        code: ''
+      });
 
-        console.log('Fechando modal e limpando formulário...');
-        await flush();
-        setShowModal(false);
-        setNewMaterial({ status: 'ACTIVE', minStock: 10, currentStock: 0, unitCost: 0, group: 'Geral', unit: 'Un', code: '' });
-        alert('Material cadastrado com sucesso!');
-        console.log('=== CADASTRO CONCLUÍDO COM SUCESSO ===');
+      alert('Material cadastrado com sucesso!');
     } catch (e: any) {
-        console.error('Exceção capturada:', e);
-        alert(`Erro ao salvar no banco de dados: ${e.message || 'Erro desconhecido'}`);
+      console.error('Erro ao salvar material:', e);
+      alert(`Erro ao salvar no banco de dados: ${e.message || 'Erro desconhecido'}`);
     }
   };
 
@@ -767,67 +810,152 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws);
 
-      const importedMaterials: Material[] = [];
+      const updatedMaterialsMap = new Map<string, Material>();
       let generatedCount = 0;
-      
+
       data.forEach((row: any) => {
         let code = row['Codigo'] || row['SKU'] || row['Code'];
         const desc = row['Descricao'] || row['Description'];
-        
-        if (desc) {
-            if (!code) {
-                code = generateUniqueSKU(); 
-                while (importedMaterials.some(im => im.code === code) || materials.some(m => m.code === code)) {
-                     const random = Math.floor(1000 + Math.random() * 9000);
-                     const year = new Date().getFullYear().toString().substr(-2);
-                     code = `MAT-${year}-${random}`;
-                }
-                generatedCount++;
-            }
 
-            if (materials.some(m => m.code === code)) return;
-            
-            const qty = Number(row['Estoque']) || 0;
-            const loc = row['Local'] || 'CD - Central';
+        if (!desc) return;
 
-            const newMat: Material = {
-                id: Math.random().toString(36).substr(2, 9),
-                code: String(code),
-                description: String(desc),
-                group: row['Grupo'] || 'Geral',
-                unit: row['Unidade'] || 'Un',
-                unitCost: Number(row['Custo']) || 0,
-                minStock: Number(row['Minimo']) || 10,
-                currentStock: qty,
-                location: loc,
-                stockLocations: [{ name: loc, quantity: qty }],
-                status: 'ACTIVE'
+        if (!code) {
+          code = generateUniqueSKU();
+          while (
+            updatedMaterialsMap.has(String(code).trim().toUpperCase()) ||
+            materials.some(m => String(m.code || '').trim().toUpperCase() === String(code).trim().toUpperCase())
+          ) {
+            const random = Math.floor(1000 + Math.random() * 9000);
+            const year = new Date().getFullYear().toString().substr(-2);
+            code = `MAT-${year}-${random}`;
+          }
+          generatedCount++;
+        }
+
+        code = String(code).trim().toUpperCase();
+
+        const qty = Number(row['Estoque']) || 0;
+        const loc = String(row['Local'] || 'CD - Central').trim();
+        const incomingCost = Number(row['Custo']) || 0;
+
+        const existingMaterial =
+          updatedMaterialsMap.get(code) ||
+          materials.find(m => String(m.code || '').trim().toUpperCase() === code);
+
+        if (existingMaterial) {
+          const existingLocations = Array.isArray(existingMaterial.stockLocations) && existingMaterial.stockLocations.length > 0
+            ? [...existingMaterial.stockLocations]
+            : [{ name: existingMaterial.location || 'CD - Central', quantity: Number(existingMaterial.currentStock || 0) }];
+
+          const locIndex = existingLocations.findIndex(
+            l => String(l.name || '').trim().toLowerCase() === loc.toLowerCase()
+          );
+
+          if (locIndex >= 0) {
+            existingLocations[locIndex] = {
+              ...existingLocations[locIndex],
+              quantity: Number(existingLocations[locIndex].quantity || 0) + qty
             };
-            importedMaterials.push(newMat);
+          } else {
+            existingLocations.push({ name: loc, quantity: qty });
+          }
 
-            if (newMat.currentStock > 0) {
-                addMovementWithSync({
-                    id: Math.random().toString(36).substr(2, 9),
-                    type: 'IN',
-                    materialId: newMat.id,
-                    quantity: newMat.currentStock,
-                    date: new Date().toISOString(),
-                    userId: currentUser.id,
-                    description: 'Importação via Planilha',
-                    toLocation: loc
-                });
-            }
+          const oldQty = Number(existingMaterial.currentStock || 0);
+          const oldCost = Number(existingMaterial.unitCost || 0);
+          const newQty = oldQty + qty;
+
+          let nextUnitCost = oldCost;
+          if (qty > 0 && newQty > 0) {
+            nextUnitCost = Math.round((((oldQty * oldCost) + (qty * incomingCost)) / newQty) * 10000) / 10000;
+          }
+
+          const mergedMaterial: Material = {
+            ...existingMaterial,
+            description: String(desc || existingMaterial.description),
+            group: row['Grupo'] || existingMaterial.group || 'Geral',
+            unit: row['Unidade'] || existingMaterial.unit || 'Un',
+            minStock: Number(row['Minimo']) || Number(existingMaterial.minStock) || 10,
+            currentStock: newQty,
+            location: loc,
+            unitCost: nextUnitCost,
+            stockLocations: existingLocations,
+            status: 'ACTIVE'
+          };
+
+          updatedMaterialsMap.set(code, mergedMaterial);
+
+          if (qty > 0) {
+            addMovementWithSync({
+              id: Math.random().toString(36).substr(2, 9),
+              type: 'IN',
+              materialId: mergedMaterial.id,
+              quantity: qty,
+              date: new Date().toISOString(),
+              userId: currentUser.id,
+              description: 'Importação via Planilha',
+              toLocation: loc
+            });
+          }
+
+          return;
+        }
+
+        const newMat: Material = {
+          id: Math.random().toString(36).substr(2, 9),
+          code,
+          description: String(desc),
+          group: row['Grupo'] || 'Geral',
+          unit: row['Unidade'] || 'Un',
+          unitCost: incomingCost,
+          minStock: Number(row['Minimo']) || 10,
+          currentStock: qty,
+          location: loc,
+          stockLocations: [{ name: loc, quantity: qty }],
+          status: 'ACTIVE'
+        };
+
+        updatedMaterialsMap.set(code, newMat);
+
+        if (newMat.currentStock > 0) {
+          addMovementWithSync({
+            id: Math.random().toString(36).substr(2, 9),
+            type: 'IN',
+            materialId: newMat.id,
+            quantity: newMat.currentStock,
+            date: new Date().toISOString(),
+            userId: currentUser.id,
+            description: 'Importação via Planilha',
+            toLocation: loc
+          });
         }
       });
 
-      if (importedMaterials.length > 0) {
-          setMaterials(prev => [...prev, ...importedMaterials]);
-          alert(`${importedMaterials.length} itens importados com sucesso! (${generatedCount} códigos gerados automaticamente)`);
+      if (updatedMaterialsMap.size > 0) {
+        const mergedList = Array.from(updatedMaterialsMap.values());
+
+        mergedList.forEach(mat => {
+          queueOperation('materials', 'upsert', mat, mat.id);
+        });
+
+        flush().then(() => {
+          setMaterials(prev => {
+            const map = new Map(prev.map(m => [String(m.code || '').trim().toUpperCase(), m]));
+            mergedList.forEach(mat => {
+              map.set(String(mat.code || '').trim().toUpperCase(), mat);
+            });
+            return Array.from(map.values());
+          });
+
+          alert(`${mergedList.length} itens processados com sucesso! (${generatedCount} códigos gerados automaticamente)`);
+        }).catch((err) => {
+          console.error('Erro ao salvar importação:', err);
+          alert('Erro ao salvar importação no banco.');
+        });
       } else {
-          alert('Nenhum item novo encontrado ou formato inválido. Use colunas: Codigo, Descricao, Grupo, Unidade, Custo, Estoque');
+        alert('Nenhum item novo encontrado ou formato inválido. Use colunas: Codigo, Descricao, Grupo, Unidade, Custo, Estoque');
       }
-      
-      if(fileInputRef.current) fileInputRef.current.value = '';
+
+      if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsBinaryString(file);
   };
