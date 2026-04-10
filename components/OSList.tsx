@@ -233,20 +233,9 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       return services.filter(s => s.name.toLowerCase().includes(allocSrvSearch.toLowerCase()));
   }, [services, allocSrvSearch]);
 
-  const normalizedOss = useMemo(() => {
-    return (oss || []).map((os: any) => ({
-      ...os,
-      number: os?.number || '',
-      description: os?.description || '',
-      services: Array.isArray(os?.services) ? os.services : [],
-      materials: Array.isArray(os?.materials) ? os.materials : [],
-      executorIds: Array.isArray(os?.executorIds) ? os.executorIds : []
-    }));
-  }, [oss]);
-
   const filteredOSs = useMemo(() => {
     const now = new Date();
-    const filtered = normalizedOss.filter(os => {
+    const filtered = oss.filter(os => {
       const matchesSearch = os.number.toLowerCase().includes(searchTerm.toLowerCase()) || os.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || os.status === statusFilter;
       const matchesPriority = priorityFilter === 'ALL' || os.priority === priorityFilter;
@@ -264,7 +253,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
     }
 
     return filtered;
-  }, [normalizedOss, searchTerm, statusFilter, priorityFilter, slaFilter, openDateSort]);
+  }, [oss, searchTerm, statusFilter, priorityFilter, slaFilter, openDateSort]);
 
   const filteredEquipments = useMemo(() => {
     if (!equipmentCompanyFilter) return equipments;
@@ -289,40 +278,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   }, [currentPage, totalPages]);
 
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
-
-
-
-  const handleOpenOSDetails = async (os: OS) => {
-      try {
-          const baseOS: OS = {
-              ...os,
-              services: Array.isArray((os as any).services) ? (os as any).services : [],
-              materials: Array.isArray((os as any).materials) ? (os as any).materials : [],
-              executorIds: Array.isArray((os as any).executorIds) ? (os as any).executorIds : []
-          };
-
-          setSelectedOS(baseOS);
-
-          const fullOS = await lazyLoader.loadSingleRecord<OS>('oss', os.id);
-
-          if (!fullOS) {
-              return;
-          }
-
-          const safeFullOS: OS = {
-              ...fullOS,
-              services: Array.isArray((fullOS as any).services) ? (fullOS as any).services : [],
-              materials: Array.isArray((fullOS as any).materials) ? (fullOS as any).materials : [],
-              executorIds: Array.isArray((fullOS as any).executorIds) ? (fullOS as any).executorIds : []
-          };
-
-          setSelectedOS(safeFullOS);
-      } catch (error) {
-          console.error('Erro ao carregar OS completa:', error);
-          alert('Erro ao carregar detalhes da OS.');
-      }
-  };
-
+  
   const translatePriority = (p: string) => {
       switch(p) {
           case 'LOW': return 'Baixa';
@@ -567,6 +523,33 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       setSelectedExecutors(prev => [...prev, newUser.id]);
       setShowExecutorModal(false);
       setNewExecutorData({ name: '', email: '', department: '' });
+  };
+
+
+  const handleOpenOSDetails = async (os: OS) => {
+      try {
+          const baseOS: OS = {
+              ...os,
+              services: Array.isArray((os as any).services) ? (os as any).services : [],
+              materials: Array.isArray((os as any).materials) ? (os as any).materials : [],
+              executorIds: Array.isArray((os as any).executorIds) ? (os as any).executorIds : []
+          };
+
+          setSelectedOS(baseOS);
+
+          const fullOS = await lazyLoader.loadSingleRecord<OS>('oss', os.id);
+          if (!fullOS) return;
+
+          setSelectedOS({
+              ...fullOS,
+              services: Array.isArray((fullOS as any).services) ? (fullOS as any).services : [],
+              materials: Array.isArray((fullOS as any).materials) ? (fullOS as any).materials : [],
+              executorIds: Array.isArray((fullOS as any).executorIds) ? (fullOS as any).executorIds : []
+          });
+      } catch (error) {
+          console.error('Erro ao carregar OS completa:', error);
+          alert('Erro ao carregar detalhes da OS.');
+      }
   };
 
   const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
