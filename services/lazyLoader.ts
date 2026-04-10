@@ -77,7 +77,7 @@ class LazyDataLoader {
           console.log(`📦 ${tableName}: loaded ${allData.length} rows`);
         }
 
-        hasMore = data && data.length === pageSize;
+        hasMore = !!(data && data.length === pageSize);
         from += pageSize;
 
         if (!hasMore) break;
@@ -85,7 +85,6 @@ class LazyDataLoader {
 
       const mapped = mapFromSupabase<T>(allData);
 
-      // Add default values for missing fields based on table type
       const normalized = this.normalizeTableData(tableName, mapped);
 
       if (useCache) {
@@ -167,11 +166,13 @@ class LazyDataLoader {
 
   private async waitForLoad(tableName: string, maxWait = 30000): Promise<void> {
     const start = Date.now();
+
     while (this.loadingState.get(tableName)) {
       if (Date.now() - start > maxWait) {
         console.warn(`⚠️ Timeout waiting for ${tableName}`);
         break;
       }
+
       await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
@@ -200,9 +201,11 @@ class LazyDataLoader {
   async loadSingleRecord<T>(tableName: string, id: string): Promise<T | null> {
     console.log(`📄 Loading single ${tableName} record: ${id}`);
 
+    const columns = getTableColumns(tableName, true);
+
     const { data, error } = await supabase
       .from(tableName)
-      .select('*')
+      .select(columns)
       .eq('id', id)
       .maybeSingle();
 
@@ -216,7 +219,8 @@ class LazyDataLoader {
     }
 
     const mapped = mapFromSupabase<T>([data]);
-    return mapped[0] || null;
+    const normalized = this.normalizeTableData(tableName, mapped);
+    return normalized[0] || null;
   }
 }
 
