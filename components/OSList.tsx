@@ -235,7 +235,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
 
   const filteredOSs = useMemo(() => {
     const now = new Date();
-    const filtered = oss.filter(os => {
+    const filtered = normalizedOss.filter(os => {
       const matchesSearch = os.number.toLowerCase().includes(searchTerm.toLowerCase()) || os.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'ALL' || os.status === statusFilter;
       const matchesPriority = priorityFilter === 'ALL' || os.priority === priorityFilter;
@@ -253,7 +253,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
     }
 
     return filtered;
-  }, [oss, searchTerm, statusFilter, priorityFilter, slaFilter, openDateSort]);
+  }, [normalizedOss, searchTerm, statusFilter, priorityFilter, slaFilter, openDateSort]);
 
   const filteredEquipments = useMemo(() => {
     if (!equipmentCompanyFilter) return equipments;
@@ -278,7 +278,51 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   }, [currentPage, totalPages]);
 
   const isEditable = (os: OS) => os.status !== OSStatus.COMPLETED && os.status !== OSStatus.CANCELED;
-  
+
+
+  const normalizedOss = useMemo(() => {
+    return (oss || []).map((os: any) => ({
+      ...os,
+      number: os?.number || '',
+      description: os?.description || '',
+      services: Array.isArray(os?.services) ? os.services : [],
+      materials: Array.isArray(os?.materials) ? os.materials : [],
+      executorIds: Array.isArray(os?.executorIds) ? os.executorIds : []
+    }));
+  }, [oss]);
+
+
+  const handleOpenOSDetails = async (os: OS) => {
+      try {
+          const baseOS: OS = {
+              ...os,
+              services: Array.isArray((os as any).services) ? (os as any).services : [],
+              materials: Array.isArray((os as any).materials) ? (os as any).materials : [],
+              executorIds: Array.isArray((os as any).executorIds) ? (os as any).executorIds : []
+          };
+
+          setSelectedOS(baseOS);
+
+          const fullOS = await lazyLoader.loadSingleRecord<OS>('oss', os.id);
+
+          if (!fullOS) {
+              return;
+          }
+
+          const safeFullOS: OS = {
+              ...fullOS,
+              services: Array.isArray((fullOS as any).services) ? (fullOS as any).services : [],
+              materials: Array.isArray((fullOS as any).materials) ? (fullOS as any).materials : [],
+              executorIds: Array.isArray((fullOS as any).executorIds) ? (fullOS as any).executorIds : []
+          };
+
+          setSelectedOS(safeFullOS);
+      } catch (error) {
+          console.error('Erro ao carregar OS completa:', error);
+          alert('Erro ao carregar detalhes da OS.');
+      }
+  };
+
   const translatePriority = (p: string) => {
       switch(p) {
           case 'LOW': return 'Baixa';
@@ -814,7 +858,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
                    </p>
                  </div>
                  <div className="grid grid-cols-2 gap-4 text-base mb-6"><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Materiais</span><span className="font-bold text-slate-800 text-lg">R$ {formatCurrency(costs.materialCost)}</span></div><div className="bg-slate-50 p-4 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Mão de Obra</span><span className="font-bold text-slate-800 text-lg">{os.services.reduce((a,b)=>a+b.quantity,0)} h</span></div></div>
-                 <div className="grid grid-cols-2 gap-3 text-sm mb-4"><div className="bg-slate-50 p-3 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Abertura</span><span className="font-mono font-bold text-slate-800">{new Date(os.openDate).toLocaleDateString()} {new Date(os.openDate).toLocaleTimeString().slice(0,5)}</span></div><div className={`p-3 rounded-lg border ${isOverdue ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Prazo</span><span className={`font-mono font-bold ${isOverdue ? "text-red-700" : "text-slate-800"}`}>{new Date(os.limitDate).toLocaleDateString()} {new Date(os.limitDate).toLocaleTimeString().slice(0,5)}</span></div></div><div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto"><span title={getStatusTooltip(os.status)} className={`text-sm font-bold uppercase px-3 py-1.5 rounded cursor-help ${os.status === 'COMPLETED' ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' : os.status === 'IN_PROGRESS' ? 'text-blue-800 bg-blue-100 border border-blue-200' : 'text-slate-700 bg-slate-100 border border-slate-200'}`}>{os.status.replace('_', ' ')}</span><button onClick={() => setSelectedOS(os)} className="text-base font-bold text-slate-700 hover:text-white hover:bg-clean-primary px-5 py-2.5 rounded-lg transition-all border border-slate-300 hover:border-clean-primary hover:shadow-md"><i className="fas fa-pen-to-square mr-2"></i> {os.status === OSStatus.COMPLETED ? 'Visualizar' : 'Gerenciar'}</button></div>
+                 <div className="grid grid-cols-2 gap-3 text-sm mb-4"><div className="bg-slate-50 p-3 rounded-lg border border-slate-200"><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Abertura</span><span className="font-mono font-bold text-slate-800">{new Date(os.openDate).toLocaleDateString()} {new Date(os.openDate).toLocaleTimeString().slice(0,5)}</span></div><div className={`p-3 rounded-lg border ${isOverdue ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}><span className="block text-slate-500 font-bold text-xs uppercase mb-1">Prazo</span><span className={`font-mono font-bold ${isOverdue ? "text-red-700" : "text-slate-800"}`}>{new Date(os.limitDate).toLocaleDateString()} {new Date(os.limitDate).toLocaleTimeString().slice(0,5)}</span></div></div><div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto"><span title={getStatusTooltip(os.status)} className={`text-sm font-bold uppercase px-3 py-1.5 rounded cursor-help ${os.status === 'COMPLETED' ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' : os.status === 'IN_PROGRESS' ? 'text-blue-800 bg-blue-100 border border-blue-200' : 'text-slate-700 bg-slate-100 border border-slate-200'}`}>{os.status.replace('_', ' ')}</span><button onClick={() => handleOpenOSDetails(os)} className="text-base font-bold text-slate-700 hover:text-white hover:bg-clean-primary px-5 py-2.5 rounded-lg transition-all border border-slate-300 hover:border-clean-primary hover:shadow-md"><i className="fas fa-pen-to-square mr-2"></i> {os.status === OSStatus.COMPLETED ? 'Visualizar' : 'Gerenciar'}</button></div>
                  {currentUser.role === 'ADMIN' && ( <button onClick={() => handleDelete(os.id)} className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity bg-white border border-red-200 text-red-500 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-50 shadow-sm z-20" title="Excluir OS"><i className="fas fa-trash text-xs"></i></button> )}
               </div>
             );
