@@ -10,7 +10,7 @@ interface LazyLoadOptions {
 
 class LazyDataLoader {
   private loadingState: Map<string, boolean> = new Map();
-  private readonly DEFAULT_PAGE_SIZE = 1000;
+  private readonly DEFAULT_PAGE_SIZE = 100;
   private readonly CACHE_TTL = 5 * 60 * 1000;
 
   async loadTable<T>(
@@ -49,8 +49,7 @@ class LazyDataLoader {
 
       while (hasMore) {
         const to = from + pageSize - 1;
-
-        const columns = getTableColumns(tableName);
+        const columns = getTableColumns(tableName, false);
 
         let query = supabase
           .from(tableName)
@@ -84,8 +83,7 @@ class LazyDataLoader {
       }
 
       const mapped = mapFromSupabase<T>(allData);
-
-      const normalized = this.normalizeTableData(tableName, mapped);
+      const normalized = this.normalizeTableData(tableName, mapped, false);
 
       if (useCache) {
         cacheService.set(cacheKey, normalized, cacheTTL);
@@ -125,20 +123,33 @@ class LazyDataLoader {
       return cached;
     }
 
-    return this.loadTable<T>(tableName, { pageSize: 500 });
+    return this.loadTable<T>(tableName, {
+      pageSize: tableName === 'oss' ? 100 : 500
+    });
   }
 
-  private normalizeTableData<T>(tableName: string, data: T[]): T[] {
+  private normalizeTableData<T>(tableName: string, data: T[], isFull: boolean): T[] {
     if (tableName === 'oss') {
       return data.map((item: any) => ({
         ...item,
-        services: Array.isArray(item.services) ? item.services : [],
-        materials: Array.isArray(item.materials) ? item.materials : [],
-        executorWorkLogs: Array.isArray(item.executorWorkLogs) ? item.executorWorkLogs : [],
-        executorStates: item.executorStates && typeof item.executorStates === 'object' ? item.executorStates : {},
-        pauseHistory: Array.isArray(item.pauseHistory) ? item.pauseHistory : [],
-        manualMaterialItems: Array.isArray(item.manualMaterialItems) ? item.manualMaterialItems : [],
-        manualServiceItems: Array.isArray(item.manualServiceItems) ? item.manualServiceItems : []
+        ...(isFull
+          ? {
+              services: Array.isArray(item.services) ? item.services : [],
+              materials: Array.isArray(item.materials) ? item.materials : [],
+              executorWorkLogs: Array.isArray(item.executorWorkLogs) ? item.executorWorkLogs : [],
+              executorStates:
+                item.executorStates && typeof item.executorStates === 'object'
+                  ? item.executorStates
+                  : {},
+              pauseHistory: Array.isArray(item.pauseHistory) ? item.pauseHistory : [],
+              manualMaterialItems: Array.isArray(item.manualMaterialItems)
+                ? item.manualMaterialItems
+                : [],
+              manualServiceItems: Array.isArray(item.manualServiceItems)
+                ? item.manualServiceItems
+                : []
+            }
+          : {})
       }));
     }
 
@@ -149,8 +160,12 @@ class LazyDataLoader {
         plannedMaterials: Array.isArray(item.plannedMaterials) ? item.plannedMaterials : [],
         auditLogs: Array.isArray(item.auditLogs) ? item.auditLogs : [],
         postponementHistory: Array.isArray(item.postponementHistory) ? item.postponementHistory : [],
-        manualMaterialItems: Array.isArray(item.manualMaterialItems) ? item.manualMaterialItems : [],
-        manualServiceItems: Array.isArray(item.manualServiceItems) ? item.manualServiceItems : []
+        manualMaterialItems: Array.isArray(item.manualMaterialItems)
+          ? item.manualMaterialItems
+          : [],
+        manualServiceItems: Array.isArray(item.manualServiceItems)
+          ? item.manualServiceItems
+          : []
       }));
     }
 
@@ -219,7 +234,7 @@ class LazyDataLoader {
     }
 
     const mapped = mapFromSupabase<T>([data]);
-    const normalized = this.normalizeTableData(tableName, mapped);
+    const normalized = this.normalizeTableData(tableName, mapped, true);
     return normalized[0] || null;
   }
 }
