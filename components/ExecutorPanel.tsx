@@ -288,14 +288,9 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
               pauseHistory: [...(getMyExecState(os)?.pauseHistory || []), pauseEntry]
           });
 
-          // Status global: só PAUSED se todos executores estiverem pausados
-          const allPaused = (os.executorIds || []).length > 0
-            ? (os.executorIds || []).every(id => (nextStates as any)[id]?.status === 'PAUSED')
-            : false;
-
           const updated = {
               executorStates: nextStates,
-              status: allPaused ? OSStatus.PAUSED : (os.status || OSStatus.IN_PROGRESS)
+              status: OSStatus.PAUSED
           };
 
           setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
@@ -390,14 +385,9 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
               pauseHistory: [...(getMyExecState(os)?.pauseHistory || []), resumeEntry]
           });
 
-          // Status global: se algum executor estiver em andamento, IN_PROGRESS
-          const anyInProgress = (os.executorIds || []).length > 0
-            ? (os.executorIds || []).some(id => (nextStates as any)[id]?.status === 'IN_PROGRESS')
-            : true;
-
           const updated = {
               executorStates: nextStates,
-              status: anyInProgress ? OSStatus.IN_PROGRESS : os.status
+              status: OSStatus.IN_PROGRESS
           };
 
           setOss(prev => prev.map(o => o.id === osId ? { ...o, ...updated } : o));
