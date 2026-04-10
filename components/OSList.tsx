@@ -302,7 +302,6 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
           };
 
           setSelectedOS(baseOS);
-          setShowModal(true);
 
           const fullOS = await lazyLoader.loadSingleRecord<OS>('oss', os.id);
 
@@ -506,6 +505,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   };
 
   const openNewOS = () => {
+      setSelectedOS(null);
       setFormOS({
           priority: 'MEDIUM',
           status: OSStatus.OPEN,
