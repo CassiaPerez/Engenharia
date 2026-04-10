@@ -520,8 +520,8 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                        desc = locForm.reason || 'Saida avulsa';
                    }
 
-                   addMovementWithSync({
-                      id: Math.random().toString(36).substr(2, 9),
+                   const movement: StockMovement = {
+                      id: crypto.randomUUID(),
                       type: 'OUT',
                       materialId: m.id,
                       quantity: qty,
@@ -532,29 +532,76 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                       projectId: projectId,
                       osId: osId,
                       costCenter: costCenter
-                  });
+                  };
 
-                  if (osId && setOss) {
-                      setOss(prevOss => prevOss.map(os => {
-                          if (os.number === locForm.osNumber) {
-                              const newMaterial: OSItem = {
-                                  materialId: m.id,
-                                  quantity: qty,
-                                  unitCost: m.unitCost,
+                  console.log('MOVIMENTO FINAL:', movement);
+                  addMovementWithSync(movement);
+
+                  if (osId) {
+                      const selectedOS = allOS.find(os => os.number === locForm.osNumber);
+
+                      if (selectedOS) {
+                          const { data: currentOS, error: osFetchError } = await supabase
+                              .from('oss')
+                              .select('id, materials')
+                              .eq('id', selectedOS.id)
+                              .maybeSingle();
+
+                          if (osFetchError) {
+                              console.error('Erro ao buscar OS para atualizar materiais:', osFetchError);
+                              throw osFetchError;
+                          }
+
+                          const currentMaterials = Array.isArray(currentOS?.materials) ? currentOS.materials : [];
+                          const existingIndex = currentMaterials.findIndex((item: any) => item.materialId === m.id);
+
+                          const materialPayload: OSItem = {
+                              materialId: m.id,
+                              quantity: qty,
+                              unitCost: Number(m.unitCost || 0),
+                              timestamp: new Date().toISOString()
+                          };
+
+                          let updatedMaterials: OSItem[] = [...currentMaterials];
+
+                          if (existingIndex >= 0) {
+                              updatedMaterials[existingIndex] = {
+                                  ...updatedMaterials[existingIndex],
+                                  quantity: Number(updatedMaterials[existingIndex].quantity || 0) + qty,
+                                  unitCost: Number(m.unitCost || 0),
                                   timestamp: new Date().toISOString()
                               };
-
-                              const updatedOS = {
-                                  ...os,
-                                  materials: [...(os.materials || []), newMaterial]
-                              };
-
-                              queueOperation('oss', 'upsert', updatedOS, updatedOS.id);
-
-                              return updatedOS;
+                          } else {
+                              updatedMaterials.push(materialPayload);
                           }
-                          return os;
-                      }));
+
+                          const { error: osUpdateError } = await supabase
+                              .from('oss')
+                              .update({
+                                  materials: updatedMaterials,
+                                  updated_at: new Date().toISOString()
+                              })
+                              .eq('id', selectedOS.id);
+
+                          if (osUpdateError) {
+                              console.error('Erro ao salvar materiais na OS:', osUpdateError);
+                              throw osUpdateError;
+                          }
+
+                          if (setOss) {
+                              setOss(prevOss => prevOss.map(os =>
+                                  os.id === selectedOS.id
+                                      ? { ...os, materials: updatedMaterials }
+                                      : os
+                              ));
+                          }
+
+                          setAllOS(prev => prev.map(os =>
+                              os.id === selectedOS.id
+                                  ? { ...os, materials: updatedMaterials }
+                                  : os
+                          ));
+                      }
                   }
 
               } else if (locAction === 'TRANSFER') {
