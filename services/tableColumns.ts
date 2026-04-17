@@ -26,7 +26,7 @@ export const TABLE_COLUMNS = {
   `,
 
   equipments: 'id, code, name, description, manufacturer, model, serial_number, location, status, notes, updated_at',
-  materials: 'id, code, description, unit, "group", location, status, current_stock, min_stock, unit_cost, updated_at',
+  materials: 'id, code, description, unit, "group", location, status, current_stock, min_stock, unit_cost, stock_locations, updated_at',
   buildings: 'id, name, type, address, city, manager, notes, updated_at',
   services: 'id, name, description, category, team, cost_type, unit_value, updated_at',
   projects: 'id, code, description, detailed_description, category, status, reason_type, reason, responsible, cost_center, location, area, city, start_date, estimated_end_date, estimated_value, sla_days, manual_material_cost, manual_service_cost, extra_materials_value, extra_materials_description, extra_services_value, extra_services_description, updated_at',

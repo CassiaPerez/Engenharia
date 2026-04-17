@@ -405,7 +405,7 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
 
       setMaterials(prev => prev.map(m => {
           if (m.id === selectedMaterialForLoc.id) {
-              let newLocations = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'CD - Central', quantity: m.currentStock }];
+              let newLocations = (m.stockLocations && m.stockLocations.length > 0) ? [...m.stockLocations] : [{ name: m.location || 'CD - Central', quantity: m.currentStock }];
 
               if (locAction === 'ADD') {
                   if (!locForm.location) return m;

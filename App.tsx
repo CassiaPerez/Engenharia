@@ -227,7 +227,7 @@ const App: React.FC = () => {
     setMaterials(prev => prev.map(m => {
       if (m.id === mId) {
         let remainingToDeduct = qty;
-        let newLocations: StockLocation[] = m.stockLocations ? [...m.stockLocations] : [{ name: m.location || 'Geral', quantity: m.currentStock }];
+        let newLocations: StockLocation[] = (m.stockLocations && m.stockLocations.length > 0) ? [...m.stockLocations] : [{ name: m.location || 'Geral', quantity: m.currentStock }];
 
         // Lógica de consumo inteligente de locais
         newLocations = newLocations.map(loc => {
