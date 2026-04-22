@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { OS, OSStatus, Project, Material, ServiceType, OSService, OSItem, OSType, Building, User, Equipment, StockMovement } from '../types';
 import { calculateOSCosts } from '../services/engine';
@@ -103,6 +102,8 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const [quickMat, setQuickMat] = useState({ description: '', unit: 'Un', cost: '' });
 
   const [isSavingItems, setIsSavingItems] = useState(false);
+  const [isLoadingOSDetails, setIsLoadingOSDetails] = useState(false);
+  const [isAddingItem, setIsAddingItem] = useState(false);
 
   const [newItem, setNewItem] = useState<{ id: string, qty: number | '', cost: number | '' }>({ id: '', qty: '', cost: '' });
   const [itemSearchTerm, setItemSearchTerm] = useState('');
@@ -292,49 +293,99 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
   const handleAddItemToOS = async () => {
       if (!selectedOS || !newItem.id || !newItem.qty || !isEditable(selectedOS)) return;
 
-      let updatedOS: OS;
-      if (activeSubTab === 'services') {
-          const serviceTemplate = services.find(s => s.id === newItem.id);
-          if (!serviceTemplate) return;
-          const finalCost = serviceTemplate.unitValue;
-          const newEntry: OSService = { serviceTypeId: serviceTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
-          updatedOS = { ...selectedOS, services: [...selectedOS.services, newEntry] };
-          setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-          setSelectedOS(updatedOS);
-      } else {
-          const materialTemplate = materials.find(m => m.id === newItem.id);
-          if (!materialTemplate) return;
-          if (materialTemplate.currentStock < Number(newItem.qty)) { alert("Estoque insuficiente."); return; }
-          const finalCost = materialTemplate.unitCost;
-          const newEntry: OSItem = { materialId: materialTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
-          onStockChange(materialTemplate.id, Number(newItem.qty), selectedOS.number);
-          updatedOS = { ...selectedOS, materials: [...selectedOS.materials, newEntry] };
-          setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-          setSelectedOS(updatedOS);
+      // PROTEÇÃO CONTRA RACE CONDITION:
+      // Se os detalhes da OS ainda estão carregando, o array de materiais/serviços
+      // pode estar vazio (vindo da listagem leve). Salvar agora sobrescreveria
+      // os itens já existentes no banco com apenas o novo item.
+      if (isLoadingOSDetails) {
+          alert('Aguarde os detalhes da OS terminarem de carregar antes de adicionar itens.');
+          return;
       }
+      if (isAddingItem) return; // evita cliques duplos
+      setIsAddingItem(true);
 
       try {
-          const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
-          if (error) throw error;
-      } catch (e) {
-          console.error('Erro ao salvar item na OS:', e);
-      }
+          // Releitura da OS completa direto do banco ANTES de aplicar a mudança,
+          // garantindo que não sobrescreveremos itens salvos por outro usuário/sessão.
+          const freshOS = await lazyLoader.loadSingleRecord<OS>('oss', selectedOS.id);
+          if (!freshOS) {
+              alert('Não foi possível carregar a OS atualizada. Tente novamente.');
+              return;
+          }
+          const baseOS: OS = {
+              ...freshOS,
+              services: Array.isArray((freshOS as any).services) ? (freshOS as any).services : [],
+              materials: Array.isArray((freshOS as any).materials) ? (freshOS as any).materials : [],
+              executorIds: Array.isArray((freshOS as any).executorIds) ? (freshOS as any).executorIds : []
+          };
 
-      setNewItem({ id: '', qty: '', cost: '' });
-      setItemSearchTerm('');
+          let updatedOS: OS;
+          let isMaterialOp = false;
+          let materialIdForStock: string | null = null;
+          let qtyForStock = 0;
+
+          if (activeSubTab === 'services') {
+              const serviceTemplate = services.find(s => s.id === newItem.id);
+              if (!serviceTemplate) return;
+              const finalCost = serviceTemplate.unitValue;
+              const newEntry: OSService = { serviceTypeId: serviceTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
+              updatedOS = { ...baseOS, services: [...baseOS.services, newEntry] };
+          } else {
+              const materialTemplate = materials.find(m => m.id === newItem.id);
+              if (!materialTemplate) return;
+              if (materialTemplate.currentStock < Number(newItem.qty)) { alert("Estoque insuficiente."); return; }
+              const finalCost = materialTemplate.unitCost;
+              const newEntry: OSItem = { materialId: materialTemplate.id, quantity: Number(newItem.qty), unitCost: finalCost, timestamp: new Date().toISOString() };
+              updatedOS = { ...baseOS, materials: [...baseOS.materials, newEntry] };
+              isMaterialOp = true;
+              materialIdForStock = materialTemplate.id;
+              qtyForStock = Number(newItem.qty);
+          }
+
+          // 1) Persistir PRIMEIRO no banco — só depois atualizamos o estado local
+          //    e damos baixa no estoque. Se o upsert falhar, nada acontece na UI.
+          const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
+          if (error) {
+              console.error('Erro ao salvar item na OS:', error);
+              alert('Falha ao salvar o item na OS: ' + (error.message || 'erro desconhecido'));
+              return;
+          }
+
+          // 2) Baixa de estoque só após o upsert bem-sucedido
+          if (isMaterialOp && materialIdForStock) {
+              onStockChange(materialIdForStock, qtyForStock, baseOS.number);
+          }
+
+          // 3) Atualizar estado local e invalidar cache da listagem
+          setOss(prev => prev.map(o => o.id === updatedOS.id ? updatedOS : o));
+          setSelectedOS(updatedOS);
+          lazyLoader.invalidateCache('oss');
+
+          setNewItem({ id: '', qty: '', cost: '' });
+          setItemSearchTerm('');
+      } catch (e: any) {
+          console.error('Erro ao salvar item na OS:', e);
+          alert('Falha ao salvar o item na OS: ' + (e?.message || 'erro desconhecido'));
+      } finally {
+          setIsAddingItem(false);
+      }
   };
 
   const handleSaveOSItems = async () => {
       if (!selectedOS) return;
+      if (isLoadingOSDetails) {
+          alert('Aguarde os detalhes da OS terminarem de carregar antes de salvar.');
+          return;
+      }
       setIsSavingItems(true);
       try {
           const { error } = await supabase.from('oss').upsert(mapToSupabase(selectedOS));
           if (error) throw error;
           lazyLoader.invalidateCache('oss');
           console.log('Itens da OS salvos com sucesso.');
-      } catch (e) {
+      } catch (e: any) {
           console.error('Erro ao salvar itens da OS:', e);
-          alert('Erro ao salvar itens da OS no banco de dados.');
+          alert('Erro ao salvar itens da OS no banco de dados: ' + (e?.message || 'erro desconhecido'));
       } finally {
           setIsSavingItems(false);
       }
@@ -342,35 +393,79 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
 
   const handleRemoveService = async (index: number) => {
       if (!selectedOS || !isEditable(selectedOS)) return;
+      if (isLoadingOSDetails) {
+          alert('Aguarde os detalhes da OS terminarem de carregar.');
+          return;
+      }
       if (!confirm('Deseja realmente remover este serviço da OS?')) return;
 
-      const updatedServices = selectedOS.services.filter((_, i) => i !== index);
-      const updatedOS = { ...selectedOS, services: updatedServices };
-      setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-      setSelectedOS(updatedOS);
-
       try {
+          // Releitura da OS completa antes de modificar, para evitar sobrescrever
+          // itens recém-adicionados por outra sessão.
+          const freshOS = await lazyLoader.loadSingleRecord<OS>('oss', selectedOS.id);
+          if (!freshOS) {
+              alert('Não foi possível carregar a OS atualizada.');
+              return;
+          }
+          const baseServices: OSService[] = Array.isArray((freshOS as any).services) ? (freshOS as any).services : [];
+          const updatedServices = baseServices.filter((_, i) => i !== index);
+          const updatedOS: OS = {
+              ...freshOS,
+              services: updatedServices,
+              materials: Array.isArray((freshOS as any).materials) ? (freshOS as any).materials : []
+          };
+
           const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
-          if (error) throw error;
-      } catch (e) {
+          if (error) {
+              console.error('Erro ao remover serviço:', error);
+              alert('Falha ao remover serviço: ' + (error.message || 'erro desconhecido'));
+              return;
+          }
+
+          setOss(prev => prev.map(o => o.id === updatedOS.id ? updatedOS : o));
+          setSelectedOS(updatedOS);
+          lazyLoader.invalidateCache('oss');
+      } catch (e: any) {
           console.error('Erro ao remover serviço:', e);
+          alert('Falha ao remover serviço: ' + (e?.message || 'erro desconhecido'));
       }
   };
 
   const handleRemoveMaterial = async (index: number) => {
       if (!selectedOS || !isEditable(selectedOS)) return;
+      if (isLoadingOSDetails) {
+          alert('Aguarde os detalhes da OS terminarem de carregar.');
+          return;
+      }
       if (!confirm('Deseja realmente remover este material da OS?')) return;
 
-      const updatedMaterials = selectedOS.materials.filter((_, i) => i !== index);
-      const updatedOS = { ...selectedOS, materials: updatedMaterials };
-      setOss(prev => prev.map(o => o.id === selectedOS.id ? updatedOS : o));
-      setSelectedOS(updatedOS);
-
       try {
+          const freshOS = await lazyLoader.loadSingleRecord<OS>('oss', selectedOS.id);
+          if (!freshOS) {
+              alert('Não foi possível carregar a OS atualizada.');
+              return;
+          }
+          const baseMaterials: OSItem[] = Array.isArray((freshOS as any).materials) ? (freshOS as any).materials : [];
+          const updatedMaterials = baseMaterials.filter((_, i) => i !== index);
+          const updatedOS: OS = {
+              ...freshOS,
+              materials: updatedMaterials,
+              services: Array.isArray((freshOS as any).services) ? (freshOS as any).services : []
+          };
+
           const { error } = await supabase.from('oss').upsert(mapToSupabase(updatedOS));
-          if (error) throw error;
-      } catch (e) {
+          if (error) {
+              console.error('Erro ao remover material:', error);
+              alert('Falha ao remover material: ' + (error.message || 'erro desconhecido'));
+              return;
+          }
+
+          setOss(prev => prev.map(o => o.id === updatedOS.id ? updatedOS : o));
+          setSelectedOS(updatedOS);
+          lazyLoader.invalidateCache('oss');
+      } catch (e: any) {
           console.error('Erro ao remover material:', e);
+          alert('Falha ao remover material: ' + (e?.message || 'erro desconhecido'));
       }
   };
 
@@ -527,6 +622,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
 
 
   const handleOpenOSDetails = async (os: OS) => {
+      setIsLoadingOSDetails(true);
       try {
           const baseOS: OS = {
               ...os,
@@ -549,6 +645,8 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       } catch (error) {
           console.error('Erro ao carregar OS completa:', error);
           alert('Erro ao carregar detalhes da OS.');
+      } finally {
+          setIsLoadingOSDetails(false);
       }
   };
 
@@ -1300,7 +1398,18 @@ Custo de Materiais e Serviços</label>
                                             <div className="w-24">
                                                 <input type="number" min="0.1" placeholder="Qtd" className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium" value={newItem.qty} onChange={e => setNewItem({ ...newItem, qty: Number(e.target.value) })} />
                                             </div>
-                                            <button onClick={handleAddItemToOS} className="h-10 px-5 bg-slate-800 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors">Adicionar</button>
+                                            <button
+                                                onClick={handleAddItemToOS}
+                                                disabled={isLoadingOSDetails || isAddingItem}
+                                                title={isLoadingOSDetails ? 'Aguarde os detalhes da OS carregarem...' : ''}
+                                                className={`h-10 px-5 rounded-lg font-bold text-sm transition-colors ${
+                                                    (isLoadingOSDetails || isAddingItem)
+                                                        ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                        : 'bg-slate-800 text-white hover:bg-slate-900'
+                                                }`}
+                                            >
+                                                {isAddingItem ? 'Adicionando...' : isLoadingOSDetails ? 'Carregando...' : 'Adicionar'}
+                                            </button>
                                             <button
                                                 type="button"
                                                 onClick={handleSaveOSItems}
