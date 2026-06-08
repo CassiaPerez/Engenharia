@@ -43,6 +43,16 @@ export const mapFromSupabase = <T extends { id: string }>(data: any[] | null): T
         }));
       }
 
+      // Reconstruct costItems from manual_material_items / manual_service_items
+      const matItems: any[] = Array.isArray(camelCased.manualMaterialItems) ? camelCased.manualMaterialItems : [];
+      const srvItems: any[] = Array.isArray(camelCased.manualServiceItems) ? camelCased.manualServiceItems : [];
+      if (matItems.length > 0 || srvItems.length > 0) {
+        camelCased.costItems = [
+          ...matItems.map((i: any) => ({ id: i.id || Math.random().toString(36).substr(2,9), type: 'MATERIAL', description: i.description || '', amount: Number(i.value) || 0 })),
+          ...srvItems.map((i: any) => ({ id: i.id || Math.random().toString(36).substr(2,9), type: 'SERVICE', description: i.description || '', amount: Number(i.value) || 0 })),
+        ];
+      }
+
       const result: any = {
         ...camelCased,
         id,
@@ -167,12 +177,22 @@ export const mapToSupabase = <T extends { id: string }>(item: T) => {
   if ('postponementHistory' in rest) normalizedData.postponement_history = rest.postponementHistory;
 
   // Custos manuais
+  // costItems is the unified list in UI; split into manual_material_items / manual_service_items for persistence
+  if ('costItems' in rest && Array.isArray(rest.costItems)) {
+    normalizedData.manual_material_items = rest.costItems
+      .filter((i: any) => i.type === 'MATERIAL')
+      .map((i: any) => ({ id: i.id, description: i.description, value: i.amount }));
+    normalizedData.manual_service_items = rest.costItems
+      .filter((i: any) => i.type === 'SERVICE')
+      .map((i: any) => ({ id: i.id, description: i.description, value: i.amount }));
+  } else {
+    if ('manualMaterialItems' in rest) normalizedData.manual_material_items = rest.manualMaterialItems;
+    if ('manualServiceItems' in rest) normalizedData.manual_service_items = rest.manualServiceItems;
+  }
   if ('manualMaterialCost' in rest) normalizedData.manual_material_cost = rest.manualMaterialCost;
   if ('manualServiceCost' in rest) normalizedData.manual_service_cost = rest.manualServiceCost;
   if ('manualMaterialDescription' in rest) normalizedData.manual_material_description = rest.manualMaterialDescription;
   if ('manualServiceDescription' in rest) normalizedData.manual_service_description = rest.manualServiceDescription;
-  if ('manualMaterialItems' in rest) normalizedData.manual_material_items = rest.manualMaterialItems;
-  if ('manualServiceItems' in rest) normalizedData.manual_service_items = rest.manualServiceItems;
 
   // SUPPLIERS
   if ('cnpj' in rest) normalizedData.cnpj = rest.cnpj;

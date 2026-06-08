@@ -2,7 +2,6 @@
 import { OS, Material, ServiceType, Project, OSStatus, ServiceCostType, User, Equipment } from '../types';
 
 export const calculateOSCosts = (os: OS, materials: Material[], services: ServiceType[]) => {
-  // Usa valor manual se definido, senão calcula pela soma dos itens
   const calculatedMaterialCost = os.materials.reduce((acc, item) => {
     return acc + (item.quantity * item.unitCost);
   }, 0);
@@ -11,13 +10,22 @@ export const calculateOSCosts = (os: OS, materials: Material[], services: Servic
     return acc + (srvEntry.quantity * srvEntry.unitCost);
   }, 0);
 
+  // costItems são itens manuais avulsos lançados direto na OS
+  const costItems: any[] = (os as any).costItems || [];
+  const costItemsMaterial = costItems
+    .filter((i: any) => i.type === 'MATERIAL')
+    .reduce((acc: number, i: any) => acc + (Number(i.amount) || 0), 0);
+  const costItemsService = costItems
+    .filter((i: any) => i.type === 'SERVICE')
+    .reduce((acc: number, i: any) => acc + (Number(i.amount) || 0), 0);
+
   const materialCost = os.manualMaterialCost !== undefined && os.manualMaterialCost !== null
     ? os.manualMaterialCost
-    : calculatedMaterialCost;
+    : calculatedMaterialCost + costItemsMaterial;
 
   const serviceCost = os.manualServiceCost !== undefined && os.manualServiceCost !== null
     ? os.manualServiceCost
-    : calculatedServiceCost;
+    : calculatedServiceCost + costItemsService;
 
   return {
     materialCost,

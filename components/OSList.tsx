@@ -382,6 +382,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
           const { error } = await supabase.from('oss').upsert(mapToSupabase(selectedOS));
           if (error) throw error;
           lazyLoader.invalidateCache('oss');
+          setOss(prev => prev.map(o => o.id === selectedOS.id ? selectedOS : o));
           console.log('Itens da OS salvos com sucesso.');
       } catch (e: any) {
           console.error('Erro ao salvar itens da OS:', e);

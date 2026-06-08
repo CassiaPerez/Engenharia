@@ -130,8 +130,17 @@ class LazyDataLoader {
 
   private normalizeTableData<T>(tableName: string, data: T[], isFull: boolean): T[] {
     if (tableName === 'oss') {
-      return data.map((item: any) => ({
+      return data.map((item: any) => {
+        // Reconstruct costItems from persisted manual_material_items / manual_service_items
+        const matItems: any[] = Array.isArray(item.manualMaterialItems) ? item.manualMaterialItems : [];
+        const srvItems: any[] = Array.isArray(item.manualServiceItems) ? item.manualServiceItems : [];
+        const costItems = [
+          ...matItems.map((i: any) => ({ id: i.id || Math.random().toString(36).substr(2,9), type: 'MATERIAL', description: i.description || '', amount: Number(i.value) || 0 })),
+          ...srvItems.map((i: any) => ({ id: i.id || Math.random().toString(36).substr(2,9), type: 'SERVICE', description: i.description || '', amount: Number(i.value) || 0 })),
+        ];
+        return ({
         ...item,
+        costItems,
 
         // IMPORTANTE: mesmo na listagem leve, manter arrays vazios
         // para a UI não quebrar ao calcular custo/horas.
@@ -160,7 +169,8 @@ class LazyDataLoader {
               manualMaterialItems: [],
               manualServiceItems: []
             })
-      }));
+        });
+      });
     }
 
     if (tableName === 'projects') {

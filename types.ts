@@ -148,6 +148,13 @@ export interface ExecutorState {
   currentPauseReason?: string;
 }
 
+export interface OSCostItem {
+  id: string;
+  type: 'MATERIAL' | 'SERVICE';
+  description: string;
+  amount: number;
+}
+
 export interface OS {
   id: string;
   number: string;
@@ -175,6 +182,7 @@ export interface OS {
   executionDescription?: string;
   materials: OSItem[];
   services: OSService[];
+  costItems?: OSCostItem[];
   manualMaterialCost?: number;
   manualServiceCost?: number;
 }
