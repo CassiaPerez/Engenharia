@@ -1214,6 +1214,158 @@ const Reports: React.FC<Props> = ({
     doc.save(`Relatorio_Geral_OS_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
+  const generateEquipmentReport = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const today = new Date().toLocaleDateString('pt-BR');
+    addHeader(doc, 'RELATÓRIO DE EQUIPAMENTOS', `Gerado em: ${today}`);
+
+    const statusLabel: Record<string, string> = {
+      ACTIVE: 'Ativo',
+      MAINTENANCE: 'Manutenção',
+      INACTIVE: 'Inativo',
+    };
+
+    // Summary stats
+    const totalEquip = equipments.length;
+    const active = equipments.filter(e => e.status === 'ACTIVE').length;
+    const maintenance = equipments.filter(e => e.status === 'MAINTENANCE').length;
+    const inactive = equipments.filter(e => e.status === 'INACTIVE').length;
+
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    doc.text(
+      `Total: ${totalEquip}  |  Ativos: ${active}  |  Em Manutenção: ${maintenance}  |  Inativos: ${inactive}`,
+      14,
+      30
+    );
+    doc.setTextColor(0, 0, 0);
+
+    // OS count per equipment
+    const osCountByEquip: Record<string, number> = {};
+    oss.forEach(o => {
+      if (o.equipmentId) osCountByEquip[o.equipmentId] = (osCountByEquip[o.equipmentId] || 0) + 1;
+    });
+
+    // OS cost per equipment
+    const osCostByEquip: Record<string, number> = {};
+    oss.forEach(o => {
+      if (!o.equipmentId) return;
+      const cost = calculateOSCosts(o, materials, services).totalCost;
+      osCostByEquip[o.equipmentId] = (osCostByEquip[o.equipmentId] || 0) + cost;
+    });
+
+    const rows = equipments
+      .sort((a, b) => a.location.localeCompare(b.location) || a.code.localeCompare(b.code))
+      .map(e => [
+        e.code,
+        e.name,
+        e.description,
+        e.manufacturer,
+        e.model,
+        e.serialNumber,
+        e.location,
+        e.purchaseDate ? new Date(e.purchaseDate).toLocaleDateString('pt-BR') : '-',
+        statusLabel[e.status] || e.status,
+        String(osCountByEquip[e.id] || 0),
+        `R$ ${formatCurrency(osCostByEquip[e.id] || 0)}`,
+        e.notes || '-',
+      ]);
+
+    autoTable(doc, {
+      startY: 36,
+      head: [['TAG', 'Nome', 'Descrição', 'Fabricante', 'Modelo', 'Série', 'Empresa', 'Aquisição', 'Status', 'OS', 'Custo Total OS', 'Observações']],
+      body: rows,
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [50, 60, 70], fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 18 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 32 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 22 },
+        5: { cellWidth: 20 },
+        6: { cellWidth: 20 },
+        7: { cellWidth: 18 },
+        8: { cellWidth: 18, halign: 'center' },
+        9: { cellWidth: 10, halign: 'center' },
+        10: { cellWidth: 22, halign: 'right' },
+        11: { cellWidth: 'auto' },
+      },
+      didParseCell: (data) => {
+        if (data.column.index === 8 && data.section === 'body') {
+          const val = String(data.cell.raw);
+          if (val === 'Em Manutenção') data.cell.styles.textColor = [180, 100, 0];
+          else if (val === 'Inativo') data.cell.styles.textColor = [180, 0, 0];
+          else if (val === 'Ativo') data.cell.styles.textColor = [0, 120, 60];
+        }
+      },
+    });
+
+    // Summary table by company/location
+    const locationMap: Record<string, { total: number; active: number; maintenance: number; inactive: number; cost: number }> = {};
+    equipments.forEach(e => {
+      if (!locationMap[e.location]) locationMap[e.location] = { total: 0, active: 0, maintenance: 0, inactive: 0, cost: 0 };
+      locationMap[e.location].total += 1;
+      if (e.status === 'ACTIVE') locationMap[e.location].active += 1;
+      else if (e.status === 'MAINTENANCE') locationMap[e.location].maintenance += 1;
+      else if (e.status === 'INACTIVE') locationMap[e.location].inactive += 1;
+      locationMap[e.location].cost += osCostByEquip[e.id] || 0;
+    });
+
+    const summaryRows = Object.entries(locationMap)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([loc, s]) => [loc, String(s.total), String(s.active), String(s.maintenance), String(s.inactive), `R$ ${formatCurrency(s.cost)}`]);
+
+    const finalY = (doc as any).lastAutoTable?.finalY ?? 200;
+    const summaryStartY = finalY + 10;
+
+    if (summaryStartY < 180) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Resumo por Empresa / Localidade', 14, summaryStartY);
+      doc.setFont('helvetica', 'normal');
+
+      autoTable(doc, {
+        startY: summaryStartY + 5,
+        head: [['Empresa / Localidade', 'Total', 'Ativos', 'Manutenção', 'Inativos', 'Custo Total OS']],
+        body: summaryRows,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [80, 100, 120] },
+        columnStyles: {
+          1: { halign: 'center' },
+          2: { halign: 'center' },
+          3: { halign: 'center' },
+          4: { halign: 'center' },
+          5: { halign: 'right', fontStyle: 'bold' },
+        },
+      });
+    } else {
+      doc.addPage();
+      addHeader(doc, 'RELATÓRIO DE EQUIPAMENTOS — Resumo por Empresa', `Gerado em: ${today}`);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Resumo por Empresa / Localidade', 14, 32);
+      doc.setFont('helvetica', 'normal');
+
+      autoTable(doc, {
+        startY: 38,
+        head: [['Empresa / Localidade', 'Total', 'Ativos', 'Manutenção', 'Inativos', 'Custo Total OS']],
+        body: summaryRows,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [80, 100, 120] },
+        columnStyles: {
+          1: { halign: 'center' },
+          2: { halign: 'center' },
+          3: { halign: 'center' },
+          4: { halign: 'center' },
+          5: { halign: 'right', fontStyle: 'bold' },
+        },
+      });
+    }
+
+    doc.save(`Relatorio_Equipamentos_${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="border-b border-slate-200 pb-6">
@@ -1407,6 +1559,21 @@ const Reports: React.FC<Props> = ({
           <button
             onClick={generateCompanyCostReport}
             className="mt-auto px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-colors flex items-center gap-2 w-full justify-center"
+          >
+            <i className="fas fa-file-pdf"></i> Gerar PDF
+          </button>
+        </div>
+
+        {/* EQUIPMENT REPORT */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-col items-start group">
+          <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-lg flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+            <i className="fas fa-cogs"></i>
+          </div>
+          <h3 className="font-bold text-lg text-slate-800 mb-2">Relatório de Equipamentos</h3>
+          <p className="text-slate-500 text-sm mb-6">Todos os equipamentos com status, empresa, número de OS e custo total.</p>
+          <button
+            onClick={generateEquipmentReport}
+            className="mt-auto px-6 py-3 bg-teal-600 text-white rounded-lg font-bold text-sm hover:bg-teal-700 transition-colors flex items-center gap-2 w-full justify-center"
           >
             <i className="fas fa-file-pdf"></i> Gerar PDF
           </button>
