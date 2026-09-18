@@ -28,6 +28,11 @@ export const TABLE_COLUMNS = {
     manual_service_description,
     manual_material_items,
     manual_service_items,
+    executor_states,
+    pause_reason,
+    pause_history,
+    completion_image,
+    execution_description,
     start_time,
     end_time,
     updated_at

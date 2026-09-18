@@ -164,10 +164,17 @@ class LazyDataLoader {
             }
           : {
               executorWorkLogs: [],
-              executorStates: {},
-              pauseHistory: [],
-              manualMaterialItems: [],
-              manualServiceItems: []
+              executorStates:
+                item.executorStates && typeof item.executorStates === 'object'
+                  ? item.executorStates
+                  : {},
+              pauseHistory: Array.isArray(item.pauseHistory) ? item.pauseHistory : [],
+              manualMaterialItems: Array.isArray(item.manualMaterialItems)
+                ? item.manualMaterialItems
+                : [],
+              manualServiceItems: Array.isArray(item.manualServiceItems)
+                ? item.manualServiceItems
+                : []
             })
         });
       });
