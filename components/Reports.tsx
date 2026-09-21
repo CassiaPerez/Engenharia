@@ -9,6 +9,7 @@ import {
   groupCostsByCompanyWithBreakdown,
   buildExecutorHoursRows,
 } from '../services/engine';
+import { fetchCompletionImages, getOsIdsWithCompletionImage } from '../services/osImages';
 
 interface Props {
   materials: Material[];
@@ -49,6 +50,7 @@ const Reports: React.FC<Props> = ({
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedExecutor, setSelectedExecutor] = useState<string>('');
+  const [isGeneratingEvidence, setIsGeneratingEvidence] = useState(false);
 
   const formatCurrency = (val: number) =>
     (Number(val) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -804,6 +806,19 @@ const Reports: React.FC<Props> = ({
   // ✅ Relatório por Executor com evidências (pausas + materiais manuais + imagens)
   // -----------------------------
   const generateExecutorReportWithEvidence = async () => {
+    if (isGeneratingEvidence) return;
+    setIsGeneratingEvidence(true);
+    try {
+      await buildExecutorReportWithEvidence();
+    } catch (error) {
+      console.error('Erro ao gerar relatório com evidências:', error);
+      alert('Não foi possível gerar o relatório com evidências. Tente novamente.');
+    } finally {
+      setIsGeneratingEvidence(false);
+    }
+  };
+
+  const buildExecutorReportWithEvidence = async () => {
     const doc = new jsPDF({ orientation: 'portrait' });
     const today = new Date().toLocaleString('pt-BR');
 
@@ -900,10 +915,20 @@ const Reports: React.FC<Props> = ({
       doc.text('Evidências (imagens de finalização):', 14, y);
       y += 6;
 
-      const osWithEvidence = osForExec
-        .map(o => ({ os: o, ev: getEvidence(o) }))
-        .filter(x => !!x.ev)
+      // As fotos não vêm na listagem de OSs: busca só as que vão para o PDF.
+      const idsWithPhoto = await getOsIdsWithCompletionImage(
+        osForExec.filter(o => !getEvidence(o)).map(o => o.id)
+      );
+      const osToShow = osForExec
+        .filter(o => !!getEvidence(o) || idsWithPhoto.has(o.id))
         .slice(0, maxOsPerExecutorWithImages);
+      const photos = await fetchCompletionImages(
+        osToShow.filter(o => !getEvidence(o)).map(o => o.id)
+      );
+
+      const osWithEvidence = osToShow
+        .map(o => ({ os: o, ev: getEvidence(o) || photos.get(o.id) || null }))
+        .filter(x => !!x.ev);
 
       if (!osWithEvidence.length) {
         doc.setFont('helvetica', 'normal');
@@ -1606,9 +1631,14 @@ const Reports: React.FC<Props> = ({
           </p>
           <button
             onClick={() => { void generateExecutorReportWithEvidence(); }}
-            className="mt-auto px-6 py-3 bg-emerald-700 text-white rounded-lg font-bold text-sm hover:bg-emerald-800 transition-colors flex items-center gap-2 w-full justify-center"
+            disabled={isGeneratingEvidence}
+            className="mt-auto px-6 py-3 bg-emerald-700 text-white rounded-lg font-bold text-sm hover:bg-emerald-800 transition-colors flex items-center gap-2 w-full justify-center disabled:opacity-60 disabled:cursor-wait"
           >
-            <i className="fas fa-file-pdf"></i> Gerar PDF com evidências
+            {isGeneratingEvidence ? (
+              <><i className="fas fa-spinner fa-spin"></i> Carregando fotos...</>
+            ) : (
+              <><i className="fas fa-file-pdf"></i> Gerar PDF com evidências</>
+            )}
           </button>
         </div>
       </div>
