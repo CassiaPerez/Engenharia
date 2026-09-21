@@ -7,6 +7,7 @@ import { supabase, mapToSupabase } from '../services/supabase';
 import { canEditField } from '../services/permissions';
 import ModalPortal from './ModalPortal';
 import { lazyLoader } from '../services/lazyLoader';
+import { fetchCompletionImage } from '../services/osImages';
 
 interface Props {
   oss: OS[];
@@ -670,7 +671,17 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
       return { label: '---', sub: '', type: 'UNKNOWN' }; 
   };
   
-  const generateOSDetailPDF = (os: OS) => {
+  const generateOSDetailPDF = async (os: OS) => {
+    // A foto não vem na listagem; busca se os detalhes da OS ainda não a trouxeram.
+    let completionImage = os.completionImage || null;
+    if (!completionImage) {
+      try {
+        completionImage = await fetchCompletionImage(os.id);
+      } catch (e) {
+        console.error('Erro ao carregar foto da OS para o PDF:', e);
+      }
+    }
+
     const doc = new jsPDF();
     const context = getContextInfo(os);
     const osExecutors = os.executorIds ? users.filter(u => os.executorIds?.includes(u.id)) : (os.executorId ? [users.find(u => u.id === os.executorId)].filter(Boolean) : []);
@@ -751,7 +762,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         y += execLines.length * 5 + 10;
     }
 
-    if (os.completionImage) {
+    if (completionImage) {
         if (y > 200) {
             doc.addPage();
             y = 40;
@@ -763,7 +774,7 @@ const [activeSubTab, setActiveSubTab] = useState<'services' | 'materials'>('serv
         y += 8;
 
         try {
-            doc.addImage(os.completionImage, 'JPEG', 14, y, 90, 90);
+            doc.addImage(completionImage, 'JPEG', 14, y, 90, 90);
             y += 100;
         } catch (e) {
             doc.setFont("helvetica", "italic");
