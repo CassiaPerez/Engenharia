@@ -147,33 +147,35 @@ const App: React.FC = () => {
         setTimeout(async () => {
           try {
             console.log('📦 Loading secondary data in background...');
+            setSyncStatus('syncing');
 
-            const [projects, oss, equipments, materials] = await Promise.all([
-              lazyLoader.loadOnDemand<Project>('projects'),
-              lazyLoader.loadOnDemand<OS>('oss'),
-              lazyLoader.loadOnDemand<Equipment>('equipments'),
-              lazyLoader.loadOnDemand<Material>('materials')
+            // allSettled + setState por tabela: se uma tabela falhar, as outras aparecem mesmo assim
+            const secondary = await Promise.allSettled([
+              lazyLoader.loadOnDemand<Project>('projects').then(setProjects),
+              lazyLoader.loadOnDemand<OS>('oss').then(setOss),
+              lazyLoader.loadOnDemand<Equipment>('equipments').then(setEquipments),
+              lazyLoader.loadOnDemand<Material>('materials').then(setMaterials)
             ]);
-
-            setProjects(projects);
-            setOss(oss);
-            setEquipments(equipments);
-            setMaterials(materials);
 
             console.log('✅ Secondary data loaded');
 
             // FASE 3: Dados menos críticos por último
-            const [movements, suppliers, purchases] = await Promise.all([
-              lazyLoader.loadOnDemand<StockMovement>('stock_movements'),
-              lazyLoader.loadOnDemand('suppliers'),
-              lazyLoader.loadOnDemand<PurchaseRecord>('purchases')
+            const tertiary = await Promise.allSettled([
+              lazyLoader.loadOnDemand<StockMovement>('stock_movements').then(setMovements),
+              lazyLoader.loadOnDemand('suppliers').then(setSuppliers),
+              lazyLoader.loadOnDemand<PurchaseRecord>('purchases').then(setPurchases)
             ]);
 
-            setMovements(movements);
-            setSuppliers(suppliers);
-            setPurchases(purchases);
-
-            console.log('✅ All data loaded!');
+            const failed = [...secondary, ...tertiary].filter(
+              (r): r is PromiseRejectedResult => r.status === 'rejected'
+            );
+            if (failed.length > 0) {
+              console.error('⚠️ Some tables failed to load:', failed.map(r => r.reason));
+              setSyncStatus('error');
+            } else {
+              setSyncStatus('online');
+              console.log('✅ All data loaded!');
+            }
 
             // Setup real-time subscriptions for OSs
             const ossChannel = supabase
