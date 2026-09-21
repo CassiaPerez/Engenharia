@@ -1,6 +1,8 @@
 export const TABLE_COLUMNS = {
   users: 'id, name, email, password, role, department, avatar, active, company, updated_at',
 
+  // Sem completion_image: a foto (base64) de centenas de OSs estourava o statement
+  // timeout (57014). Ela vem no registro completo (TABLE_COLUMNS_FULL) ou via services/osImages.ts.
   oss: `
     id,
     number,
@@ -31,7 +33,6 @@ export const TABLE_COLUMNS = {
     executor_states,
     pause_reason,
     pause_history,
-    completion_image,
     execution_description,
     start_time,
     end_time,
