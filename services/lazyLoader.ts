@@ -96,9 +96,9 @@ class LazyDataLoader {
       const mapped = mapFromSupabase<T>(allData);
       const normalized = this.normalizeTableData(tableName, mapped, false);
 
-      if (useCache) {
-        cacheService.set(cacheKey, normalized, cacheTTL);
-      }
+      // Grava sempre, mesmo com useCache=false: quem está em waitForLoad lê o resultado daqui.
+      // Sem isso, a carga inicial que esperava o refresh do painel do executor recebia [] e apagava a lista.
+      cacheService.set(cacheKey, normalized, cacheTTL);
 
       console.log(`✅ ${tableName}: completed (${normalized.length} rows)`);
       return normalized;
