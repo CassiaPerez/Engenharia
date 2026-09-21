@@ -2,6 +2,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { OS, User, OSStatus, Project, Building, ServiceType, Material, Equipment } from '../types';
 import ModalPortal from './ModalPortal';
+import CompletionPhoto from './CompletionPhoto';
 import { supabase, mapToSupabase } from '../services/supabase';
 
 interface Props {
@@ -626,13 +627,8 @@ const ExecutorPanel: React.FC<Props> = ({ user, oss, setOss, projects, buildings
                    </button>
                 </div>
                 
-                {os.status === OSStatus.COMPLETED && os.completionImage && (
-                    <div className="mt-2 relative">
-                        <img src={os.completionImage} alt="Evidência" className="w-full h-32 object-cover rounded-lg border border-slate-200 opacity-80" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm"><i className="fas fa-check-circle text-clean-primary mr-1"></i> Evidência Enviada</span>
-                        </div>
-                    </div>
+                {os.status === OSStatus.COMPLETED && (
+                    <CompletionPhoto osId={os.id} src={os.completionImage} />
                 )}
             </div>
         </div>
