@@ -10,8 +10,9 @@ interface LazyLoadOptions {
 
 class LazyDataLoader {
   private loadingState: Map<string, boolean> = new Map();
-  private readonly DEFAULT_PAGE_SIZE = 100;
+  private readonly DEFAULT_PAGE_SIZE = 500;
   private readonly CACHE_TTL = 5 * 60 * 1000;
+  private readonly MAX_RETRIES = 2;
 
   async loadTable<T>(
     tableName: string,
@@ -51,20 +52,30 @@ class LazyDataLoader {
         const to = from + pageSize - 1;
         const columns = getTableColumns(tableName, false);
 
-        let query = supabase
-          .from(tableName)
-          .select(columns)
-          .range(from, to);
+        const fetchPage = () => {
+          let query = supabase
+            .from(tableName)
+            .select(columns)
+            .range(from, to);
 
-        if (tableName === 'oss') {
-          query = query.order('open_date', { ascending: false, nullsFirst: false });
-        } else if (tableName === 'materials') {
-          query = query.order('code', { ascending: true });
-        } else if (tableName === 'projects') {
-          query = query.order('code', { ascending: true });
+          if (tableName === 'oss') {
+            query = query.order('open_date', { ascending: false, nullsFirst: false });
+          } else if (tableName === 'materials') {
+            query = query.order('code', { ascending: true });
+          } else if (tableName === 'projects') {
+            query = query.order('code', { ascending: true });
+          }
+
+          return query;
+        };
+
+        // Timeout (57014) ou queda de rede costumam ser momentâneos: tenta de novo antes de desistir.
+        let { data, error } = await fetchPage();
+        for (let attempt = 1; error && attempt <= this.MAX_RETRIES; attempt++) {
+          console.warn(`⚠️ Retrying ${tableName} rows ${from}-${to} (attempt ${attempt}):`, error.message);
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+          ({ data, error } = await fetchPage());
         }
-
-        const { data, error } = await query;
 
         if (error) {
           console.error(`❌ Error loading ${tableName}:`, error);
@@ -123,9 +134,7 @@ class LazyDataLoader {
       return cached;
     }
 
-    return this.loadTable<T>(tableName, {
-      pageSize: tableName === 'oss' ? 100 : 500
-    });
+    return this.loadTable<T>(tableName);
   }
 
   private normalizeTableData<T>(tableName: string, data: T[], isFull: boolean): T[] {
