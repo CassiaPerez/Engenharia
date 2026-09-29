@@ -8,6 +8,7 @@ import {
   groupCostsByCompany,
   groupCostsByCompanyWithBreakdown,
   buildExecutorHoursRows,
+  resolveCompanyForOS,
 } from '../services/engine';
 import { fetchCompletionImages, getOsIdsWithCompletionImage } from '../services/osImages';
 
@@ -44,12 +45,14 @@ const Reports: React.FC<Props> = ({
   buildings = [],
   equipments = [],
 }) => {
+  const allEquipments = equipments;
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedEquipment, setSelectedEquipment] = useState('');
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedExecutor, setSelectedExecutor] = useState<string>('');
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [isGeneratingEvidence, setIsGeneratingEvidence] = useState(false);
 
   const formatCurrency = (val: number) =>
@@ -79,6 +82,62 @@ const Reports: React.FC<Props> = ({
     return true;
   };
 
+  // -----------------------------
+  // Filtro por Empresa
+  // Empresa da OS = empresa do equipamento (location) ou do projeto (location)
+  // -----------------------------
+  const UNKNOWN_COMPANY = 'Não informado';
+  const normalizeCompany = (v?: string | null) => String(v || '').trim().toLowerCase();
+
+  const companyOptions = Array.from(
+    new Set(
+      [
+        ...equipments.map(e => String(e.location || '').trim()),
+        ...projects.map(p => String(p.location || '').trim()),
+      ].filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  const matchesCompany = (company?: string | null) => {
+    if (!selectedCompany) return true;
+    const c = String(company || '').trim() || UNKNOWN_COMPANY;
+    return normalizeCompany(c) === normalizeCompany(selectedCompany);
+  };
+
+  const getOSCompany = (os: any) => resolveCompanyForOS(os, equipments, projects);
+
+  const getProjectCompany = (projectId?: string) => {
+    if (!projectId) return '';
+    return String(projects.find(p => p.id === projectId)?.location || '').trim();
+  };
+
+  // Resolve a empresa de qualquer item (OS, movimentação de estoque etc.)
+  const getItemCompany = (item: any): string => {
+    if (!item) return UNKNOWN_COMPANY;
+    // É uma OS
+    if (Array.isArray(item.materials) || item.number !== undefined || item.equipmentId || item.buildingId) {
+      if (item.equipmentId || item.projectId) return getOSCompany(item);
+    }
+    // Movimentação vinculada a uma OS
+    if (item.osId) {
+      const os = oss.find(o => o.id === item.osId);
+      if (os) return getOSCompany(os);
+    }
+    // Movimentação/baixa direta em projeto
+    if (item.projectId) {
+      const pc = getProjectCompany(item.projectId);
+      if (pc) return pc;
+    }
+    // Movimentação de estoque: local de origem/destino ou local do material
+    if (item.materialId) {
+      const loc = item.fromLocation || item.toLocation || materials.find(m => m.id === item.materialId)?.location;
+      if (loc) return String(loc).trim();
+    }
+    return UNKNOWN_COMPANY;
+  };
+
+  const osMatchesCompany = (os: any) => matchesCompany(getOSCompany(os));
+
   const applyFilters = (data: any[]) => {
     let filtered = [...data];
 
@@ -100,6 +159,7 @@ const Reports: React.FC<Props> = ({
     if (selectedEquipment) filtered = filtered.filter((item: any) => item.equipmentId === selectedEquipment);
     if (selectedBuilding) filtered = filtered.filter((item: any) => item.buildingId === selectedBuilding);
     if (selectedProject) filtered = filtered.filter((item: any) => item.projectId === selectedProject);
+    if (selectedCompany) filtered = filtered.filter((item: any) => matchesCompany(getItemCompany(item)));
 
     return filtered;
   };
@@ -233,6 +293,11 @@ const Reports: React.FC<Props> = ({
     if (dateFrom || dateTo) {
       doc.setFontSize(8);
       doc.text(`Período: ${dateFrom || 'Início'} até ${dateTo || 'Hoje'}`, pageW - 14, 20, { align: 'right' });
+    }
+
+    if (selectedCompany) {
+      doc.setFontSize(8);
+      doc.text(`Empresa: ${selectedCompany}`, 14, 21);
     }
 
     doc.setTextColor(0, 0, 0);
@@ -370,7 +435,15 @@ const Reports: React.FC<Props> = ({
           })
         : normalized;
 
-      if (filteredByExec.length) return filteredByExec;
+      // filtra por empresa (engine não conhece o filtro de empresa)
+      const filteredByCompany = selectedCompany
+        ? filteredByExec.filter(row => {
+            const os = oss.find(o => o.id === row.osId || (o as any).number === row.osNumber);
+            return os ? osMatchesCompany(os) : false;
+          })
+        : filteredByExec;
+
+      if (filteredByCompany.length) return filteredByCompany;
     } catch {
       // ignora e usa fallback
     }
@@ -440,7 +513,8 @@ const Reports: React.FC<Props> = ({
     const doc = new jsPDF({ orientation: 'landscape' });
     const today = new Date().toLocaleDateString('pt-BR');
 
-    const filteredProjects = selectedProject ? projects.filter(p => p.id === selectedProject) : projects;
+    const filteredProjects = (selectedProject ? projects.filter(p => p.id === selectedProject) : projects)
+      .filter(p => matchesCompany(p.location));
     const filteredOSs = applyFilters(oss);
     const filteredMovements = applyFilters(movements);
 
@@ -518,6 +592,7 @@ const Reports: React.FC<Props> = ({
     const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
 
     const periodMovements = movements.filter(m => {
+      if (selectedCompany && !matchesCompany(getItemCompany(m))) return false;
       const d = parseAnyDate(m.date);
       if (!d) return true;
       if (from && d < from) return false;
@@ -583,6 +658,10 @@ const Reports: React.FC<Props> = ({
 
     let yPos = 35;
 
+    // Aplica filtro de empresa (se houver)
+    const companyOS = oss.filter(o => osMatchesCompany(o));
+    const companyEquipments = equipments.filter(eq => matchesCompany(eq.location));
+
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('1. CUSTOS POR EDIFÍCIO (FACILITIES)', 14, yPos);
@@ -590,10 +669,11 @@ const Reports: React.FC<Props> = ({
 
     const buildingCosts = buildings
       .map(b => {
-        const relatedOS = oss.filter(o => (o as any).buildingId === b.id && (o as any).status !== 'CANCELED');
+        const relatedOS = companyOS.filter(o => (o as any).buildingId === b.id && (o as any).status !== 'CANCELED');
         const totalCost = relatedOS.reduce((acc, os) => acc + (calculateOSCosts as any)(os, materials, services).totalCost, 0);
         return [b.name, b.city, relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
       })
+      .filter(row => !selectedCompany || Number(row[2]) > 0)
       .sort((a, b) => {
         const valA = parseFloat(String(a[3]).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
         const valB = parseFloat(String(b[3]).replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
@@ -614,9 +694,9 @@ const Reports: React.FC<Props> = ({
     doc.text('2. CUSTOS POR EQUIPAMENTO (MANUTENÇÃO)', 14, yPos);
     yPos += 5;
 
-    const equipmentCosts = equipments
+    const equipmentCosts = companyEquipments
       .map(eq => {
-        const relatedOS = oss.filter(o => (o as any).equipmentId === eq.id && (o as any).status !== 'CANCELED');
+        const relatedOS = companyOS.filter(o => (o as any).equipmentId === eq.id && (o as any).status !== 'CANCELED');
         const totalCost = relatedOS.reduce((acc, os) => acc + (calculateOSCosts as any)(os, materials, services).totalCost, 0);
         return [eq.code, eq.name, (eq as any).status || '-', relatedOS.length, `R$ ${formatCurrency(totalCost)}`];
       })
@@ -645,7 +725,7 @@ const Reports: React.FC<Props> = ({
     doc.text('3. TOP 30 ORDENS DE SERVIÇO MAIS CARAS', 14, yPos);
     yPos += 5;
 
-    const osCosts = oss
+    const osCosts = companyOS
       .filter(o => (o as any).status !== 'CANCELED')
       .map(o => {
         const costs = (calculateOSCosts as any)(o, materials, services);
@@ -723,6 +803,7 @@ const Reports: React.FC<Props> = ({
 
     // Filtra OS por período usando openDate/startTime/limitDate/endTime como fallback
     const periodOS = oss.filter(o => {
+      if (selectedCompany && !osMatchesCompany(o)) return false;
       const d = new Date(o.openDate || o.startTime || o.limitDate || o.endTime || new Date().toISOString());
       if (from && d < from) return false;
       if (to && d > to) return false;
@@ -1244,6 +1325,9 @@ const Reports: React.FC<Props> = ({
     const today = new Date().toLocaleDateString('pt-BR');
     addHeader(doc, 'RELATÓRIO DE EQUIPAMENTOS', `Gerado em: ${today}`);
 
+    // Aplica filtro de empresa (se houver)
+    const equipments = allEquipments.filter(e => matchesCompany(e.location));
+
     const statusLabel: Record<string, string> = {
       ACTIVE: 'Ativo',
       MAINTENANCE: 'Manutenção',
@@ -1279,8 +1363,8 @@ const Reports: React.FC<Props> = ({
       osCostByEquip[o.equipmentId] = (osCostByEquip[o.equipmentId] || 0) + cost;
     });
 
-    const rows = equipments
-      .sort((a, b) => a.location.localeCompare(b.location) || a.code.localeCompare(b.code))
+    const rows = [...equipments]
+      .sort((a, b) => String(a.location || '').localeCompare(String(b.location || '')) || String(a.code || '').localeCompare(String(b.code || '')))
       .map(e => [
         e.code,
         e.name,
@@ -1404,7 +1488,7 @@ const Reports: React.FC<Props> = ({
           Filtros de Período e Contexto
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data Inicial</label>
             <input
@@ -1488,6 +1572,23 @@ const Reports: React.FC<Props> = ({
                     {u.name}
                   </option>
                 ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Empresa</label>
+            <select
+              className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium"
+              value={selectedCompany}
+              onChange={e => setSelectedCompany(e.target.value)}
+            >
+              <option value="">Todas</option>
+              {companyOptions.map(c => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value={UNKNOWN_COMPANY}>{UNKNOWN_COMPANY}</option>
             </select>
           </div>
         </div>
