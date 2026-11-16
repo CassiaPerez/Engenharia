@@ -44,6 +44,11 @@ const Inventory: React.FC<Props> = ({ materials, movements, setMaterials, onAddM
   const [searchTerm, setSearchTerm] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
 
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportCompany, setExportCompany] = useState<string>('ALL');
+  const [exportGroup, setExportGroup] = useState<string>('ALL');
+  const [exportSeparateByGroup, setExportSeparateByGroup] = useState(true);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [showModal, setShowModal] = useState(false);
@@ -1089,6 +1094,10 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                 </button>
             </div>
 
+            <button onClick={() => setShowExportModal(true)} className="bg-white border border-slate-300 text-slate-700 hover:text-emerald-700 hover:border-emerald-500 px-5 py-3 rounded-xl font-bold text-sm uppercase transition-all shadow-sm flex items-center gap-2 h-[52px]">
+                <i className="fas fa-file-export"></i> Exportar Excel
+            </button>
+
             <button onClick={openNewItemModal} className="bg-clean-primary text-white px-6 py-3 rounded-xl font-bold text-sm uppercase hover:bg-clean-primary/90 shadow-lg shadow-clean-primary/20 flex items-center gap-2 transition-all h-[52px]">
                 <i className="fas fa-plus"></i> Novo Item
             </button>
@@ -1299,6 +1308,143 @@ const handleUpdateMaterial = async (e: React.FormEvent) => {
                </table>
            </div>
         </div>
+      )}
+
+      {/* MODAL DE EXPORTAÇÃO EXCEL */}
+      {showExportModal && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[9999]">
+            <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-md transition-opacity" onClick={() => setShowExportModal(false)} />
+            <div className="absolute inset-0 overflow-y-auto p-4 flex justify-center items-center">
+              <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+                <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center shrink-0">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">Exportar Almoxarifado</h3>
+                    <p className="text-sm text-slate-500 mt-1">Filtre e exporte os itens para Excel.</p>
+                  </div>
+                  <button onClick={() => setShowExportModal(false)} className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 transition-colors">
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-5">
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Empresa / Almoxarifado</label>
+                    <select
+                      className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base font-medium text-slate-800 focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/15 transition-all"
+                      value={exportCompany}
+                      onChange={e => setExportCompany(e.target.value)}
+                    >
+                      <option value="ALL">Todas as Empresas</option>
+                      <option value="Central">Central</option>
+                      <option value="Cropbio">Cropbio</option>
+                      <option value="Cropfert">Cropfert</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Grupo / Categoria</label>
+                    <select
+                      className="w-full h-12 px-4 bg-white border border-slate-200 rounded-xl text-base font-medium text-slate-800 focus:border-clean-primary focus:ring-2 focus:ring-clean-primary/15 transition-all"
+                      value={exportGroup}
+                      onChange={e => setExportGroup(e.target.value)}
+                    >
+                      <option value="ALL">Todos os Grupos</option>
+                      {Array.from(new Set(materials.map(m => m.group).filter(Boolean))).sort().map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <label className="flex items-center gap-3 cursor-pointer bg-slate-50 p-4 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 text-clean-primary rounded focus:ring-clean-primary"
+                      checked={exportSeparateByGroup}
+                      onChange={e => setExportSeparateByGroup(e.target.checked)}
+                    />
+                    <div>
+                      <span className="text-sm font-bold text-slate-800">Separar por Grupo</span>
+                      <p className="text-xs text-slate-500 mt-0.5">Cada grupo em uma aba (planilha) separada dentro do mesmo arquivo.</p>
+                    </div>
+                  </label>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-3">
+                    <i className="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                    <p className="text-sm text-blue-800">
+                      Serão exportados <strong>{(() => {
+                        let list = materials;
+                        if (exportCompany !== 'ALL') {
+                          if (exportCompany === 'Cropbio') list = list.filter(m => m.location === 'Cropbio' || m.location === 'Laboratório de defensivos');
+                          else if (exportCompany === 'Cropfert') list = list.filter(m => m.location === 'Cropfert' || m.location === 'Cropfert Jandaia');
+                          else if (exportCompany === 'Central') list = list.filter(m => m.location === 'CD - Central');
+                        }
+                        if (exportGroup !== 'ALL') list = list.filter(m => m.group === exportGroup);
+                        return list.length;
+                      })()}</strong> itens.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="px-6 py-4 bg-white border-t border-slate-100 flex justify-end gap-3 shrink-0">
+                  <button onClick={() => setShowExportModal(false)} className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-xl border border-slate-200 transition-all">Cancelar</button>
+                  <button
+                    onClick={() => {
+                      let list = [...materials];
+                      if (exportCompany === 'Cropbio') list = list.filter(m => m.location === 'Cropbio' || m.location === 'Laboratório de defensivos');
+                      else if (exportCompany === 'Cropfert') list = list.filter(m => m.location === 'Cropfert' || m.location === 'Cropfert Jandaia');
+                      else if (exportCompany === 'Central') list = list.filter(m => m.location === 'CD - Central');
+                      if (exportGroup !== 'ALL') list = list.filter(m => m.group === exportGroup);
+
+                      if (list.length === 0) { alert('Nenhum item encontrado com os filtros selecionados.'); return; }
+
+                      const buildRow = (m: Material) => ({
+                        'Código': m.code,
+                        'Descrição': m.description,
+                        'Grupo': m.group,
+                        'Unidade': m.unit,
+                        'Estoque Mínimo': m.minStock,
+                        'Saldo Total': m.currentStock,
+                        'Local Padrão': m.location,
+                        'Locais (Qtd)': (m.stockLocations || []).map(l => `${l.name}: ${l.quantity}`).join('; '),
+                        'Valor Unit.': Number(m.unitCost || 0),
+                        'Valor Total': Number((m.unitCost || 0) * (m.currentStock || 0)),
+                        'Status': m.currentStock <= m.minStock ? 'Repor' : 'OK'
+                      });
+
+                      const wscols = [{wch:15},{wch:35},{wch:18},{wch:8},{wch:12},{wch:12},{wch:18},{wch:35},{wch:14},{wch:14},{wch:10}];
+                      const wb = XLSX.utils.book_new();
+
+                      if (exportSeparateByGroup) {
+                        const groups = Array.from(new Set(list.map(m => m.group || 'Sem Grupo'))).sort();
+                        groups.forEach(g => {
+                          const groupItems = list.filter(m => (m.group || 'Sem Grupo') === g);
+                          const rows = groupItems.map(buildRow);
+                          const ws = XLSX.utils.json_to_sheet(rows);
+                          ws['!cols'] = wscols;
+                          const safeName = g.replace(/[\\/\?\*\[\]:]/g, '-').substring(0, 31);
+                          XLSX.utils.book_append_sheet(wb, ws, safeName || 'Geral');
+                        });
+                      } else {
+                        const rows = list.map(buildRow);
+                        const ws = XLSX.utils.json_to_sheet(rows);
+                        ws['!cols'] = wscols;
+                        XLSX.utils.book_append_sheet(wb, ws, 'Almoxarifado');
+                      }
+
+                      const suffix = exportCompany !== 'ALL' ? `_${exportCompany}` : '';
+                      XLSX.writeFile(wb, `Almoxarifado${suffix}.xlsx`);
+                      setShowExportModal(false);
+                    }}
+                    className="px-6 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
+                  >
+                    <i className="fas fa-file-excel"></i> Exportar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* MODAL DE CRIAÇÃO (Premium Style) */}
